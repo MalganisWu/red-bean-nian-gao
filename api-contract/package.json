@@ -1,0 +1,36 @@
+{
+  "name": "@red-bean/api-contract",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.5.2",
+  "engines": {
+    "node": ">=24.9.0 <26",
+    "pnpm": ">=11 <12"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.mjs\" \"*.{js,json}\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.mjs\" \"*.{js,json}\"",
+    "lint": "eslint \"src/**/*.ts\"",
+    "test": "pnpm build && node --test \"test/**/*.test.mjs\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.3.0",
+    "globals": "^17.6.0",
+    "prettier": "^3.9.6",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.59.2"
+  },
+  "dependencies": {
+    "zod": "^4.5.4"
+  }
+}
