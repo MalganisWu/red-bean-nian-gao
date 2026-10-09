@@ -1,0 +1,155 @@
+import type { AgentJsonObject, AgentJsonValue } from '../../model/json-value.js'
+import {
+  STREAM_EVENT_TYPES,
+  type LocalizedStatusEvent,
+  type ProductStreamEvent,
+  type StreamErrorEvent,
+} from '../../run/model/agent-run.js'
+import {
+  AGENT_EVENT_TYPES,
+  AGENT_STATUS_CODES,
+  type AgentRuntimeEvent,
+  type AgentStatusEvent,
+} from '../../run/model/agent-runtime-event.js'
+import { SESSION_STORE_ERROR_CODES, SessionStoreError } from '../../session/model/session.js'
+import { AppError } from '../../../../shared/http/error-mapper.js'
+import { optionalField } from '../../../../shared/object/optional-field.js'
+
+/** 将领域或应用错误映射为不会泄漏内部细节的 SSE 错误事件。 */
+export function toStreamErrorEvent(error: unknown): StreamErrorEvent {
+  if (error instanceof SessionStoreError) {
+    if (error.code === SESSION_STORE_ERROR_CODES.NOT_FOUND) {
+      return { type: 'error', code: 4004, message: '会话不存在' }
+    }
+    if (error.code === SESSION_STORE_ERROR_CODES.INTERACTION_CONFLICT) {
+      return { type: 'error', code: 4009, message: '交互不存在或已处理' }
+    }
+  }
+  if (error instanceof AppError) {
+    return { type: 'error', code: error.code, message: error.message }
+  }
+  return { type: 'error', code: 5000, message: '服务器内部错误' }
+}
+
+/** 在 HTTP 展示边界为 Runtime 状态补充产品文案。 */
+export function localizeRuntimeEvent(event: AgentStatusEvent): LocalizedStatusEvent
+export function localizeRuntimeEvent(event: ProductStreamEvent): ProductStreamEvent
+export function localizeRuntimeEvent(event: ProductStreamEvent): ProductStreamEvent {
+  if (event.type === AGENT_EVENT_TYPES.STATUS) return localizedStatus(event)
+  if (event.type !== STREAM_EVENT_TYPES.AGENT_EVENT) return event
+  // 信封的 `event` 字段与来源同名：先解构剔除再显式回填，避免展开后又覆盖同一个键。
+  const { event: nested, ...envelope } = event
+  return { ...envelope, event: localizeRuntimeEvent(nested) }
+}
+
+/** 将产品事件序列化为稳定的 SSE 帧。 */
+export function serializeSseEvent(event: ProductStreamEvent): string {
+  const localized = localizeRuntimeEvent(event)
+  return `event: ${localized.type}\ndata: ${JSON.stringify(eventPayload(localized))}\n\n`
+}
+
+function eventPayload(event: ProductStreamEvent): AgentJsonObject {
+  switch (event.type) {
+    case STREAM_EVENT_TYPES.START:
+      return {
+        request_id: event.requestId,
+        session_id: event.sessionId,
+        trace_id: event.traceId,
+      }
+    case STREAM_EVENT_TYPES.DONE:
+      return { tokens_used: event.tokensUsed, session_id: event.sessionId }
+    case STREAM_EVENT_TYPES.ERROR:
+      return { code: event.code, message: event.message }
+    case STREAM_EVENT_TYPES.HEARTBEAT:
+      return { timestamp: event.timestamp }
+    case STREAM_EVENT_TYPES.CARD:
+      return {
+        interaction_id: event.interactionId,
+        status: event.status,
+        questions: event.questions,
+      }
+    case STREAM_EVENT_TYPES.AGENT_EVENT:
+      return {
+        agent_id: event.agentId,
+        agent_name: event.agentName,
+        execution_id: event.executionId,
+        parent_call_id: event.parentCallId,
+        event_type: event.eventType,
+        event: eventPayload(localizeRuntimeEvent(event.event)),
+      }
+    case AGENT_EVENT_TYPES.STATUS: {
+      const localized = localizedStatus(event)
+      const payload: Record<string, AgentJsonValue> = { content: localized.content }
+      if (localized.code !== undefined) payload['code'] = localized.code
+      if (localized.attempt !== undefined && localized.attempt !== 0) {
+        payload['attempt'] = localized.attempt
+      }
+      if (localized.maxAttempts !== undefined && localized.maxAttempts !== 0) {
+        payload['max_attempts'] = localized.maxAttempts
+      }
+      return payload
+    }
+    case AGENT_EVENT_TYPES.COMPACTION:
+    case AGENT_EVENT_TYPES.REASON:
+    case AGENT_EVENT_TYPES.TOKEN:
+    case AGENT_EVENT_TYPES.TOOL_RESULT:
+    case AGENT_EVENT_TYPES.TOOL_START:
+      return serializeAgentRuntimeEvent(event)
+  }
+}
+
+function localizedStatus(event: AgentStatusEvent | LocalizedStatusEvent): LocalizedStatusEvent {
+  const attempt = event.attempt ?? 0
+  const maxAttempts = event.maxAttempts ?? 0
+  let content = '处理中...'
+  switch (event.code) {
+    case AGENT_STATUS_CODES.THINKING:
+      content = '思考中...'
+      break
+    case AGENT_STATUS_CODES.ANALYZING_RESULTS:
+      content = '正在分析结果...'
+      break
+    case AGENT_STATUS_CODES.LLM_RETRY:
+      content = `LLM 请求失败，正在进行第 ${String(Math.max(attempt - 1, 1))}/${String(Math.max(maxAttempts - 1, 1))} 次重试...`
+      break
+    case AGENT_STATUS_CODES.LLM_EMPTY_RESPONSE_RETRY:
+      content = `LLM 返回空响应，正在重试 (${String(attempt)}/${String(maxAttempts)})...`
+      break
+    case undefined:
+      break
+  }
+  return {
+    type: AGENT_EVENT_TYPES.STATUS,
+    ...optionalField('code', event.code),
+    ...optionalField('attempt', event.attempt),
+    ...optionalField('maxAttempts', event.maxAttempts),
+    content,
+  }
+}
+
+function serializeAgentRuntimeEvent(
+  event: Exclude<AgentRuntimeEvent, AgentStatusEvent>
+): AgentJsonObject {
+  switch (event.type) {
+    case AGENT_EVENT_TYPES.TOKEN:
+      return { content: event.content }
+    case AGENT_EVENT_TYPES.TOOL_START:
+      return { tool_name: event.toolName, call_id: event.callId, params: event.params }
+    case AGENT_EVENT_TYPES.TOOL_RESULT:
+      return {
+        tool_name: event.toolName,
+        call_id: event.callId,
+        content: event.content,
+        ...(event.error === undefined || event.error === '' ? {} : { error: event.error }),
+      }
+    case AGENT_EVENT_TYPES.REASON:
+      return { content: event.content, step: event.step, timestamp: event.timestamp }
+    case AGENT_EVENT_TYPES.COMPACTION:
+      return {
+        trigger: event.trigger,
+        pre_tokens: event.preTokens,
+        post_tokens: event.postTokens,
+        messages_summarized: event.messagesSummarized,
+      }
+  }
+}

@@ -1,0 +1,249 @@
+import {
+  AgentRuntime,
+  RuntimeExecutionError,
+  serializeCheckpoint,
+  type AgentRequest,
+  type ResumeRequest,
+} from 'red-bean-qing-tuan'
+import { type MessageHook, type RawMessage, type RuntimeContext } from 'red-bean-qing-tuan/pipeline'
+import type { TracerPort } from '../../../../shared/observability/tracer.js'
+
+import type {
+  AgentExecutionCommand,
+  AgentExecutionMessageObserver,
+  AgentExecutionOutcome,
+  AgentExecutionPort,
+} from '../port/agent-executor.js'
+import { EXECUTION_COMMAND_KINDS, EXECUTION_OUTCOME_STATUSES } from '../port/agent-executor.js'
+import type { StoredRuntimeState } from '../model/runtime-state.js'
+import {
+  fromRuntimeMessage,
+  fromRuntimeMessages,
+  toRuntimeMessages,
+} from './runtime-message-mapper.js'
+import { fromRuntimeEvent } from './runtime-event-mapper.js'
+import { parseStoredRuntimeState } from './runtime-state-codec.js'
+import { optionalField } from '../../../../shared/object/optional-field.js'
+
+/** 将业务执行命令适配到 SDK；所有 SDK DTO 转换都收口在此处。
+ * 失败语义：SDK 抛出的 `RuntimeExecutionError` 携带已产生的 result 快照，本适配器
+ * 不丢弃它——映射为带 error 的宿主结果，让上层仍能持久化部分进展。 */
+export class RuntimeAgentExecutor implements AgentExecutionPort {
+  readonly #tracer: TracerPort | undefined
+
+  public constructor(tracer?: TracerPort) {
+    this.#tracer = tracer
+  }
+
+  public async execute(
+    command: AgentExecutionCommand,
+    signal: AbortSignal
+  ): Promise<AgentExecutionOutcome> {
+    const runtime = new AgentRuntime({
+      model: command.definition.model,
+      toolSchemas: command.definition.tools,
+      toolDispatcher: command.definition.dispatcher,
+      systemPrompt: command.definition.systemPrompt,
+      modelParams: command.definition.modelParams,
+      runtimeConfig: command.definition.runtimeConfig,
+      ...(command.eventSink === undefined
+        ? {}
+        : {
+            eventSink: {
+              publish: (event): void => command.eventSink?.publish(fromRuntimeEvent(event)),
+            },
+          }),
+      ...(command.messageObserver === undefined
+        ? {}
+        : { messageHook: new ObserverMessageHook(command.messageObserver) }),
+    })
+    const parsedState =
+      command.state === undefined ? undefined : parseStoredRuntimeState(command.state)
+    // 增量恢复消息（上次崩溃后未入主快照）按消息键去重合并进状态，避免重复消费。
+    const state =
+      parsedState === undefined
+        ? undefined
+        : {
+            ...parsedState,
+            messages: appendWithoutOverlap(
+              parsedState.messages,
+              toRuntimeMessages(command.recoveryMessages ?? [])
+            ),
+          }
+    const run = async (): Promise<AgentExecutionOutcome> => {
+      try {
+        // resume 分支才携带 interruptId/response 语义（回答询问卡片/中断恢复）；
+        // run 分支传 messages，且仅在无显式 state 但有 recovery 时把增量消息作为 history。
+        const resumeRequest: ResumeRequest = {
+          threadId: command.sessionId,
+          userId: command.userId,
+          requestId: command.runId,
+          traceId: command.traceId,
+          interruptId: command.interruptId ?? '',
+          response: command.response ?? '',
+          ...optionalField('state', state),
+        }
+        const runRequest: AgentRequest = {
+          threadId: command.sessionId,
+          userId: command.userId,
+          requestId: command.runId,
+          traceId: command.traceId,
+          messages: toRuntimeMessages(command.messages ?? []),
+          ...(state === undefined && (command.recoveryMessages?.length ?? 0) > 0
+            ? { history: toRuntimeMessages(command.recoveryMessages ?? []) }
+            : {}),
+          ...optionalField('state', state),
+        }
+        const result =
+          command.kind === EXECUTION_COMMAND_KINDS.RESUME
+            ? await runtime.resume(resumeRequest, signal)
+            : await runtime.run(runRequest, signal)
+        return outcome(result)
+      } catch (cause: unknown) {
+        // SDK 执行失败但留下结果快照：映射为失败结果而非异常上抛，上层可持久化部分进展。
+        if (!(cause instanceof RuntimeExecutionError)) throw cause
+        return outcome(cause.result, cause)
+      } finally {
+        // 无论成败都关闭 SDK 运行实例（5s 预算），挂起的资源不能泄漏。
+        await runtime.close(AbortSignal.timeout(5_000))
+      }
+    }
+    // 观测：整段执行包在一个 agent.execute span 里，落 session/run/trace 维度。
+    if (this.#tracer === undefined) return run()
+    const span = this.#tracer.start({
+      name: 'agent.execute',
+      attributes: [
+        { key: 'session.id', value: command.sessionId },
+        { key: 'run.id', value: command.runId },
+        { key: 'trace.id', value: command.traceId },
+      ],
+    })
+    try {
+      const result = await span.within(run)
+      span.end(result.error)
+      return result
+    } catch (cause: unknown) {
+      span.end(cause instanceof Error ? cause : new Error(String(cause)))
+      throw cause
+    }
+  }
+}
+
+class ObserverMessageHook implements MessageHook {
+  readonly #observer: AgentExecutionMessageObserver
+
+  public constructor(observer: AgentExecutionMessageObserver) {
+    this.#observer = observer
+  }
+
+  public onUserMessage(
+    _context: RuntimeContext,
+    message: RawMessage,
+    signal: AbortSignal
+  ): Promise<void> {
+    return this.#observer.observe(fromRuntimeMessage(message), signal)
+  }
+
+  public onAssistantMessage(
+    _context: RuntimeContext,
+    message: RawMessage,
+    signal: AbortSignal
+  ): Promise<void> {
+    return this.#observer.observe(fromRuntimeMessage(message), signal)
+  }
+
+  public onToolMessage(
+    _context: RuntimeContext,
+    message: RawMessage,
+    signal: AbortSignal
+  ): Promise<void> {
+    return this.#observer.observe(fromRuntimeMessage(message), signal)
+  }
+}
+
+/** 崩溃恢复去重：checkpoint 已含 base，增量 suffix 头部可能与 base 尾部重叠（消息已入库），
+ * 按完整消息键找到最大重叠后缀后拼接，避免重复消息进入下一次运行。 */
+function appendWithoutOverlap(
+  base: readonly RawMessage[],
+  suffix: readonly RawMessage[]
+): RawMessage[] {
+  const max = Math.min(base.length, suffix.length)
+  let overlap = 0
+  for (let size = max; size > 0; size -= 1) {
+    const left = base.slice(base.length - size).map(serializeMessageKey)
+    const right = suffix.slice(0, size).map(serializeMessageKey)
+    if (left.every((value, index): boolean => value === right[index])) {
+      overlap = size
+      break
+    }
+  }
+  return [...base, ...suffix.slice(overlap)]
+}
+
+function serializeMessageKey(message: RawMessage): string {
+  return JSON.stringify(message)
+}
+
+/** 把 SDK 结果投影为宿主执行结果：checkpoint 序列化为 StoredRuntimeState，
+ * 状态语义按 SDK status 分发（completed / suspended(中断) / cancelled / exhausted / failed）。 */
+function outcome(
+  result: {
+    readonly status: AgentExecutionOutcome['status']
+    readonly output: string
+    readonly messages: readonly RawMessage[]
+    readonly checkpoint: Parameters<typeof serializeCheckpoint>[0]
+    readonly tokensUsed: number
+    readonly finishReason: string
+  },
+  executionError?: Error
+): AgentExecutionOutcome {
+  const state: StoredRuntimeState = {
+    engine: 'qing-tuan',
+    version: result.checkpoint.version,
+    payload: serializeCheckpoint(result.checkpoint),
+  }
+  const base = {
+    output: result.output,
+    messages: fromRuntimeMessages(result.messages),
+    state,
+    tokensUsed: result.tokensUsed,
+    finishReason: result.finishReason,
+  }
+  switch (result.status) {
+    case EXECUTION_OUTCOME_STATUSES.COMPLETED:
+      return { ...base, status: EXECUTION_OUTCOME_STATUSES.COMPLETED }
+    case EXECUTION_OUTCOME_STATUSES.SUSPENDED: {
+      const interrupt = result.checkpoint.interrupt
+      if (interrupt === undefined) {
+        return {
+          ...base,
+          status: EXECUTION_OUTCOME_STATUSES.FAILED,
+          error: new Error('暂停结果缺少 interrupt'),
+        }
+      }
+      return {
+        ...base,
+        status: EXECUTION_OUTCOME_STATUSES.SUSPENDED,
+        interrupt: {
+          id: interrupt.toolCallId,
+          toolName: interrupt.toolName,
+          arguments: interrupt.arguments,
+        },
+      }
+    }
+    case EXECUTION_OUTCOME_STATUSES.CANCELLED:
+      return { ...base, status: EXECUTION_OUTCOME_STATUSES.CANCELLED, reason: result.finishReason }
+    case EXECUTION_OUTCOME_STATUSES.EXHAUSTED:
+      return {
+        ...base,
+        status: EXECUTION_OUTCOME_STATUSES.EXHAUSTED,
+        usage: { tokensUsed: result.tokensUsed },
+      }
+    case EXECUTION_OUTCOME_STATUSES.FAILED:
+      return {
+        ...base,
+        status: EXECUTION_OUTCOME_STATUSES.FAILED,
+        error: executionError ?? new Error(result.finishReason || 'Agent 执行失败'),
+      }
+  }
+}

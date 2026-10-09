@@ -1,0 +1,244 @@
+import type { IdGenerator } from '../../../../shared/id/id-generator.js'
+import type { CancelRegistryPort } from '../../cancellation/port/cancellation-registry.port.js'
+import type { AnswerMarker } from '../../session/model/session.js'
+import type { AgentRunServicePort } from '../../run/port/agent-run-service.port.js'
+import type { AgentRunRequest } from '../../run/model/agent-run.js'
+import type {
+  AnswerChatCommand,
+  CancelChatCommand,
+  StartedChatRun,
+  StartChatCommand,
+} from '../model/chat-command.js'
+import { normalizeError } from '../../../../shared/errors/normalize-error.js'
+import type { ChatRunLifecyclePort, ChatUseCasePort } from '../port/chat-use-case.port.js'
+import { ChatUseCaseError } from '../port/chat-use-case.port.js'
+import type { ChatRunHandle } from '../stream/chat-run-handle.js'
+import { optionalField } from '../../../../shared/object/optional-field.js'
+
+interface ActiveRun {
+  readonly handle: ChatRunHandle
+  readonly cleanup: Promise<void>
+}
+
+/**
+ * 一次运行启动的完整输入：认证上下文 + 已解析的本轮消息，缺省标识已由服务补齐。
+ * 具名类型让 `#startRun` 的参数不再是无名结构——调用点读方法名即可知道传的是什么。
+ */
+interface ChatRunInput {
+  readonly userId: string
+  readonly traceId: string
+  readonly signal: AbortSignal
+  readonly sessionId: string
+  readonly agentId: string
+  readonly messages: StartChatCommand['messages']
+  readonly answer?: AnswerMarker | undefined
+}
+
+/**
+ * Chat 用例默认实现：统一拥有消息选择、ID、取消注册和活动运行生命周期。
+ */
+export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort {
+  readonly #runService: AgentRunServicePort
+  readonly #cancelRegistry: CancelRegistryPort
+  readonly #idGenerator: IdGenerator
+  readonly #activeRuns = new Map<string, ActiveRun>()
+  readonly #startingRuns = new Set<Promise<StartedChatRun>>()
+  readonly #shutdownController = new AbortController()
+  #draining = false
+
+  public constructor(options: {
+    readonly runService: AgentRunServicePort
+    readonly cancelRegistry: CancelRegistryPort
+    readonly idGenerator: IdGenerator
+  }) {
+    this.#runService = options.runService
+    this.#cancelRegistry = options.cancelRegistry
+    this.#idGenerator = options.idGenerator
+  }
+
+  /** 发起新一轮对话。前置要求：会话需有本轮 user 消息（否则拒绝）；缺省 sessionId/agentId 补默认值。 */
+  public start(command: StartChatCommand): Promise<StartedChatRun> {
+    const messages = selectMessagesForTurn(command.messages, command.sessionId)
+    if (messages.length === 0) {
+      throw new ChatUseCaseError('missing_user_message', '已有会话缺少本轮 user 消息')
+    }
+    return this.#trackStart(this.#startRun(this.#newRunInput(command, messages)))
+  }
+
+  /** 回答询问卡片：把答案包装为 AnswerMarker 走 resume 语义；回答路径不携带新消息。 */
+  public answer(command: AnswerChatCommand): Promise<StartedChatRun> {
+    return this.#trackStart(this.#startRun(this.#resumeRunInput(command)))
+  }
+
+  /** 取消单个请求：走取消注册表（按 userId+requestId），不作用于整个会话。 */
+  public async cancel(command: CancelChatCommand): Promise<void> {
+    await this.#cancelRegistry.cancel(cancelRegistryKey(command.userId, command.requestId))
+  }
+
+  /**
+   * 停机排空：置 draining（拒绝新启动）→ 中止所有活动运行 → 等启动中与清理全部落地；
+   * 每个阶段受外部 signal 约束，超时由调用方处理，不无限等待。
+   */
+  public async shutdown(signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted()
+    this.#draining = true
+    this.#shutdownController.abort(new Error('Chat 服务正在停机'))
+    const finalizations = this.#closeActiveRuns()
+    await raceWithAbort(
+      Promise.allSettled([...this.#startingRuns]).then((): void => {}),
+      signal
+    )
+    finalizations.push(...this.#closeActiveRuns())
+    await raceWithAbort(
+      Promise.all(finalizations).then((): void => {}),
+      signal
+    )
+  }
+
+  /** 新会话运行输入：缺省 sessionId/agentId 在此一次补齐，字段与 `ChatRunInput` 逐一对应。 */
+  #newRunInput(command: StartChatCommand, messages: ChatRunInput['messages']): ChatRunInput {
+    return {
+      userId: command.userId,
+      traceId: command.traceId,
+      signal: command.signal,
+      sessionId: command.sessionId ?? this.#idGenerator.generate('SESS'),
+      agentId: command.agentId ?? 'default',
+      messages,
+    }
+  }
+
+  /** 恢复运行输入：回答路径不携带新消息，答案归一化为 AnswerMarker。 */
+  #resumeRunInput(command: AnswerChatCommand): ChatRunInput {
+    return {
+      userId: command.userId,
+      traceId: command.traceId,
+      signal: command.signal,
+      sessionId: command.sessionId,
+      agentId: command.agentId ?? 'default',
+      messages: [],
+      answer: {
+        interactionId: command.interactionId,
+        answers: command.answers ?? {},
+        refused: command.refused === true,
+      },
+    }
+  }
+
+  async #startRun(command: ChatRunInput): Promise<StartedChatRun> {
+    if (this.#draining) throw new Error('Chat 服务正在停机')
+    const runId = this.#idGenerator.generate('RUN')
+    const key = cancelRegistryKey(command.userId, runId)
+    let signal: AbortSignal
+    try {
+      // 把运行信号与取消注册表绑定：其他请求可通过 cancel 中止本运行；
+      // 注册失败（如取消竞态）直接抛出，不启动孤儿运行。
+      signal = await this.#cancelRegistry.wrap(
+        AbortSignal.any([command.signal, this.#shutdownController.signal]),
+        key
+      )
+    } catch (cause: unknown) {
+      throw normalizeError(cause)
+    }
+
+    let handle: ChatRunHandle
+    try {
+      const startRequest: AgentRunRequest = {
+        agentId: command.agentId,
+        sessionId: command.sessionId,
+        userId: command.userId,
+        runId,
+        traceId: command.traceId,
+        messages: command.messages,
+        ...optionalField('answer', command.answer),
+      }
+      handle = await this.#runService.start(startRequest, signal)
+    } catch (cause: unknown) {
+      // 启动失败必须注销取消键，否则注册表条目泄漏、后续 cancel 会误伤。
+      await this.#deregisterQuietly(key)
+      throw cause
+    }
+
+    const cleanup = this.#cleanupRun(runId, key, handle)
+    this.#activeRuns.set(runId, { handle, cleanup })
+    return {
+      start: {
+        type: 'start',
+        requestId: runId,
+        sessionId: command.sessionId,
+        traceId: command.traceId,
+      },
+      handle,
+    }
+  }
+
+  #trackStart(starting: Promise<StartedChatRun>): Promise<StartedChatRun> {
+    this.#startingRuns.add(starting)
+    void starting
+      .finally((): void => {
+        this.#startingRuns.delete(starting)
+      })
+      .catch((): void => {})
+    return starting
+  }
+
+  #closeActiveRuns(): Promise<void>[] {
+    return [...this.#activeRuns.values()].map(async (run): Promise<void> => {
+      await run.handle.close('server_shutdown')
+      await run.cleanup
+    })
+  }
+
+  async #cleanupRun(runId: string, key: string, handle: ChatRunHandle): Promise<void> {
+    await handle.completion
+    await this.#deregisterQuietly(key)
+    this.#activeRuns.delete(runId)
+  }
+
+  async #deregisterQuietly(key: string): Promise<void> {
+    try {
+      await this.#cancelRegistry.deregister(key)
+    } catch {
+      // 运行结果优先于取消注册清理错误；Redis TTL 仍会提供最终兜底。
+    }
+  }
+}
+
+export function cancelRegistryKey(userId: string, requestId: string): string {
+  return `${userId}:${requestId}`
+}
+
+/**
+ * 新会话保留完整种子消息；已有会话只接受本轮最后一条用户消息，避免客户端重复提交历史。
+ */
+export function selectMessagesForTurn(
+  messages: StartChatCommand['messages'],
+  sessionId?: string
+): StartChatCommand['messages'] {
+  if (sessionId === undefined) return [...messages]
+  for (const message of messages.toReversed()) {
+    if (message.role === 'user') return [message]
+  }
+  return []
+}
+
+function raceWithAbort(operation: Promise<void>, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(abortReason(signal))
+  return new Promise<void>((resolve, reject): void => {
+    const onAbort = (): void => reject(abortReason(signal))
+    signal.addEventListener('abort', onAbort, { once: true })
+    void operation.then(
+      (): void => {
+        signal.removeEventListener('abort', onAbort)
+        resolve()
+      },
+      (cause: unknown): void => {
+        signal.removeEventListener('abort', onAbort)
+        reject(normalizeError(cause))
+      }
+    )
+  })
+}
+
+function abortReason(signal: AbortSignal): Error {
+  return signal.reason instanceof Error ? signal.reason : new Error('Chat shutdown aborted')
+}

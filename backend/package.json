@@ -1,0 +1,58 @@
+{
+  "name": "@red-bean-nian-gao/backend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "pnpm@11.5.2",
+  "engines": {
+    "node": ">=24.9.0 <26",
+    "pnpm": ">=11 <12"
+  },
+  "scripts": {
+    "clean": "node ./scripts/clean.mjs",
+    "architecture:check": "node ./scripts/check-architecture.mjs",
+    "build": "pnpm clean && tsc -p tsconfig.build.json",
+    "dev": "pnpm build && node --enable-source-maps dist/entrypoint/server.main.js",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.{js,mjs,json}\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"*.{js,mjs,json}\"",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
+    "migrate": "node dist/entrypoint/migrate.main.js",
+    "start": "node --enable-source-maps dist/entrypoint/server.main.js",
+    "test:clean": "node -e \"require('node:fs').rmSync('.test-dist',{recursive:true,force:true})\"",
+    "test": "pnpm test:clean && tsc -p tsconfig.test.json && node --test \".test-dist/test/**/*.test.js\"",
+    "test:integration": "pnpm test:clean && tsc -p tsconfig.test.json && node --test \".test-dist/test/integration/*.integration.test.js\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.12.3",
+    "@types/pg": "^8.23.1",
+    "eslint": "^10.3.0",
+    "globals": "^17.6.0",
+    "prettier": "^3.9.6",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.59.2"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@fastify/multipart": "^10.1.1",
+    "@fastify/rate-limit": "^11.2.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
+    "@opentelemetry/resources": "^2.11.0",
+    "@opentelemetry/sdk-node": "^0.222.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
+    "@red-bean/api-contract": "workspace:*",
+    "bcryptjs": "^3.0.3",
+    "croner": "^10.0.1",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.12.1",
+    "jose": "^6.2.10",
+    "minio": "^8.0.7",
+    "pg": "^8.23.0",
+    "red-bean-qing-tuan": "link:../../red-bean-qing-tuan",
+    "redis": "^6.2.1",
+    "yaml": "^2.9.0",
+    "zod": "^4.5.4"
+  }
+}

@@ -1,0 +1,63 @@
+# go-agent 配置模板 — 提交到 git
+#
+# 安全边界：
+# - 敏感值（数据库/Redis/MinIO 口令、JWT secret、LLM key 等）一律放在
+#   config.local.yaml（已 gitignore）中覆盖，本文件只保留 CHANGE_ME 占位符。
+# - 本地开发：在 config.local.yaml 填入与 docker-compose.yml 一致的值。
+# - 生产环境：通过环境变量或配置中心注入，禁止提交真实密钥。
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  env: local
+  log_format: text
+  log_level: info
+
+database:
+  url: postgres://admin:CHANGE_ME@localhost:5432/red_bean?sslmode=disable
+  # 本地开发可自动迁移；生产必须为 false，并在发布前运行独立 migrate job。
+  auto_migrate: true
+
+redis:
+  url: redis://:CHANGE_ME@localhost:6379/0
+
+jwt:
+  secret: CHANGE_ME
+
+minio:
+  endpoint: localhost:9000
+  access_key: CHANGE_ME
+  secret_key: CHANGE_ME
+  bucket: red-bean-nian-gao
+  use_ssl: false
+  region: ""
+
+cors:
+  origins: http://localhost:5173
+
+llm:
+  api_key: ""
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat
+
+# 默认仅写本地结构化 span 日志。切换为 otlp 后，Exporter 地址、TLS 和认证使用
+# 标准 OTEL_EXPORTER_OTLP_* 环境变量注入。
+observability:
+  exporter: slog
+  service_name: red-bean-nian-gao
+  sample_ratio: 1.0
+
+dev_user:
+  username: ""
+  password: ""
+  display_name: ""
+  email: ""
+
+scheduled_task:
+  max_retries: 3
+  retry_interval: 5m
+  timezone: Asia/Shanghai
+  scan_interval: 1m
+  batch_size: 100
+  max_concurrent: 4
+  execution_timeout: 15m
