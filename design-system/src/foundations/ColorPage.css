@@ -1,0 +1,180 @@
+.color-page section + section {
+  margin-top: 40px;
+}
+
+.color-page__principle {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 20px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.color-page__principle strong {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.color-page__principle p {
+  margin: 0;
+  color: var(--foreground-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.color-token-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.color-token {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+}
+
+.color-token__preview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 72px;
+  border-bottom: 1px solid var(--border);
+}
+
+.color-token__preview button {
+  display: flex;
+  align-items: flex-end;
+  padding: 8px;
+  border: 0;
+  cursor: copy;
+}
+
+.color-token__preview button:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.color-token__preview span {
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: #ffffff;
+  background: var(--swatch-label-overlay);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.color-token__copy {
+  padding: 11px 12px 12px;
+}
+
+.color-token__copy code {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--foreground);
+  font: 500 12px/1.4 var(--font-mono);
+}
+
+.color-token__copy p {
+  min-height: 38px;
+  margin: 5px 0 9px;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.color-token__copy > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--foreground-muted);
+  font: 12px/1.4 var(--font-mono);
+}
+
+.color-usage {
+  border-top: 1px solid var(--border-strong);
+}
+
+.color-usage > div {
+  display: grid;
+  grid-template-columns: 120px 1fr 1fr;
+  gap: 20px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.color-usage strong {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.color-usage p {
+  margin: 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.color-usage .color-usage__no {
+  color: var(--foreground-muted);
+}
+
+.color-state-demo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.color-state-demo .is-neutral {
+  color: var(--foreground-muted);
+}
+
+.color-state-demo .is-success {
+  color: var(--success-text);
+}
+
+.color-state-demo .is-danger {
+  color: var(--danger-text);
+}
+
+.color-state-demo .is-confirm {
+  color: var(--action-confirm);
+}
+
+.color-state-demo i {
+  font-style: normal;
+}
+
+.color-state-demo .is-neutral i {
+  color: var(--process-node);
+}
+
+.color-state-demo .is-success i {
+  color: var(--success-indicator);
+}
+
+.color-state-demo .is-danger i {
+  color: var(--danger-indicator);
+}
+
+.color-page__note {
+  margin: 12px 0 0;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .color-page__principle,
+  .color-usage > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+}

@@ -1,0 +1,17 @@
+/* 轨迹组件的少量非 Tailwind 视觉：空档带的虚线竖轴（repeating gradient 无法用 utility 表达） */
+.trajectory-gap-axis {
+  background: repeating-linear-gradient(to bottom, var(--border-strong) 0 2px, transparent 2px 6px);
+}
+
+/*
+ * 轮次导轨（turnRail）：强调色以 22% 混入底色
+ * = color-mix(in srgb, <强调色> 22%, <底色>)，取品牌豆沙红。
+ *
+ * 这是**组件级组合**，只组合已有 token，没有在 design-tokens.css 新增颜色角色。
+ * 它的对比度约 1.25:1，低于 3:1——它属于**装饰性**指示：
+ * 「当前在哪一轮」的信息由轮次标题行（填充带）与选中竖条（3px、3.26:1）承载，
+ * 导轨只是同一信息的弱化重述，因此不以 3:1 为门槛。
+ */
+.trajectory-turn-rail {
+  background: color-mix(in srgb, var(--brand-indicator) 22%, var(--background));
+}

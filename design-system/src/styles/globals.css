@@ -1,0 +1,155 @@
+@import './design-tokens.css';
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@theme inline {
+  /* Font */
+  --font-head: var(--font-head);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  /* Labels stay readable: no information-bearing text below 12px. */
+  --text-label: var(--font-size-label);
+  --tracking-action: var(--tracking-action);
+  --tracking-label: var(--tracking-label);
+  --tracking-label-wide: var(--tracking-label-wide);
+  --tracking-caption: var(--tracking-caption);
+  --tracking-brand: var(--tracking-brand);
+
+  /* Radius */
+  --radius: 8px;
+  --radius-xs: 0;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-avatar: 8px;
+  --radius-pill: 9999px;
+
+  /* Shadows - var() 引用 design-tokens.css 单一来源（@theme inline 不自发光，无循环解析）
+     与 frontend @theme 键集逐字对齐 */
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+  --shadow-primary-glow: var(--shadow-primary-glow);
+
+  /* Semantic Color mappings → Tailwind utilities */
+  --color-background: var(--background);
+  --color-sidebar: var(--sidebar);
+  --color-foreground: var(--foreground);
+  --color-foreground-body: var(--foreground-body);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-ink: var(--ink);
+  --color-foreground-faint: var(--foreground-faint);
+  --color-foreground-faintest: var(--foreground-faintest);
+  --color-process-node: var(--process-node);
+  --color-process-node-active: var(--process-node-active);
+  --color-process-title: var(--process-title);
+  --color-process-copy-active: var(--process-copy-active);
+  --color-process-code: var(--process-code);
+  --color-tool-name: var(--tool-name);
+  --color-tool-target: var(--tool-target);
+  --color-tool-duration: var(--tool-duration);
+  --color-delegation-name: var(--delegation-name);
+  --color-question-copy: var(--question-copy);
+  --color-question-option: var(--question-option);
+  --color-hairline: var(--hairline);
+  --color-brand-text: var(--brand-text);
+  --color-brand-indicator: var(--brand-indicator);
+  --color-selection-accent: var(--selection-accent);
+  --color-focus-ring: var(--focus-ring);
+  --color-round-nav-marker: var(--round-nav-marker);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-action-confirm: var(--action-confirm);
+  --color-action-confirm-hover: var(--action-confirm-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-control-border: var(--control-border);
+  --color-popover: var(--popover);
+  --color-input: var(--input);
+  --color-surface-hover: var(--surface-hover);
+  --color-success: var(--success);
+  --color-success-text: var(--success-text);
+  --color-success-indicator: var(--success-indicator);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-text: var(--danger-text);
+  --color-danger-indicator: var(--danger-indicator);
+  --color-danger-bg: var(--danger-bg);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-highlight-bg: var(--highlight-bg);
+  --color-highlight-fg: var(--highlight-fg);
+  --color-code-inline-bg: var(--code-inline-bg);
+  --color-code-inline-fg: var(--code-inline-fg);
+  /* 审计分类色（轨迹视图等）：文字 / 图形指示 / 软底 */
+  --color-cat-tool-text: var(--cat-tool-text);
+  --color-cat-tool-indicator: var(--cat-tool-indicator);
+  --color-cat-tool-soft: var(--cat-tool-soft);
+  --color-cat-sub-text: var(--cat-sub-text);
+  --color-cat-sub-indicator: var(--cat-sub-indicator);
+  --color-cat-sub-soft: var(--cat-sub-soft);
+  --color-cat-cmp-text: var(--cat-cmp-text);
+  --color-cat-cmp-indicator: var(--cat-cmp-indicator);
+  --color-cat-cmp-soft: var(--cat-cmp-soft);
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--background);
+  color: var(--foreground-body);
+  line-height: var(--line-height-body);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Keyboard focus must remain visible in both themes. */
+:where(:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@keyframes process-breathe {
+  0%,
+  100% {
+    opacity: 0.42;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--process-node-active) 0%, transparent);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--process-node-active) 12%, transparent);
+  }
+}
+
+/* 减动效偏好：动画/过渡/平滑滚动全部瞬时化（与 frontend 对齐） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

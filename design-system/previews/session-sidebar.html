@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quiet Tool · 会话列表与账号入口提案</title>
+    <style>
+      :root {
+        font-family:
+          Inter,
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          'PingFang SC',
+          'Hiragino Sans GB',
+          'Microsoft YaHei',
+          sans-serif;
+        color-scheme: light;
+        --canvas: #ffffff;
+        --sidebar: #f6f6f5;
+        --hover: #efefed;
+        --active: #eaeae7;
+        --ink: #11110f;
+        --body: #44413d;
+        --muted: #67635f;
+        --faint: #706c67;
+        --line: #e8e6e3;
+        --line-strong: #d7d3ce;
+        --bean: #97534d;
+        --bean-hover: #793e39;
+        --danger: #d11f2a;
+        --success: #217a43;
+        --shadow: 0 12px 34px rgb(17 17 15 / 0.12);
+      }
+
+      html[data-theme='dark'] {
+        color-scheme: dark;
+        --canvas: #0b0b0c;
+        --sidebar: #111112;
+        --hover: #19191a;
+        --active: #1d1d1f;
+        --ink: #f3f2ef;
+        --body: #d2cfca;
+        --muted: #aaa59f;
+        --faint: #96918b;
+        --line: #242426;
+        --line-strong: #38383b;
+        --bean: #c87972;
+        --bean-hover: #df948d;
+        --danger: #ff515e;
+        --success: #55c47b;
+        --shadow: 0 16px 40px rgb(0 0 0 / 0.45);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        min-height: 100%;
+      }
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: var(--canvas);
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
+      }
+      button {
+        font: inherit;
+        -webkit-tap-highlight-color: transparent;
+      }
+      button:focus-visible {
+        outline: 2px solid var(--bean);
+        outline-offset: 2px;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 224px minmax(0, 1fr);
+        min-height: 100vh;
+        background: var(--canvas);
+      }
+      .sidebar {
+        position: relative;
+        z-index: 20;
+        display: flex;
+        min-width: 0;
+        height: 100vh;
+        flex-direction: column;
+        border-right: 1px solid var(--line);
+        background: var(--sidebar);
+      }
+      .sidebar-head {
+        flex: 0 0 auto;
+        padding: 18px 13px 12px;
+      }
+      .brand-row {
+        min-height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 7px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        color: var(--ink);
+        font-size: 14px;
+        font-weight: 660;
+        letter-spacing: -0.02em;
+      }
+      .bean {
+        width: 8px;
+        height: 11px;
+        margin: 0 4px;
+        border-radius: 60% 40% 58% 42%;
+        background: var(--bean);
+        transform: rotate(28deg);
+      }
+      .collapse {
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .collapse:hover {
+        background: var(--hover);
+        color: var(--ink);
+      }
+      svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .new-chat {
+        width: 100%;
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-top: 16px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--canvas);
+        padding: 0 10px;
+        color: var(--body);
+        cursor: pointer;
+        font-size: 12.5px;
+        font-weight: 540;
+        text-align: left;
+        transition:
+          color 140ms ease,
+          border-color 140ms ease,
+          background-color 140ms ease;
+      }
+      .new-chat:hover {
+        border-color: color-mix(in srgb, var(--line-strong) 62%, var(--ink));
+        color: var(--ink);
+      }
+      .new-chat svg {
+        color: var(--muted);
+      }
+
+      .main-nav {
+        display: grid;
+        gap: 2px;
+        margin-top: 12px;
+        padding-bottom: 13px;
+        border-bottom: 1px solid var(--line);
+      }
+      .nav-item {
+        min-height: 36px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        padding: 0 9px;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 12.5px;
+        text-align: left;
+      }
+      .nav-item:hover {
+        background: var(--hover);
+        color: var(--ink);
+      }
+      .nav-item svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .history {
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 7px 9px 16px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--line-strong) transparent;
+      }
+      .group {
+        margin-top: 14px;
+      }
+      .group-label {
+        margin: 0 8px 6px;
+        color: var(--faint);
+        font-size: 12px;
+        font-weight: 520;
+        line-height: 1.4;
+      }
+      .session {
+        position: relative;
+        width: 100%;
+        height: 36px;
+        overflow: hidden;
+        display: block;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        padding: 0 9px 0 11px;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 12.5px;
+        line-height: 36px;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .session:hover {
+        background: var(--hover);
+        color: var(--ink);
+      }
+      .session[aria-current='page'] {
+        background: var(--active);
+        color: var(--ink);
+        font-weight: 560;
+      }
+      .session[aria-current='page']::before {
+        position: absolute;
+        top: 10px;
+        bottom: 10px;
+        left: 0;
+        width: 2px;
+        border-radius: 2px;
+        background: var(--bean);
+        content: '';
+      }
+
+      .state {
+        display: none;
+        padding: 18px 9px;
+      }
+      .history[data-state='loading'] .groups,
+      .history[data-state='error'] .groups,
+      .history[data-state='empty'] .groups {
+        display: none;
+      }
+      .history[data-state='loading'] .loading,
+      .history[data-state='error'] .error-state,
+      .history[data-state='empty'] .empty-state {
+        display: block;
+      }
+      .skeleton {
+        height: 10px;
+        margin: 10px 0;
+        border-radius: 3px;
+        background: var(--line);
+      }
+      .skeleton:nth-child(1) {
+        width: 76%;
+      }
+      .skeleton:nth-child(2) {
+        width: 58%;
+      }
+      .skeleton:nth-child(3) {
+        width: 85%;
+      }
+      .empty-state {
+        color: var(--muted);
+        font-size: 12.5px;
+        line-height: 1.6;
+      }
+      .error-state {
+        border-left: 2px solid var(--danger);
+        padding-left: 12px;
+        color: var(--body);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+      .retry {
+        display: block;
+        margin-top: 5px;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: var(--danger);
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .account {
+        position: relative;
+        flex: 0 0 auto;
+        padding: 0 9px max(10px, env(safe-area-inset-bottom));
+        background: var(--sidebar);
+      }
+      .account::before {
+        display: block;
+        height: 1px;
+        margin: 0 4px 7px;
+        background: var(--line);
+        content: '';
+      }
+      .account-trigger {
+        width: 100%;
+        min-height: 52px;
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr) 16px;
+        align-items: center;
+        gap: 9px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        padding: 0 8px;
+        color: var(--ink);
+        cursor: pointer;
+        text-align: left;
+      }
+      .account-trigger:hover,
+      .account-trigger[aria-expanded='true'] {
+        background: var(--hover);
+      }
+      .avatar {
+        width: 24px;
+        height: 24px;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border: 1px solid var(--line-strong);
+        border-radius: 50%;
+        background: var(--canvas);
+        color: var(--body);
+        font-size: 10px;
+        font-weight: 650;
+      }
+      .identity {
+        min-width: 0;
+      }
+      .display-name,
+      .username {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .display-name {
+        font-size: 12.5px;
+        font-weight: 580;
+        line-height: 1.35;
+      }
+      .username {
+        margin-top: 2px;
+        color: var(--faint);
+        font-size: 11px;
+        line-height: 1.2;
+      }
+      .chevron {
+        color: var(--faint);
+        transition: transform 140ms ease;
+      }
+      .account-trigger[aria-expanded='true'] .chevron {
+        transform: rotate(180deg);
+      }
+
+      .account-menu {
+        position: absolute;
+        right: 13px;
+        bottom: calc(100% + 7px);
+        left: 13px;
+        display: none;
+        padding: 4px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--canvas);
+        box-shadow: var(--shadow);
+      }
+      .account-menu[data-open='true'] {
+        display: block;
+      }
+      .menu-summary {
+        padding: 9px 9px 8px;
+      }
+      .menu-summary strong {
+        display: block;
+        overflow: hidden;
+        color: var(--ink);
+        font-size: 12.5px;
+        font-weight: 590;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .menu-summary span {
+        display: block;
+        overflow: hidden;
+        margin-top: 3px;
+        color: var(--faint);
+        font-size: 11.5px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .menu-separator {
+        height: 1px;
+        margin: 3px 4px;
+        background: var(--line);
+      }
+      .menu-item {
+        width: 100%;
+        min-height: 34px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        padding: 0 9px;
+        color: var(--body);
+        cursor: pointer;
+        font-size: 12.5px;
+        text-align: left;
+      }
+      .menu-item:hover,
+      .menu-item:focus-visible {
+        background: var(--hover);
+        color: var(--ink);
+      }
+      .menu-item:focus-visible {
+        outline: 2px solid var(--bean);
+        outline-offset: -2px;
+      }
+      .menu-item.danger:hover,
+      .menu-item.danger:focus-visible {
+        color: var(--danger);
+      }
+      .menu-item svg {
+        width: 14px;
+        height: 14px;
+        color: var(--muted);
+      }
+
+      .main {
+        min-width: 0;
+        min-height: 100vh;
+        background: var(--canvas);
+      }
+      .topbar {
+        border-bottom: 1px solid var(--line);
+      }
+      .topbar-inner {
+        width: min(760px, calc(100% - 48px));
+        min-height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        margin: 0 auto;
+      }
+      .mobile-trigger {
+        display: none;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .thread-title {
+        min-width: 0;
+      }
+      .thread-title strong {
+        display: block;
+        overflow: hidden;
+        font-size: 14px;
+        font-weight: 620;
+        letter-spacing: -0.01em;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .thread-title span {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+      }
+      .view-switch {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .view-switch button,
+      .theme-toggle {
+        border: 0;
+        background: transparent;
+        padding: 7px 3px;
+        color: var(--faint);
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .view-switch button:hover,
+      .theme-toggle:hover {
+        color: var(--ink);
+      }
+      .view-switch button[aria-current='true'] {
+        color: var(--bean);
+      }
+      .top-divider {
+        width: 1px;
+        height: 13px;
+        background: var(--line-strong);
+      }
+
+      .conversation {
+        width: min(760px, calc(100% - 48px));
+        margin: 0 auto;
+        padding: 48px 0 120px;
+      }
+      .user-turn {
+        display: flex;
+        align-items: flex-end;
+        flex-direction: column;
+        margin-bottom: 28px;
+      }
+      .user-meta {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin: 0 4px 7px 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .user-meta::before {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--bean);
+        content: '';
+      }
+      .user-copy {
+        max-width: 78%;
+        margin: 0;
+        border-radius: 13px 13px 4px 13px;
+        background: var(--active);
+        padding: 11px 14px;
+        color: var(--ink);
+        font-size: 14px;
+        line-height: 1.65;
+      }
+      details summary {
+        list-style: none;
+      }
+      details summary::-webkit-details-marker {
+        display: none;
+      }
+      .process summary {
+        width: fit-content;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 0;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .process summary svg {
+        width: 13px;
+        height: 13px;
+        transition: transform 140ms ease;
+      }
+      .process[open] summary svg {
+        transform: rotate(90deg);
+      }
+      .process-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--success);
+      }
+      .timeline {
+        margin: 8px 0 0 5px;
+      }
+      .step {
+        position: relative;
+        min-height: 31px;
+        padding: 4px 0 14px 26px;
+        color: var(--muted);
+        font-size: 12.5px;
+        line-height: 1.65;
+      }
+      .step::before {
+        position: absolute;
+        top: 10px;
+        left: 0;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #85817c;
+        content: '';
+      }
+      .step:not(:last-child)::after {
+        position: absolute;
+        top: 18px;
+        bottom: -10px;
+        left: 3px;
+        width: 1px;
+        background: var(--line-strong);
+        content: '';
+      }
+      .tool {
+        color: var(--body);
+      }
+      .tool code {
+        color: var(--body);
+        font:
+          11.5px/1.6 'SFMono-Regular',
+          Consolas,
+          monospace;
+      }
+      .success {
+        margin-left: 8px;
+        color: var(--success);
+        font-weight: 600;
+      }
+      .answer {
+        margin-top: 22px;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        padding: 22px 24px;
+      }
+      .answer h2 {
+        margin: 0 0 11px;
+        font-size: 19px;
+        line-height: 1.35;
+        letter-spacing: -0.025em;
+      }
+      .answer p {
+        margin: 0;
+        color: var(--body);
+        font-size: 14px;
+        line-height: 1.78;
+      }
+      .answer p + p {
+        margin-top: 10px;
+      }
+      .answer code {
+        border-radius: 4px;
+        background: var(--hover);
+        padding: 1px 4px;
+        font:
+          0.88em/1.5 'SFMono-Regular',
+          Consolas,
+          monospace;
+      }
+
+      .backdrop {
+        position: fixed;
+        z-index: 10;
+        inset: 0;
+        display: none;
+        background: rgb(0 0 0 / 0.42);
+      }
+
+      @media (min-width: 761px) {
+        body.sidebar-collapsed .app {
+          grid-template-columns: 0 minmax(0, 1fr);
+        }
+        body.sidebar-collapsed .sidebar {
+          overflow: hidden;
+          visibility: hidden;
+        }
+        body.sidebar-collapsed .mobile-trigger {
+          display: grid;
+        }
+      }
+
+      @media (max-width: 760px) {
+        body {
+          overflow: auto;
+        }
+        .app {
+          display: block;
+        }
+        .sidebar {
+          position: fixed;
+          inset: 0 auto 0 0;
+          width: min(288px, 84vw);
+          transform: translateX(-101%);
+          box-shadow: var(--shadow);
+          transition: transform 180ms ease;
+        }
+        body.drawer-open .sidebar {
+          transform: translateX(0);
+        }
+        body.drawer-open .backdrop {
+          display: block;
+        }
+        .mobile-trigger {
+          display: grid;
+        }
+        .topbar-inner,
+        .conversation {
+          width: min(100% - 28px, 620px);
+        }
+        .thread-title {
+          flex: 1;
+        }
+        .top-actions .view-switch,
+        .top-actions .top-divider {
+          display: none;
+        }
+        .conversation {
+          padding-top: 34px;
+        }
+        .session {
+          height: 44px;
+          line-height: 44px;
+          font-size: 13px;
+        }
+        .nav-item {
+          min-height: 44px;
+          font-size: 13px;
+        }
+        .account-trigger {
+          min-height: 58px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside id="sidebar" class="sidebar" aria-label="主导航" tabindex="-1">
+        <div class="sidebar-head">
+          <div class="brand-row">
+            <div class="brand">
+              <span>red</span><i class="bean" aria-hidden="true"></i><span>bean</span>
+            </div>
+            <button class="collapse" type="button" aria-label="收起侧栏" onclick="closeDrawer()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <path d="M15 6l-6 6 6 6" />
+              </svg>
+            </button>
+          </div>
+          <button class="new-chat" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            新建会话
+          </button>
+          <nav class="main-nav" aria-label="功能导航">
+            <button class="nav-item" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <rect x="4" y="5" width="16" height="15" rx="2" />
+                <path d="M8 3v4m8-4v4M4 10h16" />
+              </svg>
+              定时任务
+            </button>
+          </nav>
+        </div>
+
+        <div id="history" class="history" data-state="normal">
+          <div class="groups">
+            <section class="group">
+              <h2 class="group-label">今天</h2>
+              <button
+                class="session"
+                aria-current="page"
+                title="设计一套更清晰的会话列表与头像区域 · 17:56"
+              >
+                设计会话列表与头像区域
+              </button>
+              <button class="session" title="排查用户消息重复显示 · 17:42">
+                排查用户消息重复显示
+              </button>
+              <button class="session" title="定时任务详情布局调整 · 14:18">
+                定时任务详情布局调整
+              </button>
+            </section>
+            <section class="group">
+              <h2 class="group-label">最近 7 天</h2>
+              <button
+                class="session"
+                title="这是一条很长很长的会话标题，用于验证单行截断与完整信息提示"
+              >
+                这是一条很长很长的会话标题，用于验证单行截断
+              </button>
+              <button class="session" title="Markdown 回答框 · 星期二">Markdown 回答框</button>
+              <button class="session" title="设计系统颜色规范 · 星期一">设计系统颜色规范</button>
+            </section>
+            <section class="group">
+              <h2 class="group-label">更早</h2>
+              <button class="session" title="新会话 · 8月12日">新会话</button>
+              <button class="session" title="工具调用状态 · 8月08日">工具调用状态</button>
+            </section>
+          </div>
+          <div class="state loading" aria-label="会话加载中">
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+          </div>
+          <div class="state error-state">
+            会话暂时无法加载<button class="retry" type="button" onclick="setListState('normal')">
+              重试
+            </button>
+          </div>
+          <div class="state empty-state">还没有历史会话。<br />从上方新建一段对话。</div>
+        </div>
+
+        <div class="account">
+          <div id="account-menu" class="account-menu" data-open="false" role="menu">
+            <div class="menu-summary"><strong>张三</strong><span>san.zhang@example.com</span></div>
+            <div class="menu-separator"></div>
+            <button class="menu-item" type="button" role="menuitem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4.5 21a7.5 7.5 0 0115 0" /></svg
+              >个人信息
+            </button>
+            <button class="menu-item danger" type="button" role="menuitem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <path d="M10 5H5v14h5M14 8l4 4-4 4m4-4H9" /></svg
+              >退出登录
+            </button>
+          </div>
+          <button
+            id="account-trigger"
+            class="account-trigger"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            onclick="toggleAccount(event)"
+          >
+            <span class="avatar" aria-hidden="true">张</span>
+            <span class="identity"
+              ><span class="display-name">张三</span><span class="username">san.zhang</span></span
+            >
+            <svg
+              class="chevron"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+            >
+              <path d="M7 14l5-5 5 5" />
+            </svg>
+          </button>
+        </div>
+      </aside>
+
+      <button class="backdrop" type="button" aria-label="关闭侧栏" onclick="closeDrawer()"></button>
+
+      <main id="main-content" class="main">
+        <header class="topbar">
+          <div class="topbar-inner">
+            <button
+              id="mobile-trigger"
+              class="mobile-trigger"
+              type="button"
+              aria-label="打开会话列表"
+              onclick="openDrawer()"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+            </button>
+            <div class="thread-title">
+              <strong>设计会话列表与头像区域</strong><span>今天 17:56</span>
+            </div>
+            <div class="top-actions">
+              <div class="view-switch" role="group" aria-label="列表状态预览">
+                <button aria-current="true" onclick="setListState('normal', this)">正常</button>
+                <button aria-current="false" onclick="setListState('loading', this)">加载</button>
+                <button aria-current="false" onclick="setListState('error', this)">错误</button>
+                <button aria-current="false" onclick="setListState('empty', this)">空</button>
+              </div>
+              <span class="top-divider"></span>
+              <button
+                id="theme-toggle"
+                class="theme-toggle"
+                type="button"
+                aria-label="切换深色主题"
+              >
+                深色
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div class="conversation">
+          <div class="user-turn">
+            <div class="user-meta">你 · 刚刚</div>
+            <p class="user-copy">会话列表和头像这一块看起来有点挤，能不能更清楚一点？</p>
+          </div>
+          <details class="process" open>
+            <summary>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M9 6l6 6-6 6" /></svg
+              ><span class="process-dot"></span><span>思考过程 · 已完成</span>
+            </summary>
+            <div class="timeline">
+              <div class="step">检查侧栏的信息层级与导航位置</div>
+              <div class="step tool">
+                <code>inspect_ui</code> · SessionSidebar.tsx <span class="success">成功</span>
+              </div>
+              <div class="step">将会话按时间分组，并把账号入口独立到底部</div>
+            </div>
+          </details>
+          <article class="answer">
+            <h2>侧栏需要先解决层级，再处理装饰。</h2>
+            <p>
+              新版本把功能入口放在上方、会话历史放在中间、账号入口固定在底部。会话行只保留标题，时间与完整标题交给提示，不再重复展示消息数。
+            </p>
+            <p>
+              头像统一为 <code>24px</code> 圆形中性回退，账号菜单向上展开；没有真实 presence
+              时不显示在线绿点。
+            </p>
+          </article>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const root = document.documentElement
+      const themeButton = document.getElementById('theme-toggle')
+      function syncThemeLabel() {
+        const dark = root.dataset.theme === 'dark'
+        themeButton.textContent = dark ? '浅色' : '深色'
+        themeButton.setAttribute('aria-label', dark ? '切换浅色主题' : '切换深色主题')
+      }
+      themeButton.addEventListener('click', () => {
+        root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark'
+        syncThemeLabel()
+      })
+      function toggleAccount(event) {
+        event.stopPropagation()
+        const menu = document.getElementById('account-menu')
+        const trigger = document.getElementById('account-trigger')
+        const open = menu.dataset.open !== 'true'
+        menu.dataset.open = String(open)
+        trigger.setAttribute('aria-expanded', String(open))
+        if (open) menu.querySelector('[role="menuitem"]').focus()
+      }
+      function closeAccount(restoreFocus = false) {
+        const menu = document.getElementById('account-menu')
+        const trigger = document.getElementById('account-trigger')
+        if (menu.dataset.open !== 'true') return
+        menu.dataset.open = 'false'
+        trigger.setAttribute('aria-expanded', 'false')
+        if (restoreFocus) trigger.focus()
+      }
+      function setListState(state, button) {
+        document.getElementById('history').dataset.state = state
+        document
+          .querySelectorAll('.view-switch button')
+          .forEach((item) => item.setAttribute('aria-current', String(item === button)))
+      }
+      function openDrawer() {
+        if (!window.matchMedia('(max-width: 760px)').matches) {
+          document.body.classList.remove('sidebar-collapsed')
+          document.querySelector('.collapse').focus()
+          return
+        }
+        document.body.classList.add('drawer-open')
+        const sidebar = document.getElementById('sidebar')
+        sidebar.setAttribute('role', 'dialog')
+        sidebar.setAttribute('aria-modal', 'true')
+        document.getElementById('main-content').inert = true
+        document.querySelector('#sidebar button').focus()
+      }
+      function closeDrawer() {
+        if (!window.matchMedia('(max-width: 760px)').matches) {
+          document.body.classList.add('sidebar-collapsed')
+          document.getElementById('mobile-trigger').focus()
+          return
+        }
+        const wasOpen = document.body.classList.contains('drawer-open')
+        document.body.classList.remove('drawer-open')
+        const sidebar = document.getElementById('sidebar')
+        sidebar.removeAttribute('role')
+        sidebar.removeAttribute('aria-modal')
+        document.getElementById('main-content').inert = false
+        if (wasOpen) document.getElementById('mobile-trigger').focus()
+      }
+      document.addEventListener('click', (event) => {
+        if (!event.target.closest('.account')) {
+          closeAccount()
+        }
+      })
+      document.getElementById('account-trigger').addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+        event.preventDefault()
+        const menu = document.getElementById('account-menu')
+        const trigger = document.getElementById('account-trigger')
+        menu.dataset.open = 'true'
+        trigger.setAttribute('aria-expanded', 'true')
+        const items = [...menu.querySelectorAll('[role="menuitem"]')]
+        ;(event.key === 'ArrowUp' ? items.at(-1) : items[0]).focus()
+      })
+      document.getElementById('account-menu').addEventListener('keydown', (event) => {
+        const items = [...event.currentTarget.querySelectorAll('[role="menuitem"]')]
+        const index = items.indexOf(document.activeElement)
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          closeAccount(true)
+        } else if (event.key === 'Home') {
+          event.preventDefault()
+          items[0].focus()
+        } else if (event.key === 'End') {
+          event.preventDefault()
+          items.at(-1).focus()
+        } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault()
+          const offset = event.key === 'ArrowDown' ? 1 : -1
+          items[(index + offset + items.length) % items.length].focus()
+        }
+      })
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && document.body.classList.contains('drawer-open')) closeDrawer()
+        if (event.key !== 'Tab' || !document.body.classList.contains('drawer-open')) return
+        const focusable = [...document.querySelectorAll('#sidebar button:not([disabled])')]
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last.focus()
+        }
+        if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
+      })
+      syncThemeLabel()
+    </script>
+  </body>
+</html>

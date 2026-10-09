@@ -1,0 +1,385 @@
+'use client'
+
+import { useId, useState, type ReactNode } from 'react'
+
+import { cn } from '../lib/utils'
+
+export interface QuestionCardQuestion {
+  id: string
+  text: string
+  /** 可选影响说明；旧协议没有该字段时不渲染。 */
+  description?: string | undefined
+  options?: string[] | undefined
+  select?: 'single' | 'multi' | undefined
+}
+
+export interface QuestionCardAnswer {
+  kind: 'option' | 'multi' | 'custom' | 'skip'
+  value?: string | undefined
+  values?: string[] | undefined
+}
+
+export interface QuestionCardProps {
+  questions: QuestionCardQuestion[]
+  status?: 'pending' | 'answered' | 'refused' | undefined
+  answers?: Record<string, QuestionCardAnswer> | undefined
+  submitting?: boolean | undefined
+  /** 当前仍有另一条流在收尾时锁定交互，但不显示“正在提交”。 */
+  disabled?: boolean | undefined
+  error?: string | undefined
+  /** 只有业务明确允许自由输入时才显示，确认卡默认保持基准的纯选项形态。 */
+  allowCustomAnswer?: boolean | undefined
+  /** 业务明确知道动作时可给出更直接的确认文案；函数形态可随当前选择变化。 */
+  confirmLabel?: string | ((answer: QuestionCardAnswer | undefined) => string) | undefined
+  onConfirm?: ((answers: Record<string, QuestionCardAnswer>) => void) | undefined
+  onRefuse?: (() => void) | undefined
+}
+
+function initialAnswersFor(
+  questions: QuestionCardQuestion[],
+  answers?: Record<string, QuestionCardAnswer>
+): Record<string, QuestionCardAnswer> {
+  const initial = { ...answers }
+  for (const question of questions) {
+    if (
+      !initial[question.id] &&
+      (question.select ?? 'single') === 'single' &&
+      question.options?.[0]
+    ) {
+      initial[question.id] = { kind: 'option', value: question.options[0] }
+    }
+  }
+  return initial
+}
+
+function answerLabel(answer: QuestionCardAnswer | undefined): string {
+  if (!answer) return ''
+  if (answer.kind === 'skip') return '已跳过'
+  if (answer.kind === 'multi') return answer.values?.join('、') ?? ''
+  return answer.value ?? ''
+}
+
+function renderInlineCode(content: string): ReactNode {
+  return content.split(/(`[^`\n]+`)/g).map((part, index) =>
+    part.startsWith('`') && part.endsWith('`') ? (
+      <code
+        key={`${part}-${index}`}
+        className="rounded bg-code-inline-bg px-1 py-px font-mono text-[0.88em] leading-[1.5] text-code-inline-fg"
+      >
+        {part.slice(1, -1)}
+      </code>
+    ) : (
+      part
+    )
+  )
+}
+
+function AnsweredQuestion({
+  question,
+  answer,
+  refused,
+}: {
+  question: QuestionCardQuestion
+  answer?: QuestionCardAnswer | undefined
+  refused: boolean
+}): ReactNode {
+  return (
+    <div className="min-w-0 py-1 first:pt-0 last:pb-0">
+      <p className="m-0 min-w-0 font-sans text-[13px] font-[550] leading-[1.55] text-foreground [overflow-wrap:anywhere]">
+        {question.text}
+      </p>
+      <p className="mt-1.5 flex min-w-0 items-center gap-2 font-sans text-[12.5px] leading-[normal] text-foreground-body">
+        <span
+          aria-hidden="true"
+          className={cn(
+            'h-1.5 w-1.5 shrink-0 rounded-full',
+            refused ? 'bg-foreground-muted' : 'bg-success-indicator'
+          )}
+        />
+        <span className={cn('font-semibold', refused ? 'text-foreground-muted' : 'text-success')}>
+          {refused ? '你的选择' : '你的回答'}
+        </span>
+        <span className="min-w-0 [overflow-wrap:anywhere]">
+          {refused ? '暂不执行' : answerLabel(answer)}
+        </span>
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Process 内的确认节点。它使用独立边框与状态提示；
+ * 确认后原地压缩为问题与回答，不生成新的过程或消息。
+ */
+export function QuestionCard({
+  questions,
+  status,
+  answers,
+  submitting = false,
+  disabled = false,
+  error,
+  allowCustomAnswer = false,
+  confirmLabel,
+  onConfirm,
+  onRefuse,
+}: QuestionCardProps) {
+  const groupId = useId()
+  const [innerStatus, setInnerStatus] = useState<'pending' | 'answered' | 'refused'>('pending')
+  const [draftAnswers, setDraftAnswers] = useState<Record<string, QuestionCardAnswer>>(() =>
+    initialAnswersFor(questions, answers)
+  )
+  const [page, setPage] = useState(0)
+  const [customOpen, setCustomOpen] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      Object.entries(answers ?? {})
+        .filter(([, answer]) => answer.kind === 'custom')
+        .map(([questionId]) => [questionId, true])
+    )
+  )
+
+  const resolvedStatus = status ?? innerStatus
+  const resolvedAnswers = resolvedStatus === 'pending' ? draftAnswers : (answers ?? draftAnswers)
+  const question = questions[page]
+
+  if (questions.length === 0 || !question) return null
+
+  const setAnswer = (questionId: string, answer?: QuestionCardAnswer) => {
+    setDraftAnswers((current) => {
+      const next = { ...current }
+      if (answer) next[questionId] = answer
+      else delete next[questionId]
+      return next
+    })
+  }
+
+  const selectOption = (value: string) => {
+    setCustomOpen((current) => ({ ...current, [question.id]: false }))
+    if ((question.select ?? 'single') === 'multi') {
+      const current = draftAnswers[question.id]
+      const values = current?.kind === 'multi' ? [...(current.values ?? [])] : []
+      const index = values.indexOf(value)
+      if (index >= 0) values.splice(index, 1)
+      else values.push(value)
+      setAnswer(question.id, values.length > 0 ? { kind: 'multi', values } : undefined)
+      return
+    }
+    setAnswer(question.id, { kind: 'option', value })
+  }
+
+  const isSelected = (value: string): boolean => {
+    const answer = draftAnswers[question.id]
+    if (answer?.kind === 'option') return answer.value === value
+    if (answer?.kind === 'multi') return answer.values?.includes(value) ?? false
+    return false
+  }
+
+  const allAnswered = questions.every((item) => Boolean(draftAnswers[item.id]))
+  const currentAnswered = Boolean(draftAnswers[question.id])
+  const isLast = page === questions.length - 1
+  const currentDraftAnswer = draftAnswers[question.id]
+  const selectedLabel = answerLabel(currentDraftAnswer)
+  const defaultConfirmLabel =
+    questions.length === 1 && selectedLabel && selectedLabel.length <= 18
+      ? `确认：${selectedLabel}`
+      : '确认并继续'
+  const resolvedConfirmLabel =
+    typeof confirmLabel === 'function'
+      ? confirmLabel(draftAnswers[question.id])
+      : (confirmLabel ?? defaultConfirmLabel)
+
+  const handlePrimary = () => {
+    if (!currentAnswered || submitting || disabled) return
+    if (!isLast) {
+      setPage(page + 1)
+      return
+    }
+    if (!allAnswered) return
+    if (status === undefined) setInnerStatus('answered')
+    onConfirm?.(draftAnswers)
+  }
+
+  const handleRefuse = () => {
+    if (submitting || disabled) return
+    if (status === undefined) setInnerStatus('refused')
+    onRefuse?.()
+  }
+
+  if (resolvedStatus !== 'pending') {
+    return (
+      <div
+        className="mb-[3px] mt-px min-w-0 max-w-full rounded-xl border border-border-strong bg-background px-3.5 py-3 font-sans"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="space-y-3">
+          {questions.map((item) => (
+            <AnsweredQuestion
+              key={item.id}
+              question={item}
+              answer={resolvedAnswers[item.id]}
+              refused={resolvedStatus === 'refused'}
+            />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="mb-[3px] mt-px min-w-0 max-w-full rounded-xl border border-border-strong bg-background px-5 pb-[17px] pt-[19px] font-sans max-[760px]:px-[15px] max-[760px]:pb-[15px] max-[760px]:pt-[17px]"
+      role="group"
+      aria-labelledby={`${groupId}-title`}
+      aria-describedby={question.description ? `${groupId}-description` : undefined}
+      aria-busy={submitting}
+    >
+      <div
+        className={cn(
+          'flex items-center gap-[7px] text-[10.5px] font-semibold leading-[normal] tracking-[0.02em]',
+          error ? 'text-danger-text' : 'text-brand-text'
+        )}
+      >
+        <span
+          aria-hidden="true"
+          className={cn(
+            'h-[5px] w-[5px] rounded-full',
+            error ? 'bg-danger-indicator' : 'bg-brand-indicator'
+          )}
+        />
+        <span>{error ? '提交失败' : '需要确认'}</span>
+        {questions.length > 1 && (
+          <span className="ml-auto font-normal text-foreground-muted">
+            问题 {page + 1} / {questions.length}
+          </span>
+        )}
+      </div>
+
+      <h3
+        id={`${groupId}-title`}
+        className="mb-[5px] mt-2 min-w-0 font-sans text-[15px] font-[620] leading-[1.5] tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]"
+      >
+        {question.text}
+      </h3>
+      {question.description && (
+        <p
+          id={`${groupId}-description`}
+          className="m-0 min-w-0 text-xs leading-[1.65] text-question-copy [overflow-wrap:anywhere]"
+        >
+          {renderInlineCode(question.description)}
+        </p>
+      )}
+
+      <fieldset className="m-0 mt-3.5 grid min-w-0 gap-[7px] border-0 p-0">
+        <legend className="sr-only">{question.text}</legend>
+        {question.options?.map((option) => (
+          <label
+            key={option}
+            className={cn(
+              'flex min-h-[34px] min-w-0 cursor-pointer items-center gap-[9px] text-[12.5px] leading-[1.45] text-question-option transition-colors hover:text-foreground max-[760px]:min-h-[42px]',
+              isSelected(option) && 'font-medium text-foreground',
+              (submitting || disabled) && 'cursor-not-allowed opacity-60'
+            )}
+          >
+            <input
+              type={question.select === 'multi' ? 'checkbox' : 'radio'}
+              name={`${groupId}-${question.id}`}
+              value={option}
+              checked={isSelected(option)}
+              disabled={submitting || disabled}
+              onChange={() => selectOption(option)}
+              className="m-0 h-3.5 w-3.5 shrink-0 accent-selection-accent"
+            />
+            <span className="min-w-0 [overflow-wrap:anywhere]">{option}</span>
+          </label>
+        ))}
+      </fieldset>
+
+      {allowCustomAnswer &&
+        (customOpen[question.id] || draftAnswers[question.id]?.kind === 'custom' ? (
+          <input
+            aria-label={`${question.text}——自定义回答`}
+            className="mt-2 min-h-11 w-full border-0 border-b border-control-border bg-transparent px-0 py-2 text-[13px] text-foreground outline-none placeholder:text-foreground-faint focus:border-brand-text disabled:cursor-not-allowed disabled:opacity-60"
+            placeholder="自定义回答…"
+            disabled={submitting || disabled}
+            value={currentDraftAnswer?.kind === 'custom' ? (currentDraftAnswer.value ?? '') : ''}
+            onChange={(event) => {
+              const value = event.target.value
+              setAnswer(question.id, value.trim() ? { kind: 'custom', value } : undefined)
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            disabled={submitting || disabled}
+            onClick={() => setCustomOpen((current) => ({ ...current, [question.id]: true }))}
+            className="min-h-11 bg-transparent px-0 text-xs text-foreground-muted transition-colors hover:text-foreground-body disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            自定义回答
+          </button>
+        ))}
+
+      {error && (
+        <p
+          role="alert"
+          className="mt-2 min-w-0 text-xs leading-normal text-danger [overflow-wrap:anywhere]"
+        >
+          {error}
+        </p>
+      )}
+      {submitting && (
+        <span role="status" aria-live="polite" className="sr-only">
+          正在提交回答
+        </span>
+      )}
+
+      <div className="mt-[15px] flex min-w-0 flex-wrap items-center gap-x-4 gap-y-0.5 max-[760px]:flex-col max-[760px]:items-start max-[760px]:gap-0.5">
+        <button
+          type="button"
+          disabled={!currentAnswered || submitting || disabled || (isLast && !allAnswered)}
+          onClick={handlePrimary}
+          className="group inline-flex min-w-0 max-w-full cursor-pointer items-center gap-[5px] bg-transparent px-0 py-1.5 text-[12.5px] font-[650] leading-[normal] text-action-confirm transition-colors hover:text-action-confirm-hover disabled:cursor-not-allowed disabled:text-foreground-faint"
+        >
+          <span className="min-w-0 [overflow-wrap:anywhere]">
+            {submitting ? '正在提交…' : isLast ? resolvedConfirmLabel : '下一题'}
+          </span>
+          {!submitting && (
+            <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">
+              →
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          disabled={submitting || disabled}
+          onClick={handleRefuse}
+          className="cursor-pointer bg-transparent px-0 py-1.5 text-[12.5px] leading-[normal] text-foreground-muted transition-colors hover:text-foreground-body disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          暂不执行
+        </button>
+        {questions.length > 1 && (
+          <button
+            type="button"
+            disabled={submitting || disabled}
+            onClick={() => {
+              setAnswer(question.id, { kind: 'skip' })
+              if (!isLast) setPage(page + 1)
+            }}
+            className="cursor-pointer bg-transparent px-0 py-1.5 text-[12.5px] leading-[normal] text-foreground-muted transition-colors hover:text-foreground-body disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            跳过此问
+          </button>
+        )}
+        {page > 0 && (
+          <button
+            type="button"
+            disabled={submitting || disabled}
+            onClick={() => setPage(page - 1)}
+            className="ml-auto cursor-pointer bg-transparent px-0 py-1.5 text-[12.5px] leading-[normal] text-foreground-muted transition-colors hover:text-foreground-body disabled:cursor-not-allowed disabled:opacity-45 max-[760px]:ml-0"
+          >
+            上一题
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}

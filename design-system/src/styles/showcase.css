@@ -1,0 +1,374 @@
+/* Design-system documentation shell */
+
+.ds-app {
+  display: flex;
+  min-height: 100vh;
+  background: var(--background);
+}
+
+.ds-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  width: 244px;
+  height: 100vh;
+  flex: 0 0 244px;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--sidebar);
+}
+
+.ds-sidebar__brand {
+  padding: 24px 20px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-sidebar__title {
+  margin: 0;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.ds-sidebar__subtitle {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ds-sidebar__theme-toggle {
+  padding: 14px 20px 18px;
+  border-top: 1px solid var(--border);
+}
+
+.ds-theme-button {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  border: 0;
+  color: var(--foreground-secondary);
+  background: transparent;
+  cursor: pointer;
+  font: 500 12px/1.4 var(--font-sans);
+}
+
+.ds-theme-button:hover {
+  color: var(--foreground);
+}
+
+.ds-theme-button__icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--foreground-secondary);
+}
+
+.ds-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 10px;
+}
+
+.ds-nav-group {
+  margin-bottom: 20px;
+}
+
+.ds-nav-group__title {
+  margin: 0;
+  padding: 0 10px 7px;
+  color: var(--foreground-faint);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ds-nav-list {
+  display: grid;
+  gap: 1px;
+}
+
+.ds-nav-btn {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--foreground-body);
+  background: transparent;
+  cursor: pointer;
+  font: 400 13px/1.5 var(--font-sans);
+  text-align: left;
+  transition:
+    color var(--transition-base),
+    background-color var(--transition-base);
+}
+
+.dark .ds-nav-btn {
+  color: var(--foreground-secondary);
+}
+
+.ds-nav-btn:hover {
+  color: var(--foreground);
+  background: var(--surface-hover);
+}
+
+.ds-nav-btn.active {
+  color: var(--foreground);
+  background: transparent;
+  font-weight: 500;
+}
+
+.ds-nav-btn.active::before {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--brand-indicator);
+  content: '';
+}
+
+.ds-nav-btn__bullet {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.ds-nav-btn.active .ds-nav-btn__bullet {
+  background: var(--brand-indicator);
+}
+
+.ds-content {
+  min-width: 0;
+  flex: 1;
+  /*
+   * 这里**故意不设 overflow**（曾为 `overflow-y: auto`）。
+   * .ds-app 用的是 min-height: 100vh，会随内容长高，于是 .ds-content 的高度等于内容高度、
+   * scrollHeight === clientHeight —— 它成了「永远滚不动的滚动容器」，实际滚动的是 document。
+   * 而 overflow ≠ visible 的元素会成为 sticky 的 scrollport：里面的 sticky 表头/轮次头
+   * 因此全部钉不住，滚动时整片滚走。去掉它，sticky 回到 document 滚动端口，
+   * 列头钉 0、轮次头钉 30，正是设计值（.ds-sidebar 的 sticky 不受影响）。
+   */
+  padding: 40px clamp(24px, 5vw, 72px) 72px;
+}
+
+.ds-page-loading {
+  color: var(--foreground-muted);
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-body);
+}
+
+/* Foundation pages */
+.module-container {
+  width: min(100%, 1040px);
+  margin: 0 auto;
+}
+
+.module-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 36px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.module-header h2 {
+  margin: 0;
+  color: var(--foreground);
+  font: 600 20px/1.35 var(--font-sans);
+}
+
+.module-header p {
+  max-width: 720px;
+  margin: 6px 0 0;
+  color: var(--muted-foreground);
+  font: 400 13px/1.65 var(--font-sans);
+}
+
+.module-header .hint {
+  color: var(--foreground-faint);
+  font-size: 12px;
+}
+
+.section-title,
+.color-section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 36px 0 16px;
+  color: var(--foreground-secondary);
+  background: transparent;
+  font: 500 12px/1.4 var(--font-sans);
+}
+
+.section-title::after,
+.color-section-title::after {
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+  content: '';
+}
+
+/* Component showcase */
+.uikit-container {
+  display: flex;
+  width: min(100%, 1040px);
+  flex-direction: column;
+  gap: 44px;
+  margin: 0 auto;
+}
+
+.uikit-section {
+  padding: 0 0 36px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.uikit-section:last-child {
+  border-bottom: 0;
+}
+
+.uikit-section-title {
+  margin: 0 0 20px;
+  color: var(--foreground);
+  font: 600 18px/1.4 var(--font-sans);
+}
+
+.component-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.component-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.component-label {
+  color: var(--muted-foreground);
+  font: 500 12px/1.45 var(--font-sans);
+}
+
+.component-row--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.component-item--block {
+  width: 100%;
+  align-items: stretch;
+  padding: 16px 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.component-item--block:last-child {
+  border-bottom: 0;
+}
+
+.component-item--block > .component-label {
+  align-self: flex-start;
+}
+
+@media (max-width: 900px) {
+  .ds-app {
+    flex-direction: column;
+  }
+
+  .ds-sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    flex-basis: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ds-sidebar__brand {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .ds-nav {
+    display: flex;
+    overflow-x: auto;
+    padding: 8px 10px;
+  }
+
+  .ds-nav-group {
+    display: contents;
+  }
+
+  .ds-nav-group__title {
+    display: none;
+  }
+
+  .ds-nav-list {
+    display: flex;
+    flex: 0 0 auto;
+  }
+
+  .ds-nav-btn {
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .ds-sidebar__theme-toggle {
+    position: absolute;
+    top: 5px;
+    right: 8px;
+    width: 40px;
+    padding: 8px 6px;
+    border: 0;
+  }
+
+  .ds-theme-button > span:first-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .ds-content {
+    padding: 28px 16px 56px;
+  }
+}
+
+@media (max-width: 560px) {
+  .ds-sidebar__subtitle {
+    display: none;
+  }
+
+  .module-header {
+    flex-direction: column;
+    margin-bottom: 28px;
+  }
+}

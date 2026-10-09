@@ -1,0 +1,245 @@
+.typography-page section + section {
+  margin-top: 42px;
+}
+
+.typography-families {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.typography-families article {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.typography-families article > span {
+  color: var(--foreground-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.typography-families h3 {
+  margin: 5px 0 18px;
+  color: var(--foreground);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.typography-families__sample {
+  min-height: 56px;
+  margin: 0 0 16px;
+  color: var(--foreground-body);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.typography-families__sample.is-mono,
+.typography-families code {
+  font-family: var(--font-mono);
+}
+
+.typography-families__sample.is-mono {
+  font-size: 13px;
+}
+
+.typography-families code {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.typography-families article > p:last-child {
+  margin: 12px 0 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.typography-page__aside {
+  max-width: 800px;
+  margin: 12px 0 0;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.typography-hierarchy {
+  max-width: 760px;
+  padding: 20px 0;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.typography-hierarchy__answer {
+  color: var(--foreground);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.typography-hierarchy__progress {
+  margin-top: 18px;
+  color: var(--foreground-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.typography-hierarchy__tool {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.typography-hierarchy__tool code {
+  color: var(--foreground-body);
+  font: inherit;
+  font-family: var(--font-mono);
+}
+
+.typography-hierarchy__tool .is-success {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.typography-hierarchy__meta {
+  margin-top: 10px;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.typography-table-wrap {
+  overflow-x: auto;
+}
+
+.typography-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 1px solid var(--border-strong);
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.typography-table th,
+.typography-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.typography-table th {
+  color: var(--foreground-muted);
+  background: var(--muted);
+  font-weight: 500;
+}
+
+.typography-table td:first-child {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.typography-table .is-measure {
+  color: var(--foreground-body);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.typography-weights {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--border);
+}
+
+.typography-weights article {
+  padding: 18px 18px 18px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.typography-weights article + article {
+  padding-left: 18px;
+  border-left: 1px solid var(--border);
+}
+
+.typography-weights span {
+  color: var(--foreground-muted);
+  font: 12px/1.4 var(--font-mono);
+}
+
+.typography-weights h3 {
+  margin: 6px 0 4px;
+  color: var(--foreground);
+  font-size: 18px;
+}
+
+.typography-weights .is-weight-400 h3 {
+  font-weight: 400;
+}
+
+.typography-weights .is-weight-500 h3 {
+  font-weight: 500;
+}
+
+.typography-weights .is-weight-600 h3 {
+  font-weight: 600;
+}
+
+.typography-weights p {
+  margin: 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.typography-do-dont {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.typography-do-dont > div {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-left-width: 2px;
+}
+
+.typography-do-dont .is-do {
+  border-left-color: var(--success);
+}
+
+.typography-do-dont .is-dont {
+  border-left-color: var(--danger);
+}
+
+.typography-do-dont strong {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.typography-do-dont p {
+  margin: 5px 0 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+@media (max-width: 700px) {
+  .typography-families,
+  .typography-weights,
+  .typography-do-dont {
+    grid-template-columns: 1fr;
+  }
+
+  .typography-weights article + article {
+    padding-left: 0;
+    border-left: 0;
+  }
+}

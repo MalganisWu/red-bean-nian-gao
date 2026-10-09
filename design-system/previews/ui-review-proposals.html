@@ -1,0 +1,1139 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quiet Tool UI · 已确认方案归档</title>
+    <link rel="icon" href="/favicon.svg" />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #ffffff;
+        --surface: #ffffff;
+        --surface-muted: #f6f5f4;
+        --surface-hover: #f1efed;
+        --ink: #171719;
+        --body: #3e3b39;
+        --muted: #706b68;
+        --faint: #78716d;
+        --line: #e6e2df;
+        --line-strong: #c9c2be;
+        --bean: #97534d;
+        --bean-hover: #7f443f;
+        --success: #23834b;
+        --danger: #cf241a;
+        --shadow: 0 8px 24px rgb(28 24 22 / 10%);
+        --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      html[data-theme='dark'] {
+        color-scheme: dark;
+        --bg: #0b0b0c;
+        --surface: #0b0b0c;
+        --surface-muted: #151516;
+        --surface-hover: #1c1b1c;
+        --ink: #f3f2f1;
+        --body: #cfccca;
+        --muted: #a6a19e;
+        --faint: #8f8985;
+        --line: #292728;
+        --line-strong: #4a4543;
+        --bean: #c87972;
+        --bean-hover: #d98b84;
+        --success: #55b97b;
+        --danger: #ff4d4f;
+        --shadow: 0 8px 24px rgb(0 0 0 / 34%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--bg);
+        font-family: var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        color: inherit;
+      }
+
+      button:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      [tabindex]:focus-visible {
+        outline: 2px solid var(--bean);
+        outline-offset: 3px;
+      }
+
+      .shell {
+        min-height: 100vh;
+      }
+
+      .topbar {
+        position: sticky;
+        z-index: 10;
+        top: 0;
+        display: flex;
+        min-height: 58px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 0 28px;
+        border-bottom: 1px solid var(--line);
+        background: var(--bg);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .bean {
+        position: relative;
+        width: 16px;
+        height: 16px;
+        border-radius: 52% 48% 46% 54%;
+        background: var(--bean);
+        transform: rotate(-16deg);
+      }
+
+      .bean::after {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        width: 8px;
+        height: 5px;
+        border-top: 1.5px solid var(--bg);
+        border-radius: 50%;
+        content: '';
+        opacity: 0.72;
+        transform: rotate(4deg);
+      }
+
+      .meta {
+        color: var(--faint);
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .theme-button {
+        min-height: 36px;
+        padding: 0 2px;
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .theme-button:hover {
+        color: var(--ink);
+      }
+
+      .page {
+        width: min(1120px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 44px 0 84px;
+      }
+
+      .intro {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+        gap: 28px;
+        margin-bottom: 32px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(25px, 3vw, 34px);
+        font-weight: 650;
+        letter-spacing: -0.035em;
+      }
+
+      .intro p {
+        max-width: 680px;
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
+      .proposal-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 28px;
+        color: var(--bean);
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      .proposal-badge::before {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        content: '';
+      }
+
+      .tabs {
+        display: flex;
+        gap: 22px;
+        margin: 0 0 34px;
+        overflow-x: auto;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .tab {
+        position: relative;
+        min-height: 42px;
+        flex: 0 0 auto;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .tab[aria-selected='true'] {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .tab[aria-selected='true']::after {
+        position: absolute;
+        right: 0;
+        bottom: -1px;
+        left: 0;
+        height: 2px;
+        background: var(--bean);
+        content: '';
+      }
+
+      .view[hidden] {
+        display: none;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin: 42px 0 16px;
+      }
+
+      .section-head:first-child {
+        margin-top: 0;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 620;
+      }
+
+      .section-head span {
+        color: var(--faint);
+        font-size: 11px;
+      }
+
+      .section-head::after {
+        height: 1px;
+        flex: 1;
+        background: var(--line);
+        content: '';
+      }
+
+      .demo {
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: var(--surface);
+      }
+
+      .conversation-header {
+        display: flex;
+        min-height: 52px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 19px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .conversation-header strong {
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .quiet-action {
+        min-height: 36px;
+        padding: 0 4px;
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .quiet-action:hover {
+        color: var(--ink);
+      }
+
+      .conversation-body {
+        width: min(680px, calc(100% - 36px));
+        margin: 0 auto;
+        padding: 38px 0 30px;
+      }
+
+      .user-row {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 28px;
+      }
+
+      .user-message {
+        max-width: min(78%, 520px);
+        padding: 10px 13px;
+        border-radius: 8px;
+        background: var(--surface-muted);
+        color: var(--ink);
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .process-trigger {
+        display: flex;
+        width: 100%;
+        min-height: 40px;
+        align-items: center;
+        gap: 9px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .process-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--ink);
+      }
+
+      .process-trigger strong {
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .process-trigger span:last-child {
+        margin-left: auto;
+        color: var(--faint);
+        font-size: 11px;
+      }
+
+      .timeline {
+        margin: 1px 0 24px 3px;
+        padding-left: 19px;
+        border-left: 1px solid var(--line-strong);
+      }
+
+      .event {
+        position: relative;
+        padding: 5px 0 13px;
+        color: var(--muted);
+        font-size: 12.5px;
+        line-height: 1.65;
+      }
+
+      .event::before {
+        position: absolute;
+        top: 11px;
+        left: -23px;
+        width: 7px;
+        height: 7px;
+        border: 2px solid var(--surface);
+        border-radius: 50%;
+        background: var(--line-strong);
+        content: '';
+      }
+
+      .event.tool {
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      .event.tool b {
+        color: var(--success);
+        font-family: var(--sans);
+        font-weight: 600;
+      }
+
+      .answer {
+        position: relative;
+        padding: 19px 20px 21px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+      }
+
+      .answer-copy {
+        position: absolute;
+        top: 11px;
+        right: 14px;
+      }
+
+      .answer h3 {
+        margin: 0 0 12px;
+        padding-right: 60px;
+        font-size: 17px;
+        font-weight: 650;
+      }
+
+      .answer p {
+        margin: 0;
+        color: var(--body);
+        font-size: 14px;
+        line-height: 1.76;
+      }
+
+      .composer {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: end;
+        gap: 12px;
+        margin: 24px 0 0;
+        padding: 10px 12px 10px 15px;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+      }
+
+      .composer textarea {
+        min-height: 44px;
+        resize: vertical;
+        border: 0;
+        outline: 0;
+        color: var(--ink);
+        background: transparent;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .send {
+        min-height: 36px;
+        padding: 0 4px;
+        border: 0;
+        background: transparent;
+        color: var(--bean);
+        cursor: pointer;
+        font-size: 12.5px;
+        font-weight: 650;
+      }
+
+      .notes {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0;
+        margin-top: 18px;
+        border-block: 1px solid var(--line);
+      }
+
+      .note {
+        padding: 16px 18px;
+        border-right: 1px solid var(--line);
+      }
+
+      .note:last-child {
+        border-right: 0;
+      }
+
+      .note strong {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 12px;
+      }
+
+      .note p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11.5px;
+        line-height: 1.6;
+      }
+
+      .lab-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .specimen {
+        min-height: 250px;
+        padding: 22px;
+        border-block: 1px solid var(--line);
+      }
+
+      .specimen h3 {
+        margin: 0 0 4px;
+        font-size: 13px;
+        font-weight: 620;
+      }
+
+      .specimen > p {
+        margin: 0 0 22px;
+        color: var(--muted);
+        font-size: 11.5px;
+        line-height: 1.6;
+      }
+
+      .field {
+        display: grid;
+        gap: 7px;
+      }
+
+      .field label {
+        color: var(--body);
+        font-size: 12px;
+        font-weight: 550;
+      }
+
+      .field input {
+        width: 100%;
+        min-height: 42px;
+        padding: 0 11px;
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        color: var(--ink);
+        background: transparent;
+        font-size: 13px;
+      }
+
+      .hint {
+        color: var(--faint);
+        font-size: 11px;
+      }
+
+      .demo-menu {
+        width: 230px;
+        padding: 5px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .menu-item {
+        display: flex;
+        width: 100%;
+        min-height: 38px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--body);
+        cursor: pointer;
+        font-size: 12.5px;
+        text-align: left;
+      }
+
+      .menu-item:hover {
+        background: var(--surface-hover);
+        color: var(--ink);
+      }
+
+      .menu-item.danger {
+        color: var(--danger);
+      }
+
+      .menu-help {
+        display: block;
+        padding: 5px 10px 8px;
+        color: var(--faint);
+        font-size: 10.5px;
+        line-height: 1.5;
+      }
+
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .text-button {
+        min-height: 40px;
+        padding: 0 2px;
+        border: 0;
+        background: transparent;
+        color: var(--bean);
+        cursor: pointer;
+        font-size: 12.5px;
+        font-weight: 650;
+      }
+
+      .text-button[disabled] {
+        color: var(--faint);
+        cursor: wait;
+      }
+
+      .text-button.danger {
+        color: var(--danger);
+      }
+
+      .state-list {
+        border-top: 1px solid var(--line);
+      }
+
+      .state-row {
+        display: grid;
+        grid-template-columns: 120px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 18px;
+        min-height: 64px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .state-name {
+        font-size: 12px;
+        font-weight: 620;
+      }
+
+      .state-copy {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .state-action {
+        min-height: 36px;
+        padding: 0 2px;
+        border: 0;
+        background: transparent;
+        color: var(--bean);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .state-row.error .state-name,
+      .state-row.error .state-action {
+        color: var(--danger);
+      }
+
+      .state-row.success .state-name {
+        color: var(--success);
+      }
+
+      .spinner {
+        width: 12px;
+        height: 12px;
+        border: 1.5px solid var(--line-strong);
+        border-top-color: var(--muted);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .task-layout {
+        display: grid;
+        grid-template-columns: 340px minmax(0, 1fr);
+        min-height: 530px;
+      }
+
+      .task-list {
+        border-right: 1px solid var(--line);
+      }
+
+      .task-list-head,
+      .task-detail-head {
+        display: flex;
+        min-height: 62px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .task-list-head strong,
+      .task-detail-head strong {
+        font-size: 13px;
+        font-weight: 620;
+      }
+
+      .task-row {
+        width: 100%;
+        padding: 15px 18px;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        background: transparent;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .task-row.active {
+        box-shadow: inset 2px 0 0 var(--bean);
+        background: var(--surface-muted);
+      }
+
+      .task-row strong {
+        display: block;
+        font-size: 12.5px;
+        font-weight: 600;
+      }
+
+      .task-row span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .task-row .failed {
+        color: var(--danger);
+      }
+
+      .task-detail {
+        min-width: 0;
+      }
+
+      .detail-actions {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .detail-body {
+        padding: 25px 22px;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        border-block: 1px solid var(--line);
+      }
+
+      .detail-cell {
+        padding: 16px;
+        border-right: 1px solid var(--line);
+      }
+
+      .detail-cell:last-child {
+        border-right: 0;
+      }
+
+      .detail-cell small {
+        display: block;
+        color: var(--faint);
+        font-size: 11px;
+      }
+
+      .detail-cell strong {
+        display: block;
+        margin-top: 7px;
+        font-size: 12.5px;
+        font-weight: 600;
+      }
+
+      .run-list {
+        margin-top: 28px;
+        border-top: 1px solid var(--line);
+      }
+
+      .run-row {
+        display: grid;
+        grid-template-columns: 92px 86px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 13px;
+        min-height: 58px;
+        border-bottom: 1px solid var(--line);
+        font-size: 12px;
+      }
+
+      .run-status.success {
+        color: var(--success);
+      }
+
+      .run-status.failed {
+        color: var(--danger);
+      }
+
+      .run-summary {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--muted);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .review-footer {
+        margin-top: 40px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+        color: var(--faint);
+        font-size: 11px;
+        line-height: 1.7;
+      }
+
+      @media (max-width: 760px) {
+        .topbar {
+          padding: 0 18px;
+        }
+
+        .page {
+          width: min(100% - 28px, 680px);
+          padding-top: 28px;
+        }
+
+        .intro {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+
+        .lab-grid,
+        .task-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .task-list {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .notes,
+        .detail-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .note,
+        .detail-cell {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .note:last-child,
+        .detail-cell:last-child {
+          border-bottom: 0;
+        }
+
+        .state-row {
+          grid-template-columns: 90px minmax(0, 1fr);
+        }
+
+        .state-row > :last-child {
+          grid-column: 2;
+          justify-self: start;
+        }
+
+        .run-row {
+          grid-template-columns: 72px 74px minmax(0, 1fr);
+        }
+
+        .run-row > :last-child {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand"><span class="bean" aria-hidden="true"></span> Quiet Tool UI</div>
+        <button class="theme-button" type="button" id="theme">切换到 Dark</button>
+      </header>
+
+      <main class="page">
+        <div class="intro">
+          <div>
+            <h1>已确认 UI 方案归档</h1>
+            <p>
+              这些方案已于 2026-08-31 确认并同步到正式组件；本页保留为评审记录。Light / Dark
+              共用结构和信息层级。
+            </p>
+          </div>
+          <span class="proposal-badge">Accepted · 已入册</span>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="方案分类">
+          <button class="tab" role="tab" aria-selected="true" data-view="conversation">会话外壳</button>
+          <button class="tab" role="tab" aria-selected="false" data-view="interaction">交互与焦点</button>
+          <button class="tab" role="tab" aria-selected="false" data-view="states">系统状态</button>
+          <button class="tab" role="tab" aria-selected="false" data-view="tasks">任务操作</button>
+        </div>
+
+        <section class="view" id="conversation" role="tabpanel">
+          <div class="section-head"><h2>会话外壳</h2><span>圆角、标记、顶栏和 Composer</span></div>
+          <div class="demo">
+            <div class="conversation-header">
+              <strong>数据同步问题</strong>
+              <button class="quiet-action" type="button">会话任务</button>
+            </div>
+            <div class="conversation-body">
+              <div class="user-row">
+                <div class="user-message">帮我检查订单同步失败的原因，并给出最小范围修复。</div>
+              </div>
+              <button class="process-trigger" type="button" aria-expanded="true">
+                <span class="process-dot" aria-hidden="true"></span>
+                <strong>已完成 · 3 个步骤</strong>
+                <span>12.4 秒　⌃</span>
+              </button>
+              <div class="timeline">
+                <div class="event">先读取任务日志，确认失败发生在拉取、转换还是写入阶段。</div>
+                <div class="event tool">read_logs · order-sync <b>成功</b></div>
+                <div class="event">错误集中在上游超时；现有重试没有覆盖连接重置。</div>
+              </div>
+              <article class="answer">
+                <button class="quiet-action answer-copy" type="button">复制</button>
+                <h3>问题来自上游连接超时</h3>
+                <p>
+                  现有同步逻辑只重试响应超时，没有处理连接重置。建议把两类可恢复错误归入同一重试策略，保留当前
+                  3 次上限，不改公开接口。
+                </p>
+              </article>
+              <div class="composer">
+                <textarea aria-label="发送消息" placeholder="继续提问…"></textarea>
+                <button class="send" type="button">发送 →</button>
+              </div>
+            </div>
+          </div>
+          <div class="notes">
+            <div class="note"><strong>用户消息</strong><p>统一 8px 对称圆角，不使用气泡尾，也移除无语义的豆沙红圆点。</p></div>
+            <div class="note"><strong>顶部栏</strong><p>使用不透明背景与 1px 分隔线，不使用 backdrop blur。</p></div>
+            <div class="note"><strong>移动端</strong><p>RoundNav 直接隐藏；新增替代导航另行评审。</p></div>
+          </div>
+        </section>
+
+        <section class="view" id="interaction" role="tabpanel" hidden>
+          <div class="section-head"><h2>交互与焦点</h2><span>键盘可见性、异步与危险操作</span></div>
+          <div class="lab-grid">
+            <div class="specimen">
+              <h3>Focus-visible</h3>
+              <p>点击输入框或使用 Tab 查看豆沙红外轮廓；边界仍保留中性层级。</p>
+              <div class="field">
+                <label for="account-name">账户显示名</label>
+                <input id="account-name" value="张三" />
+                <span class="hint">示例使用虚构身份，不展示真实用户名。</span>
+              </div>
+            </div>
+            <div class="specimen">
+              <h3>Overlay</h3>
+              <p>浮层统一 8px 圆角和唯一一档阴影，不使用 blur 或彩色表面。</p>
+              <div class="demo-menu" role="menu">
+                <button class="menu-item" role="menuitem">重命名<span>⌘ R</span></button>
+                <button class="menu-item" role="menuitem">归档</button>
+                <button class="menu-item danger" role="menuitem" id="delete-action">删除任务</button>
+                <span class="menu-help" id="delete-help">第一次点击进入二次确认，不立即删除。</span>
+              </div>
+            </div>
+            <div class="specimen">
+              <h3>Async action</h3>
+              <p>pending 保持原位置与宽度，只锁定当前动作；失败后恢复输入。</p>
+              <div class="button-row">
+                <button class="text-button" id="save-button" type="button">保存资料 →</button>
+                <span class="hint" id="save-status" aria-live="polite">尚未保存</span>
+              </div>
+            </div>
+            <div class="specimen">
+              <h3>Question locked</h3>
+              <p>另一条流仍在收尾时保留选择，但锁定提交，不误报“正在提交”。</p>
+              <div class="field" aria-disabled="true">
+                <label>按最小范围继续？</label>
+                <label class="hint"><input type="radio" checked disabled /> 仅修复已定位的问题</label>
+                <button class="text-button" type="button" disabled>等待当前输出结束</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="states" role="tabpanel" hidden>
+          <div class="section-head"><h2>系统状态</h2><span>保持上下文，不用空白和大面积状态色</span></div>
+          <div class="state-list">
+            <div class="state-row">
+              <span class="state-name">首次加载</span>
+              <span class="state-copy">正在读取执行记录，页面结构保持稳定。</span>
+              <span class="spinner" role="status" aria-label="正在加载"></span>
+            </div>
+            <div class="state-row">
+              <span class="state-name">后台刷新</span>
+              <span class="state-copy">现有内容继续可读；只在标题旁提示“正在更新”。</span>
+              <button class="state-action" type="button" disabled>正在更新…</button>
+            </div>
+            <div class="state-row">
+              <span class="state-name">空结果</span>
+              <span class="state-copy">当前筛选没有任务。清除筛选后仍保留列表上下文。</span>
+              <button class="state-action" type="button">清除筛选</button>
+            </div>
+            <div class="state-row error">
+              <span class="state-name">读取失败</span>
+              <span class="state-copy">暂时无法读取执行记录，已有任务定义未受影响。</span>
+              <button class="state-action" type="button">重新加载</button>
+            </div>
+            <div class="state-row success">
+              <span class="state-name">保存成功</span>
+              <span class="state-copy">资料已保存；反馈原位出现，不遮挡下一步操作。</span>
+              <span class="state-copy">已保存</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="tasks" role="tabpanel" hidden>
+          <div class="section-head"><h2>任务操作</h2><span>列表、详情、执行记录保持独立层级</span></div>
+          <div class="demo task-layout">
+            <div class="task-list">
+              <div class="task-list-head"><strong>定时任务</strong><span class="meta">1 个需关注</span></div>
+              <button class="task-row active" type="button">
+                <strong>订单同步异常巡检</strong>
+                <span class="failed">最近执行失败 · 今天 02:00</span>
+              </button>
+              <button class="task-row" type="button">
+                <strong>每日数据质量摘要</strong>
+                <span>最近执行成功 · 今天 08:30</span>
+              </button>
+              <button class="task-row" type="button">
+                <strong>月度归档提醒</strong>
+                <span>已暂停 · 7 月 31 日</span>
+              </button>
+            </div>
+            <div class="task-detail">
+              <div class="task-detail-head">
+                <strong>订单同步异常巡检</strong>
+                <div class="detail-actions">
+                  <button class="quiet-action" id="pause-action" type="button">暂停</button>
+                  <button class="quiet-action" type="button">更多 ···</button>
+                </div>
+              </div>
+              <div class="detail-body">
+                <div class="detail-grid">
+                  <div class="detail-cell"><small>任务状态</small><strong style="color: var(--success)">已启用</strong></div>
+                  <div class="detail-cell"><small>执行计划</small><strong>每 30 分钟</strong></div>
+                  <div class="detail-cell"><small>下次执行</small><strong>今天 10:30</strong></div>
+                </div>
+                <div class="run-list">
+                  <div class="run-row">
+                    <span>今天 02:00</span><span class="run-status failed">失败</span>
+                    <span class="run-summary">3 个订单源连续超时</span><button class="quiet-action">查看 →</button>
+                  </div>
+                  <div class="run-row">
+                    <span>今天 01:30</span><span class="run-status success">成功</span>
+                    <span class="run-summary">全部订单已完成同步</span><button class="quiet-action">查看 →</button>
+                  </div>
+                  <div class="run-row">
+                    <span>今天 01:00</span><span class="run-status success">成功</span>
+                    <span class="run-summary">全部订单已完成同步</span><button class="quiet-action">查看 →</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="notes">
+            <div class="note"><strong>字号</strong><p>任务时间、结果与摘要不低于 12px，不把必要信息压成 10px。</p></div>
+            <div class="note"><strong>异步启停</strong><p>点击后原位显示“正在暂停…”，锁定单个动作，完成后更新生命周期。</p></div>
+            <div class="note"><strong>删除确认</strong><p>危险项进入第二阶段并说明影响范围；确认文字用鲜红，仍不填充背景。</p></div>
+          </div>
+        </section>
+
+        <footer class="review-footer">
+          本页仅保留评审稿。正式规范与实现以 Design System Showcase、组件源码及正式前端为准。
+        </footer>
+      </main>
+    </div>
+
+    <script>
+      const root = document.documentElement
+      const themeButton = document.getElementById('theme')
+      const tabs = [...document.querySelectorAll('.tab')]
+      const views = [...document.querySelectorAll('.view')]
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      root.dataset.theme = prefersDark ? 'dark' : 'light'
+
+      function updateThemeLabel() {
+        themeButton.textContent = root.dataset.theme === 'dark' ? '切换到 Light' : '切换到 Dark'
+      }
+
+      updateThemeLabel()
+      themeButton.addEventListener('click', () => {
+        root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark'
+        updateThemeLabel()
+      })
+
+      tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          tabs.forEach((item) => item.setAttribute('aria-selected', String(item === tab)))
+          views.forEach((view) => {
+            view.hidden = view.id !== tab.dataset.view
+          })
+        })
+      })
+
+      const deleteAction = document.getElementById('delete-action')
+      const deleteHelp = document.getElementById('delete-help')
+      let deletePending = false
+      deleteAction.addEventListener('click', () => {
+        if (!deletePending) {
+          deletePending = true
+          deleteAction.textContent = '确认删除“订单同步异常巡检”？'
+          deleteHelp.textContent = '删除后停止后续执行；历史执行记录仍保留。再次点击确认。'
+          return
+        }
+        deletePending = false
+        deleteAction.textContent = '删除任务'
+        deleteHelp.textContent = '演示完成：真实页面此时才提交删除请求。'
+      })
+
+      const saveButton = document.getElementById('save-button')
+      const saveStatus = document.getElementById('save-status')
+      saveButton.addEventListener('click', () => {
+        saveButton.disabled = true
+        saveButton.textContent = '正在保存…'
+        saveStatus.textContent = '只锁定保存动作'
+        window.setTimeout(() => {
+          saveButton.disabled = false
+          saveButton.textContent = '保存资料 →'
+          saveStatus.textContent = '已保存'
+          saveStatus.style.color = 'var(--success)'
+        }, 900)
+      })
+
+      const pauseAction = document.getElementById('pause-action')
+      pauseAction.addEventListener('click', () => {
+        pauseAction.disabled = true
+        pauseAction.textContent = '正在暂停…'
+        window.setTimeout(() => {
+          pauseAction.disabled = false
+          pauseAction.textContent = '启用'
+        }, 900)
+      })
+    </script>
+  </body>
+</html>

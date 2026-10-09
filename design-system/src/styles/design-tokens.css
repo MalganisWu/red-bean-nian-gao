@@ -1,0 +1,482 @@
+/**
+ * red-bean-nian-gao Design Tokens
+ *
+ * Canonical direction: quiet tool interface.
+ * Pure white / near black / neutral gray / restrained red-bean accent.
+ * Light and dark share geometry and behavior; only semantic values change.
+ *
+ * Architecture: Primitive -> Semantic -> Component.
+ * This file is the single source of truth for the design-system site and product frontend.
+ */
+
+/* =========================================
+   1. Primitive Tokens
+   ========================================= */
+:root {
+  /* Neutral anchors */
+  --color-white: #ffffff;
+  --color-near-black: #0b0b0c;
+
+  /* Light neutrals */
+  --color-light-sidebar: #f6f6f5;
+  --color-light-muted: #f2f4f5;
+  --color-light-ink: #101114;
+  --color-light-body: #24262a;
+  --color-light-secondary: #494c52;
+  --color-light-meta: #656972;
+  --color-light-faint: #70747c;
+  --color-light-line: #dadce0;
+  --color-light-line-strong: #c8cbd0;
+  --color-light-control-border: #8f949c;
+  --color-light-process-node: #70747c;
+  --color-light-process-node-active: #c87972;
+  --color-light-process-title: #494c52;
+  --color-light-process-copy-active: #5d6169;
+  --color-light-process-code: #34363b;
+  --color-light-tool-name: #34363b;
+  --color-light-tool-target: #5d6169;
+  --color-light-tool-duration: #70747c;
+  --color-light-delegation-name: #34363b;
+  --color-light-question-copy: #494c52;
+  --color-light-question-option: #5d6169;
+  --color-light-inline-code-bg: #f2f4f5;
+  --color-light-inline-code-fg: #34363b;
+
+  /* Dark neutrals */
+  --color-dark-sidebar: #111112;
+  --color-dark-muted: #1d1d1f;
+  --color-dark-ink: #f3f2ef;
+  --color-dark-body: #d7d4d0;
+  --color-dark-secondary: #aaa7a3;
+  --color-dark-meta: #8c8883;
+  --color-dark-faint: #817d78;
+  --color-dark-line: #242426;
+  --color-dark-line-strong: #363639;
+  --color-dark-control-border: #5e5e63;
+  --color-dark-process-node: #77736f;
+  --color-dark-process-node-active: #c87972;
+  --color-dark-process-title: #aaa6a1;
+  --color-dark-process-copy-active: #b8b4af;
+  --color-dark-process-code: #c8c4bf;
+  --color-dark-tool-name: #cfcbc6;
+  --color-dark-tool-target: #918d88;
+  --color-dark-tool-duration: #8c8883;
+  --color-dark-delegation-name: #b7b3ae;
+  --color-dark-question-copy: #a9a5a0;
+  --color-dark-question-option: #a9a5a0;
+  --color-dark-inline-code-bg: #1b1b1d;
+  --color-dark-inline-code-fg: #d9d5d0;
+
+  /* Red-bean accent: identity and confirmation, never status */
+  --color-bean-light: #99413c;
+  --color-bean-light-hover: #793e39;
+  --color-bean-light-indicator: #c87972;
+  --color-bean-light-soft: #faeeee;
+  --color-bean-dark: #c87972;
+  --color-bean-dark-hover: #df948d;
+  --color-bean-dark-indicator: #c87972;
+  --color-bean-dark-soft: #251817;
+
+  /* State colors: reserved for state meaning */
+  --color-success-light: #0f713d;
+  --color-success-light-indicator: #2f9e58;
+  --color-success-light-soft: #eaf8ef;
+  --color-success-dark: #55c47b;
+  --color-success-dark-indicator: #55c47b;
+  --color-success-dark-soft: #102719;
+  --color-danger-light: #b52a36;
+  --color-danger-light-indicator: #e04752;
+  --color-danger-light-soft: #fff0f2;
+  --color-danger-dark: #ff515e;
+  --color-danger-dark-indicator: #ff515e;
+  --color-danger-dark-soft: #2d1115;
+
+  /* Category colors（审计/轨迹场景的记录分类色，只用于 chip、节点、细条等小面积元素）
+     石板蓝=工具、灰绿=子 Agent、暖石灰=压缩；LLM 步骤用既有中性灰、用户用品牌豆沙红，
+     不新增。Dark 的 soft 不用近黑染色，而是 indicator 低透明度混合，避免读作"黑洞"。 */
+  --color-cat-tool-light-text: #3a5c7e;
+  --color-cat-tool-light-indicator: #6e8fae;
+  --color-cat-tool-light-soft: #edf2f7;
+  --color-cat-sub-light-text: #486b53;
+  --color-cat-sub-light-indicator: #6e967e;
+  --color-cat-sub-light-soft: #edf3ee;
+  --color-cat-cmp-light-text: #6e5f49;
+  --color-cat-cmp-light-indicator: #9c8b6e;
+  --color-cat-cmp-light-soft: #f5f1ea;
+  --color-cat-tool-dark-text: #9dbad6;
+  --color-cat-tool-dark-indicator: #7fa0bf;
+  --color-cat-sub-dark-text: #a3c2ae;
+  --color-cat-sub-dark-indicator: #84a48f;
+  --color-cat-cmp-dark-text: #c9b795;
+  --color-cat-cmp-dark-indicator: #a89878;
+
+  /* Backward-compatible primitive aliases. Do not use in new work. */
+  --color-primitive-redbean: var(--color-bean-light);
+  --color-primitive-redbean-dark: var(--color-bean-light-hover);
+  --color-primitive-neutral-bg: var(--background);
+  --color-primitive-neutral-surface-input: var(--input);
+  --color-primitive-neutral-surface: var(--card);
+  --color-primitive-neutral-elevated: var(--muted);
+  --color-primitive-neutral-bubble: var(--border);
+  --color-primitive-neutral-border-strong: var(--border-strong);
+  --color-primitive-neutral-foreground: var(--foreground);
+  --color-primitive-neutral-foreground-body: var(--foreground-body);
+  --color-primitive-neutral-foreground-muted: var(--foreground-muted);
+  --color-primitive-neutral-ink: var(--ink);
+  --color-primitive-neutral-faint: var(--foreground-faint);
+  --color-primitive-neutral-faintest: var(--foreground-faintest);
+  --color-primitive-neutral-hairline: var(--hairline);
+  --color-primitive-success: var(--success);
+  --color-primitive-success-bg: var(--success-bg);
+  --color-primitive-danger: var(--danger);
+  --color-primitive-danger-bg: var(--danger-bg);
+  --color-primitive-warning: var(--warning);
+  --color-primitive-warning-bg: var(--warning-bg);
+  --color-primitive-info: var(--info);
+  --color-primitive-info-bg: var(--info-bg);
+}
+
+/* =========================================
+   2. Semantic Tokens - Light is the default
+   ========================================= */
+:root {
+  color-scheme: light;
+
+  /* Identity and action */
+  --brand-text: var(--color-bean-light);
+  --brand-indicator: var(--color-bean-light-indicator);
+  --selection-accent: var(--color-bean-light-indicator);
+  --focus-ring: var(--color-bean-light-indicator);
+  --round-nav-marker: var(--color-light-control-border);
+  --primary: var(--color-bean-light);
+  --primary-hover: var(--color-bean-light-hover);
+  --primary-soft: var(--color-bean-light-soft);
+  --primary-foreground: var(--color-white);
+  --action-confirm: var(--color-bean-light);
+  --action-confirm-hover: var(--color-bean-light-hover);
+
+  /* Surfaces */
+  --background: var(--color-white);
+  --sidebar: var(--color-light-sidebar);
+  --card: var(--color-white);
+  --card-foreground: var(--color-light-ink);
+  --muted: var(--color-light-muted);
+  --popover: var(--color-white);
+  --input: var(--color-white);
+  --surface-hover: var(--color-light-muted);
+
+  /* Text */
+  --foreground: var(--color-light-ink);
+  --foreground-body: var(--color-light-body);
+  --foreground-secondary: var(--color-light-secondary);
+  --foreground-muted: var(--color-light-meta);
+  --muted-foreground: var(--color-light-meta);
+  --foreground-faint: var(--color-light-meta);
+  --foreground-faintest: var(--color-light-faint);
+  --process-node: var(--color-light-process-node);
+  --process-node-active: var(--color-light-process-node-active);
+  --process-title: var(--color-light-process-title);
+  --process-copy-active: var(--color-light-process-copy-active);
+  --process-code: var(--color-light-process-code);
+  --tool-name: var(--color-light-tool-name);
+  --tool-target: var(--color-light-tool-target);
+  --tool-duration: var(--color-light-tool-duration);
+  --delegation-name: var(--color-light-delegation-name);
+  --question-copy: var(--color-light-question-copy);
+  --question-option: var(--color-light-question-option);
+
+  /* Structure */
+  --border: var(--color-light-line);
+  --border-strong: var(--color-light-line-strong);
+  --control-border: var(--color-light-control-border);
+  --hairline: var(--color-light-line);
+  --ink: var(--color-near-black);
+
+  /* Compatibility semantics */
+  --secondary: var(--color-light-muted);
+  --secondary-hover: #ecebe8;
+  --secondary-foreground: var(--color-light-body);
+  --accent: var(--color-bean-light);
+  --accent-foreground: var(--color-white);
+
+  /* State */
+  --success-text: var(--color-success-light);
+  --success-indicator: var(--color-success-light-indicator);
+  --success: var(--success-text);
+  --success-bg: var(--color-success-light-soft);
+  --danger-text: var(--color-danger-light);
+  --danger-indicator: var(--color-danger-light-indicator);
+  --danger: var(--danger-text);
+  --danger-bg: var(--color-danger-light-soft);
+  --destructive: var(--color-danger-light);
+  --destructive-foreground: var(--color-white);
+  --warning: var(--color-bean-light);
+  --warning-bg: var(--color-bean-light-soft);
+  --info: var(--color-light-secondary);
+  --info-bg: var(--color-light-muted);
+
+  /* Category semantics（审计分类色：文字 / 图形指示 / 软底） */
+  --cat-tool-text: var(--color-cat-tool-light-text);
+  --cat-tool-indicator: var(--color-cat-tool-light-indicator);
+  --cat-tool-soft: var(--color-cat-tool-light-soft);
+  --cat-sub-text: var(--color-cat-sub-light-text);
+  --cat-sub-indicator: var(--color-cat-sub-light-indicator);
+  --cat-sub-soft: var(--color-cat-sub-light-soft);
+  --cat-cmp-text: var(--color-cat-cmp-light-text);
+  --cat-cmp-indicator: var(--color-cat-cmp-light-indicator);
+  --cat-cmp-soft: var(--color-cat-cmp-light-soft);
+
+  /* Code and selection */
+  --highlight-bg: var(--color-bean-light-soft);
+  --highlight-fg: var(--color-bean-light-hover);
+  --code-inline-bg: var(--color-light-inline-code-bg);
+  --code-inline-fg: var(--color-light-inline-code-fg);
+
+  /* Motion accent for the single current Process node */
+  --process-active-ring: 0 0 0 4px rgb(200 121 114 / 16%);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --brand-text: var(--color-bean-dark);
+  --brand-indicator: var(--color-bean-dark-indicator);
+  --selection-accent: var(--color-bean-dark-indicator);
+  --focus-ring: var(--color-bean-dark-indicator);
+  --round-nav-marker: var(--color-dark-control-border);
+  --primary: var(--color-bean-dark);
+  --primary-hover: var(--color-bean-dark-hover);
+  --primary-soft: var(--color-bean-dark-soft);
+  --primary-foreground: var(--color-near-black);
+  --action-confirm: var(--color-bean-dark);
+  --action-confirm-hover: var(--color-bean-dark-hover);
+
+  --background: var(--color-near-black);
+  --sidebar: var(--color-dark-sidebar);
+  --card: var(--color-near-black);
+  --card-foreground: var(--color-dark-ink);
+  --muted: var(--color-dark-muted);
+  --popover: var(--color-dark-muted);
+  --input: var(--color-near-black);
+  --surface-hover: var(--color-dark-muted);
+
+  --foreground: var(--color-dark-ink);
+  --foreground-body: var(--color-dark-body);
+  --foreground-secondary: var(--color-dark-secondary);
+  --foreground-muted: var(--color-dark-meta);
+  --muted-foreground: var(--color-dark-meta);
+  --foreground-faint: var(--color-dark-meta);
+  --foreground-faintest: var(--color-dark-faint);
+  --process-node: var(--color-dark-process-node);
+  --process-node-active: var(--color-dark-process-node-active);
+  --process-title: var(--color-dark-process-title);
+  --process-copy-active: var(--color-dark-process-copy-active);
+  --process-code: var(--color-dark-process-code);
+  --tool-name: var(--color-dark-tool-name);
+  --tool-target: var(--color-dark-tool-target);
+  --tool-duration: var(--color-dark-tool-duration);
+  --delegation-name: var(--color-dark-delegation-name);
+  --question-copy: var(--color-dark-question-copy);
+  --question-option: var(--color-dark-question-option);
+
+  --border: var(--color-dark-line);
+  --border-strong: var(--color-dark-line-strong);
+  --control-border: var(--color-dark-control-border);
+  --hairline: var(--color-dark-line);
+  --ink: #050506;
+
+  --secondary: var(--color-dark-muted);
+  --secondary-hover: #262628;
+  --secondary-foreground: var(--color-dark-body);
+  --accent: var(--color-bean-dark);
+  --accent-foreground: var(--color-near-black);
+
+  --success-text: var(--color-success-dark);
+  --success-indicator: var(--color-success-dark-indicator);
+  --success: var(--success-text);
+  --success-bg: var(--color-success-dark-soft);
+  --danger-text: var(--color-danger-dark);
+  --danger-indicator: var(--color-danger-dark-indicator);
+  --danger: var(--danger-text);
+  --danger-bg: var(--color-danger-dark-soft);
+  --destructive: var(--color-danger-dark);
+  --destructive-foreground: var(--color-near-black);
+  --warning: var(--color-bean-dark);
+  --warning-bg: var(--color-bean-dark-soft);
+  --info: var(--color-dark-secondary);
+  --info-bg: var(--color-dark-muted);
+
+  --cat-tool-text: var(--color-cat-tool-dark-text);
+  --cat-tool-indicator: var(--color-cat-tool-dark-indicator);
+  --cat-tool-soft: color-mix(in srgb, var(--cat-tool-indicator) 16%, transparent);
+  --cat-sub-text: var(--color-cat-sub-dark-text);
+  --cat-sub-indicator: var(--color-cat-sub-dark-indicator);
+  --cat-sub-soft: color-mix(in srgb, var(--cat-sub-indicator) 16%, transparent);
+  --cat-cmp-text: var(--color-cat-cmp-dark-text);
+  --cat-cmp-indicator: var(--color-cat-cmp-dark-indicator);
+  --cat-cmp-soft: color-mix(in srgb, var(--cat-cmp-indicator) 14%, transparent);
+
+  --highlight-bg: var(--color-bean-dark-soft);
+  --highlight-fg: var(--color-bean-dark-hover);
+  --code-inline-bg: var(--color-dark-inline-code-bg);
+  --code-inline-fg: var(--color-dark-inline-code-fg);
+
+  --process-active-ring: 0 0 0 4px rgb(200 121 114 / 20%);
+}
+
+/* =========================================
+   3. Component Tokens
+   ========================================= */
+:root {
+  --button-default-bg: transparent;
+  --button-default-text: var(--action-confirm);
+  --button-secondary-bg: var(--secondary);
+  --button-secondary-text: var(--secondary-foreground);
+  --button-outline-bg: var(--background);
+  --button-outline-text: var(--foreground-body);
+  --button-solid-bg: var(--foreground);
+  --button-solid-text: var(--background);
+  --button-destructive-bg: transparent;
+  --button-destructive-text: var(--danger);
+
+  --input-bg: var(--input);
+  --input-text: var(--foreground);
+  --input-border: var(--control-border);
+  --input-focus-ring: var(--focus-ring);
+  --input-placeholder: var(--muted-foreground);
+
+  --avatar-bg: var(--background);
+  --avatar-text: var(--foreground-body);
+  --avatar-border: var(--border-strong);
+
+  --menu-bg: var(--popover);
+  --menu-item-text: var(--foreground);
+  --tooltip-default-bg: var(--foreground);
+  --tooltip-default-text: var(--background);
+  --tooltip-primary-bg: var(--primary);
+  --tooltip-primary-text: var(--primary-foreground);
+  --tooltip-solid-bg: var(--foreground);
+  --tooltip-solid-text: var(--background);
+
+  --toast-bg: var(--popover);
+  --toast-text: var(--foreground);
+  --toast-action-bg: transparent;
+  --toast-action-text: var(--action-confirm);
+  --toast-cancel-bg: transparent;
+  --toast-cancel-text: var(--foreground-muted);
+
+  /* Design-system documentation chrome */
+  --swatch-label-overlay: rgb(0 0 0 / 60%);
+}
+
+/* =========================================
+   4. Spacing - 4px base rhythm
+   ========================================= */
+:root {
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+}
+
+/* =========================================
+   5. Shadow - only detached overlays
+   ========================================= */
+:root {
+  --shadow-xs: none;
+  --shadow-sm: none;
+  --shadow: none;
+  --shadow-md: none;
+  --shadow-lg: 0 8px 24px rgb(17 17 15 / 8%);
+  --shadow-xl: var(--shadow-lg);
+  --shadow-2xl: var(--shadow-lg);
+  --shadow-overlay: var(--shadow-lg);
+  --shadow-composer: 0 8px 28px rgb(20 18 16 / 4.5%);
+  --shadow-primary-glow: var(--process-active-ring);
+}
+
+.dark {
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 38%);
+  --shadow-composer: 0 8px 28px rgb(0 0 0 / 26%);
+}
+
+/* =========================================
+   6. Radius - content stays quiet
+   ========================================= */
+:root {
+  --radius: 8px;
+  --radius-xs: 0;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-avatar: 8px;
+  --radius-pill: 9999px;
+}
+
+/* =========================================
+   7. Border
+   ========================================= */
+:root {
+  --border-width-thin: 1px;
+  --border-width-base: 1px;
+  --border-width-thick: 2px;
+}
+
+/* =========================================
+   8. Typography
+   ========================================= */
+:root {
+  --font-head:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --font-sans: var(--font-head);
+  --font-body: var(--font-sans);
+  --font-mono: 'SFMono-Regular', 'SF Mono', Consolas, 'Liberation Mono', monospace;
+  --font-size-label: 12px;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 30px;
+  --font-size-4xl: 36px;
+  --font-size-5xl: 48px;
+
+  --line-height-tight: 1.35;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.7;
+  --line-height-body: 1.7;
+  --line-height-longform: 1.75;
+
+  --tracking-action: 0;
+  --tracking-label: 0.01em;
+  --tracking-label-wide: 0.02em;
+  --tracking-caption: 0.02em;
+  --tracking-brand: 0.02em;
+}
+
+/* =========================================
+   9. Motion
+   ========================================= */
+:root {
+  --transition-fast: 0.1s;
+  --transition-base: 0.15s;
+  --transition-slow: 0.3s;
+}
+
+/* =========================================
+   10. Z-index
+   ========================================= */
+:root {
+  --z-base: 1;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal: 500;
+  --z-toast: 1000;
+}

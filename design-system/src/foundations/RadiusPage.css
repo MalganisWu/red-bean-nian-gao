@@ -1,0 +1,92 @@
+.radius-page section + section {
+  margin-top: 40px;
+}
+
+.radius-scale {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--border);
+}
+
+.radius-scale article {
+  padding: 18px 18px 18px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.radius-scale article + article {
+  padding-left: 18px;
+  border-left: 1px solid var(--border);
+}
+
+.radius-scale__shape {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border-strong);
+  background: var(--muted);
+}
+
+.radius-scale strong {
+  display: block;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.radius-scale code {
+  color: var(--foreground-muted);
+  font: 12px/1.5 var(--font-mono);
+}
+
+.radius-scale p {
+  margin: 7px 0 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.radius-map {
+  border-top: 1px solid var(--border-strong);
+}
+
+.radius-map > div {
+  display: grid;
+  grid-template-columns: 190px 80px 1fr;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.radius-map strong {
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.radius-map code {
+  color: var(--primary);
+  font: 12px/1.5 var(--font-mono);
+}
+
+.radius-map p {
+  margin: 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 700px) {
+  .radius-scale {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .radius-scale article:nth-child(3) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .radius-map > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}

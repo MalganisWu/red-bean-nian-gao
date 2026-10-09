@@ -1,0 +1,113 @@
+.spacing-base-demo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
+}
+
+.spacing-base-block {
+  width: 4px;
+  height: 40px;
+  background-color: var(--primary);
+  border: var(--border-width-thin) solid var(--border);
+  border-radius: var(--radius-xs);
+}
+
+.spacing-base-info__title {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.spacing-base-info__desc {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+  line-height: var(--line-height-relaxed);
+}
+
+/* Scale */
+.spacing-scale {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.spacing-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-3);
+  border: var(--border-width-thin) solid var(--border);
+  background-color: var(--card);
+  border-radius: var(--radius-sm);
+}
+
+.spacing-row__info {
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.spacing-row__token {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--foreground);
+  font-size: var(--font-size-sm);
+}
+
+.spacing-row__px {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+
+.spacing-row__multiplier {
+  font-size: var(--font-size-xs);
+  color: var(--primary);
+}
+
+.spacing-row__bar {
+  height: 20px;
+  border: var(--border-width-thin) solid var(--border);
+  border-radius: var(--radius-xs);
+}
+
+.spacing-row__bar--primary {
+  background-color: var(--primary);
+}
+
+.spacing-row__bar--accent {
+  background-color: var(--accent);
+}
+
+.spacing-row__bar--muted {
+  background-color: var(--muted);
+}
+
+.spacing-row__desc {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+  flex: 1;
+}
+
+/* Usage Map */
+.spacing-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--spacing-3);
+}
+
+.spacing-usage-card {
+  padding: var(--spacing-3) 0;
+  border-top: var(--border-width-thin) solid var(--border);
+  background-color: transparent;
+}
+
+.spacing-usage-card__component {
+  font-weight: 700;
+  color: var(--foreground);
+  margin-bottom: var(--spacing-1);
+}
+
+.spacing-usage-card__details {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}

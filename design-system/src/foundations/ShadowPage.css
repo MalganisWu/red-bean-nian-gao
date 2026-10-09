@@ -1,0 +1,82 @@
+.shadow-page section + section {
+  margin-top: 40px;
+}
+
+.shadow-levels {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 28px;
+}
+
+.shadow-levels article {
+  padding: 20px 0;
+}
+
+.shadow-levels__surface,
+.shadow-levels__overlay {
+  display: grid;
+  height: 132px;
+  place-items: center;
+  margin-bottom: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  color: var(--foreground-secondary);
+  background: var(--popover);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.shadow-levels__overlay {
+  box-shadow: var(--shadow-overlay);
+}
+
+.shadow-levels h3 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.shadow-levels p {
+  min-height: 42px;
+  margin: 6px 0 10px;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.shadow-levels code,
+.shadow-composer-rule code {
+  color: var(--foreground-muted);
+  font: 12px/1.55 var(--font-mono);
+}
+
+.shadow-composer-rule {
+  max-width: 800px;
+  padding: 18px;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.shadow-composer-rule strong {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.shadow-composer-rule p {
+  margin: 6px 0 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.shadow-composer-rule code {
+  margin-left: 4px;
+}
+
+@media (max-width: 680px) {
+  .shadow-levels {
+    grid-template-columns: 1fr;
+  }
+}

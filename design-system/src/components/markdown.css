@@ -1,0 +1,264 @@
+/* Quiet Tool UI markdown: reading-first sans typography with restrained structure. */
+.markdown-body {
+  color: var(--foreground-body);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.76;
+  overflow-wrap: anywhere;
+}
+
+/* Delegation output lives inside the compact process timeline, not the answer column. */
+.markdown-body.delegation-output {
+  color: inherit;
+  font-size: 10.5px;
+  line-height: 1.75;
+}
+
+.markdown-body > *:first-child {
+  margin-top: 0;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin: 1.65em 0 0.55em;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.markdown-body h1 {
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+}
+
+.markdown-body h2 {
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+}
+
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  display: block;
+  font-size: 15px;
+}
+
+.markdown-body p {
+  margin: 0.75em 0;
+}
+
+.markdown-body a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.markdown-body strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.markdown-body em {
+  font-style: normal;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0.75em 0;
+  padding-left: 1.35em;
+}
+
+.markdown-body ul {
+  list-style: disc;
+}
+
+.markdown-body ol {
+  list-style: decimal;
+}
+
+.markdown-body li {
+  margin: 0.3em 0;
+  padding-left: 0.2em;
+}
+
+.markdown-body li::marker {
+  color: var(--foreground-muted);
+}
+
+.markdown-body input[type='checkbox'] {
+  margin-right: 0.45em;
+  accent-color: var(--selection-accent);
+}
+
+.markdown-body li.task-list-item {
+  margin-left: -1.35em;
+  list-style: none;
+}
+
+.markdown-body blockquote {
+  margin: 1em 0;
+  padding: 0.1em 0 0.1em 0.875rem;
+  border-left: 2px solid var(--border-strong);
+  color: var(--foreground-secondary);
+  font-style: normal;
+}
+
+.markdown-body blockquote p {
+  margin: 0.25em 0;
+}
+
+.markdown-body code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: var(--code-inline-fg);
+  background: var(--code-inline-bg);
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.markdown-code-block {
+  margin: 1.1em 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground-body);
+  background: var(--muted);
+}
+
+.markdown-code-block__header {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px 6px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground-muted);
+  background: var(--background);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.markdown-code-block pre {
+  overflow-x: auto;
+  margin: 0;
+  padding: 0.875rem 1rem;
+  color: var(--foreground-body);
+  background: transparent;
+}
+
+.markdown-code-block pre code {
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font-size: 0.75rem;
+  line-height: 1.7;
+}
+
+.markdown-body table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  margin: 1em 0;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 0.6em 0.75em;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.markdown-body th {
+  color: var(--foreground-secondary);
+  background: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.markdown-body td {
+  color: var(--foreground-secondary);
+}
+
+.markdown-body hr {
+  margin: 1.5em 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.markdown-body .hljs {
+  color: var(--foreground-body);
+  background: transparent;
+}
+
+.markdown-body .hljs-comment,
+.markdown-body .hljs-quote,
+.markdown-body .hljs-meta,
+.markdown-body .hljs-doctag {
+  color: var(--foreground-muted);
+}
+
+.markdown-body .hljs-keyword,
+.markdown-body .hljs-selector-tag,
+.markdown-body .hljs-tag,
+.markdown-body .hljs-variable,
+.markdown-body .hljs-template-variable,
+.markdown-body .hljs-regexp,
+.markdown-body .hljs-deletion {
+  color: var(--danger);
+}
+
+.markdown-body .hljs-string,
+.markdown-body .hljs-attr,
+.markdown-body .hljs-symbol,
+.markdown-body .hljs-addition {
+  color: var(--success);
+}
+
+.markdown-body .hljs-number,
+.markdown-body .hljs-literal,
+.markdown-body .hljs-built_in,
+.markdown-body .hljs-type,
+.markdown-body .hljs-title,
+.markdown-body .hljs-section,
+.markdown-body .hljs-function,
+.markdown-body .hljs-params {
+  color: var(--foreground-secondary);
+}
+
+@media (max-width: 760px) {
+  .markdown-body {
+    font-size: 14.5px;
+  }
+
+  .markdown-body h1 {
+    font-size: 18px;
+  }
+
+  .markdown-body h2 {
+    font-size: 18px;
+  }
+}

@@ -1,0 +1,238 @@
+.conversation-showcase {
+  width: min(100%, 1040px);
+  margin: 0 auto;
+}
+
+.spec-page__header {
+  margin-bottom: 36px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.spec-page__header h2 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.spec-page__header p {
+  margin: 6px 0 0;
+  color: var(--foreground-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.spec-page__header span {
+  display: block;
+  margin-top: 4px;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.spec-section {
+  margin-top: 42px;
+}
+
+.spec-section:first-of-type {
+  margin-top: 0;
+}
+
+.spec-section__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.spec-section__title::after {
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+  content: '';
+}
+
+.spec-section__note,
+.spec-callout {
+  max-width: 760px;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.spec-callout {
+  margin: 0 0 28px;
+  padding: 13px 0 13px 16px;
+  border-left: 2px solid var(--primary);
+}
+
+.spec-callout strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.spec-frame {
+  max-width: 760px;
+  padding: 18px 0;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.spec-rule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--border);
+}
+
+.spec-rule-grid > div {
+  padding: 13px 16px 13px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.spec-rule-grid > div:nth-child(even) {
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+.spec-rule-grid strong {
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.spec-rule-grid p {
+  margin: 4px 0 0;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.spec-state-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.spec-state-row .is-success {
+  color: var(--success);
+}
+
+.spec-state-row .is-danger {
+  color: var(--danger);
+}
+
+.spec-state-row .is-neutral {
+  color: var(--foreground-muted);
+}
+
+.round-nav-specimen {
+  display: grid;
+  max-width: 760px;
+  min-height: 280px;
+  grid-template-columns: 56px minmax(0, 1fr);
+  border: 1px solid var(--border);
+}
+
+.round-nav-specimen__rail {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  border-right: 1px solid var(--border);
+}
+
+.round-nav-specimen__preview {
+  align-self: center;
+  max-width: 560px;
+  padding: 28px 32px;
+}
+
+.round-nav-specimen__preview > span,
+.round-nav-specimen__preview .is-meta {
+  color: var(--foreground-muted);
+  font-size: 12px;
+}
+
+.round-nav-specimen__preview p {
+  margin: 0;
+}
+
+.round-nav-specimen__preview .is-question {
+  width: fit-content;
+  margin: 14px 0 24px auto;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: var(--foreground);
+  background: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.round-nav-specimen__preview .is-answer {
+  color: var(--foreground);
+  font-size: 15px;
+  line-height: 1.76;
+}
+
+.round-nav-specimen__preview .is-meta {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.approval-final {
+  margin: 22px 0 0;
+  color: var(--foreground);
+  font-size: 15px;
+  line-height: 1.76;
+}
+
+.approval-state-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.delegation-machine {
+  color: var(--foreground-secondary);
+  font-family: var(--font-mono);
+}
+
+.delegation-machine.is-danger {
+  color: var(--danger);
+}
+
+.markdown-specimen {
+  max-width: 760px;
+  padding: 4px 0 24px;
+}
+
+@media (max-width: 720px) {
+  .spec-rule-grid,
+  .approval-state-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .spec-rule-grid > div:nth-child(even) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .round-nav-specimen {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .round-nav-specimen__preview {
+    padding: 24px 18px;
+  }
+}
