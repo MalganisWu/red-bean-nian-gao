@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .bean { fill: #97534d; }
+    .crease { stroke: #63342f; }
+    @media (prefers-color-scheme: dark) {
+      .bean { fill: #c87972; }
+      .crease { stroke: #8f4d47; }
+    }
+  </style>
+  <circle class="bean" cx="16" cy="16" r="13" />
+  <path
+    class="crease"
+    d="M9 17.4c2.9-3 6.6-3.8 10.7-2.9"
+    fill="none"
+    stroke-linecap="round"
+    stroke-width="2.6"
+  />
+</svg>
