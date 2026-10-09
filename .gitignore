@@ -1,0 +1,44 @@
+# Build output
+dist/
+bin/
+
+# Coverage output
+coverage.txt
+coverage.html
+
+# Config
+# 本地配置单源：所有本地配置只写在 backend/.env.local（被 .env* 忽略）
+.env*
+!**/.env.local.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependency directories
+node_modules/
+
+# pnpm 本地 store（本机 pnpm 默认在当前目录建 .pnpm-store；缓存不进版本库）
+.pnpm-store/
+
+# 临时目录
+tmp/
+
+# Claude Code worktrees（保留 .claude/CLAUDE.md 被跟踪）
+.claude/worktrees/
+
+# AI 协作讨论稿/运行时状态（brainstorm 会话产物，不入库）
+.superpowers/
+
+# Vite 构建缓存
+**/.vite/
+
+# 动态插件构建产生的本地数据
+backend/.plugin-data/

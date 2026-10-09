@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      # 两个仓必须落在同一个父目录下，且 SDK 目录名必须叫 red-bean-qing-tuan：
+      # backend/package.json 的依赖是 link:../../red-bean-qing-tuan，是相对路径而不是包名。
+      - name: Checkout product repo
+        uses: actions/checkout@v4
+        with:
+          path: red-bean-nian-gao
+
+      - name: Read pinned Runtime revision
+        id: runtime
+        working-directory: red-bean-nian-gao
+        run: echo "sha=$(cat runtime.lock)" >> "$GITHUB_OUTPUT"
+
+      # 精确 checkout 到 runtime.lock 的 SHA（不是 main）：scripts/check-runtime-revision.sh
+      # 要求 SDK 的 HEAD 与该 SHA 完全相等，而不是祖先关系。
+      - name: Checkout Runtime SDK at pinned revision
+        uses: actions/checkout@v4
+        with:
+          repository: cuteVanilla12138/red-bean-qing-tuan
+          ref: ${{ steps.runtime.outputs.sha }}
+          path: red-bean-qing-tuan
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: red-bean-nian-gao/pnpm-lock.yaml
+
+      # 顺序不能反：SDK 必须先装好并构建出 dist/，产品后端才可能通过类型检查。
+      # 产品仓通过 link: 消费 SDK，pnpm 只做符号链接、不会替它构建。
+      - name: Install Runtime SDK
+        working-directory: red-bean-qing-tuan
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Runtime SDK
+        working-directory: red-bean-qing-tuan
+        run: pnpm build
+
+      - name: Install product workspace
+        working-directory: red-bean-nian-gao
+        run: pnpm install --frozen-lockfile
+
+      # 不需要 Docker、数据库或任何外部服务；verify-full 才用真实基础设施。
+      - name: Verify
+        working-directory: red-bean-nian-gao
+        run: make verify

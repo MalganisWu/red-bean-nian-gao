@@ -1,0 +1,27 @@
+# 仓库级 pnpm workspace：四个 TypeScript 包共用一份依赖图与单一 lockfile。
+# 此前各包独立安装（4 份 lockfile / 4 份 node_modules），迁移后根级 pnpm install 一次完成。
+# 配置合并自原 backend/pnpm-workspace.yaml（allowBuilds/overrides），删除该文件时不得丢失。
+packages:
+  - api-contract
+  - backend
+  - design-system
+  - frontend
+
+allowBuilds:
+  # OpenTelemetry SDK 的传递依赖；其 postinstall 只检查版本前缀兼容性。
+  protobufjs: true
+
+# MinIO 8.0.7 的依赖范围仍指向存在已知 DoS 的旧版本；在上游发布新版本前锁定修复版。
+overrides:
+  decode-uri-component: 0.5.0
+  stream-json: 3.6.0
+
+# pnpm 11 的 verify-deps-before-run 前置检查在本仓库误报：它判定 node_modules 与 lockfile
+# 不一致，于是触发清空重建 node_modules，而在无 TTY 环境（CI、Git hook）下直接中止
+# （ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY）。实测 pnpm-lock.yaml 与
+# node_modules/.pnpm/lock.yaml 逐字节相同，确属误报。此键跳过检查本身，不触发 install。
+#
+# 注意：只认这里的配置键。`.npmrc` 的 verify-deps-before-run / verifyDepsBeforeRun
+# 两种拼写均实测无效，环境变量 npm_config_verify_deps_before_run 同样无效。
+# 也不要改用 CI=true —— 那是"放行清空重建"，会真的删掉整个 workspace 的 node_modules。
+verifyDepsBeforeRun: false
