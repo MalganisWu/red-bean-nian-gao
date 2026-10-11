@@ -69,6 +69,10 @@
   留在产品存储边界。
 - MinIO 8.0.7 尚未更新两个存在 moderate DoS 公告的传递依赖；`pnpm-workspace.yaml` 暂时将
   `decode-uri-component` 与 `stream-json` 锁定到修复版。升级 MinIO 后应重新审计并移除不再需要的 override。
+- 同一版本 minio 的 ESM 产物还以错误大小写导入 `stream-json/jsonl/Parser.js`（实际文件为小写
+  `parser.js`），在大小写敏感的文件系统上（Linux CI、生产容器）加载即抛 `ERR_MODULE_NOT_FOUND`，
+  macOS 因文件系统不区分大小写而掩盖了该问题。`pnpm-workspace.yaml` 的 `patchedDependencies`
+  将导入路径改回正确大小写；该补丁与上述 override 同源，升级 MinIO 时一并复核。
 - 两个客户端都由应用 lifecycle 登记并在退出时反序关闭或停止使用。
 
 ### 认证、调度与观测

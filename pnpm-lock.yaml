@@ -8,6 +8,9 @@ overrides:
   decode-uri-component: 0.5.0
   stream-json: 3.6.0
 
+patchedDependencies:
+  minio@8.0.7: b87ef9a2d0525325581c73b6ddf55af012ecda3551a9e8789f92d492c12da8d3
+
 importers:
 
   api-contract:
@@ -81,7 +84,7 @@ importers:
         version: 6.2.12
       minio:
         specifier: ^8.0.7
-        version: 8.0.7
+        version: 8.0.7(patch_hash=b87ef9a2d0525325581c73b6ddf55af012ecda3551a9e8789f92d492c12da8d3)
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -1126,6 +1129,7 @@ packages:
   '@testing-library/jest-dom@6.10.0':
     resolution: {integrity: sha512-HQwu0KaB2zyT0iLzBL+8CLyZDL3KlZlZJ+2iyc9uCUnlJVskJU/UlPuVCyIPhtukjPQdT2QNoR5nCP5FqTmmDQ==}
     engines: {node: '>=22', npm: '>=6', yarn: '>=1'}
+    deprecated: Incorrect minor release with breaking changes (Node >=22 and required @testing-library/dom peer). Use 6.9.1 for the 6.x line, or upgrade to 7.0.0.
     peerDependencies:
       '@testing-library/dom': '>=10 <11'
 
@@ -1345,10 +1349,6 @@ packages:
 
   ajv@8.20.0:
     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
-
-  ansi-regex@5.0.0:
-    resolution: {integrity: sha512-bY6fj56OUQ0hU1KjFNDQuJFezqKdrAyFdIevADiqrWHwSlbmBNMHp5ak2f40Pm8JTFyM2mqxkG6ngkHO11f/lg==}
-    engines: {node: '>=8'}
 
   ansi-regex@5.0.1:
     resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
@@ -4009,8 +4009,6 @@ snapshots:
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
-  ansi-regex@5.0.0: {}
-
   ansi-regex@5.0.1: {}
 
   ansi-styles@4.0.0:
@@ -5064,7 +5062,7 @@ snapshots:
     dependencies:
       brace-expansion: 5.0.9
 
-  minio@8.0.7:
+  minio@8.0.7(patch_hash=b87ef9a2d0525325581c73b6ddf55af012ecda3551a9e8789f92d492c12da8d3):
     dependencies:
       async: 3.2.6
       block-stream2: 2.1.0
@@ -5217,7 +5215,7 @@ snapshots:
   pretty-format@27.0.2:
     dependencies:
       '@jest/types': 27.0.2
-      ansi-regex: 5.0.0
+      ansi-regex: 5.0.1
       ansi-styles: 5.0.0
       react-is: 17.0.1
 

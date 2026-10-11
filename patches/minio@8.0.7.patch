@@ -1,0 +1,13 @@
+diff --git a/dist/esm/notification.mjs b/dist/esm/notification.mjs
+index 2fe075b73a9f98ece945993ebc151f601e0d52ee..b6b2b6a60f3b2e699a351540bd9f6aa8259b2e33 100644
+--- a/dist/esm/notification.mjs
++++ b/dist/esm/notification.mjs
+@@ -15,7 +15,7 @@
+  */
+ 
+ import { EventEmitter } from 'eventemitter3';
+-import jsonLineParser from 'stream-json/jsonl/Parser.js';
++import jsonLineParser from 'stream-json/jsonl/parser.js';
+ import { DEFAULT_REGION } from "./helpers.mjs";
+ import { pipesetup, uriEscape } from "./internal/helper.mjs";
+ 

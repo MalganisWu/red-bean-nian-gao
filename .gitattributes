@@ -8,3 +8,7 @@
 *.webp binary
 *.woff binary
 *.woff2 binary
+
+# unified diff 的空上下文行就是一个单独的空格，属格式要求而非书写疏漏；
+# 豁免空白检查，避免 make diff-check 对补丁文件误报。
+patches/*.patch -whitespace

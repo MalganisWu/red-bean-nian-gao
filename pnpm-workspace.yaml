@@ -16,6 +16,13 @@ overrides:
   decode-uri-component: 0.5.0
   stream-json: 3.6.0
 
+# MinIO 8.0.7 的 ESM 产物写的是 `import ... from 'stream-json/jsonl/Parser.js'`（大写 P），
+# 而 stream-json 3.x 实际文件名是小写 `src/jsonl/parser.js`。macOS 文件系统大小写不敏感，
+# 本地一直能跑；Linux（CI、生产容器）大小写敏感，该导入直接 ERR_MODULE_NOT_FOUND。
+# 8.0.7 已是 npm 最新版且问题依旧，故用补丁改回正确大小写。
+patchedDependencies:
+  minio@8.0.7: patches/minio@8.0.7.patch
+
 # pnpm 11 的 verify-deps-before-run 前置检查在本仓库误报：它判定 node_modules 与 lockfile
 # 不一致，于是触发清空重建 node_modules，而在无 TTY 环境（CI、Git hook）下直接中止
 # （ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY）。实测 pnpm-lock.yaml 与
