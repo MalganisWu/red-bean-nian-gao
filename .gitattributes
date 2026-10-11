@@ -12,3 +12,7 @@
 # unified diff 的空上下文行就是一个单独的空格，属格式要求而非书写疏漏；
 # 豁免空白检查，避免 make diff-check 对补丁文件误报。
 patches/*.patch -whitespace
+
+# 这些是自包含的设计稿（内联 CSS/JS），用途是视觉评审与截图来源，不是产品的 HTML 实现。
+# 不计入 GitHub 的语言构成，否则 HTML 会虚占三分之一。
+design-system/previews/*.html linguist-documentation
