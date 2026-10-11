@@ -56,41 +56,51 @@ void describe('chat request and SSE parity', () => {
     await server.close()
   })
 
-  void it('merges adjacent reason fragments and keeps an idle stream alive', async () => {
-    const events: AsyncIterable<ProductStreamEvent> = {
-      async *[Symbol.asyncIterator](): AsyncGenerator<ProductStreamEvent> {
-        yield { type: 'reason', content: '先分析', step: 1, timestamp: 10 }
-        yield { type: 'reason', content: '，再执行', step: 1, timestamp: 11 }
-        await new Promise<void>((resolve): void => {
-          setTimeout(resolve, 12)
-        })
-        yield { type: 'done', tokensUsed: 8, sessionId: 'SESSION_1' }
-      },
-    }
-    const frames: string[] = []
-    for await (const frame of streamFrames(
-      testHandle(events),
-      {
-        type: 'start',
-        requestId: 'RUN_1',
-        sessionId: 'SESSION_1',
-        traceId: '0123456789abcdef0123456789abcdef',
-      },
-      new AbortController().signal,
-      5,
-      (): number => 123
-    )) {
-      frames.push(frame)
-    }
+  // 生产者空转到消费者看到心跳为止，而不是睡一个固定时长：后者要求"心跳间隔 < 空转时长"，
+  // 而两者只差几毫秒，定时器抖动会让生产者抢先产出 done、心跳还没发出流就结束了（CI 间歇失败）。
+  // 用闸门后生产者不推进就永远不产出 done，唯一能成帧的就是心跳，判定不再依赖时序。
+  void it(
+    'merges adjacent reason fragments and keeps an idle stream alive',
+    { timeout: 5_000 },
+    async () => {
+      let releaseProducer!: () => void
+      const idleUntilHeartbeat = new Promise<void>((resolve): void => {
+        releaseProducer = resolve
+      })
+      const events: AsyncIterable<ProductStreamEvent> = {
+        async *[Symbol.asyncIterator](): AsyncGenerator<ProductStreamEvent> {
+          yield { type: 'reason', content: '先分析', step: 1, timestamp: 10 }
+          yield { type: 'reason', content: '，再执行', step: 1, timestamp: 11 }
+          await idleUntilHeartbeat
+          yield { type: 'done', tokensUsed: 8, sessionId: 'SESSION_1' }
+        },
+      }
+      const frames: string[] = []
+      for await (const frame of streamFrames(
+        testHandle(events),
+        {
+          type: 'start',
+          requestId: 'RUN_1',
+          sessionId: 'SESSION_1',
+          traceId: '0123456789abcdef0123456789abcdef',
+        },
+        new AbortController().signal,
+        5,
+        (): number => 123
+      )) {
+        frames.push(frame)
+        if (frame.includes('event: heartbeat')) releaseProducer()
+      }
 
-    assert.equal(frames.filter((frame): boolean => frame.startsWith('event: reason')).length, 1)
-    assert.match(frames.join(''), /"content":"先分析，再执行"/u)
-    assert.equal(frames.filter((frame): boolean => frame.startsWith('event: done')).length, 1)
-    assert.equal(
-      frames.some((frame): boolean => frame.includes('event: heartbeat')),
-      true
-    )
-  })
+      assert.equal(frames.filter((frame): boolean => frame.startsWith('event: reason')).length, 1)
+      assert.match(frames.join(''), /"content":"先分析，再执行"/u)
+      assert.equal(frames.filter((frame): boolean => frame.startsWith('event: done')).length, 1)
+      assert.equal(
+        frames.some((frame): boolean => frame.includes('event: heartbeat')),
+        true
+      )
+    }
+  )
 
   void it('真实 socket 断开时以 client_disconnected 关闭运行', async () => {
     const chat = new DisconnectCapturingChat()
