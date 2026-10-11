@@ -10,9 +10,14 @@ embedded anywhere.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D24.9.0%20%3C26-brightgreen)](package.json)
 
+**English** · [简体中文](README.zh-CN.md)
+
 </div>
 
-![A Red Bean conversation: reasoning steps, tool calls, and a delegated sub-agent](docs/assets/conversation.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/conversation-dark.png">
+  <img alt="A Red Bean conversation: reasoning steps, tool calls, and a delegated sub-agent" src="docs/assets/conversation.png">
+</picture>
 
 ## Why this exists
 
@@ -53,7 +58,15 @@ Three consequences worth calling out:
 | **Session trajectory** | A read-only audit view over the run fact log, with per-request token accounting and timing. |
 | **Design system** | A component library with Light/Dark parity, shipped as a runnable showcase site. |
 
-![Scheduled tasks: definitions, plans, and the latest run side by side](docs/assets/scheduled-tasks.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/scheduled-tasks-dark.png">
+  <img alt="Scheduled tasks: definitions, plans, and the latest run side by side" src="docs/assets/scheduled-tasks.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/task-run-dark.png">
+  <img alt="A scheduled run: the automatic execution is folded into the same timeline reading as a conversation" src="docs/assets/task-run.png">
+</picture>
 
 ## Architecture
 

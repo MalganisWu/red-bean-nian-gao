@@ -2,54 +2,65 @@
 
 # Red Bean · 年糕
 
-**AI Agent 对话平台。** 流式对话、工具调用、子 Agent 委派、定时任务，以及每一次运行的完整审计轨迹 ——
-构建在一个可嵌入到任何宿主里的运行时 SDK 之上。
+**一个 AI Agent 对话平台。** 支持流式对话、工具调用、子 Agent 委派、定时任务，并为每次运行留下完整审计轨迹。
+底层是一个可以嵌进任何宿主的运行时 SDK。
 
 [![CI](https://github.com/cuteVanilla12138/red-bean-nian-gao/actions/workflows/ci.yml/badge.svg)](https://github.com/cuteVanilla12138/red-bean-nian-gao/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D24.9.0%20%3C26-brightgreen)](package.json)
 
-英文版见 [README.md](README.md)。
+[English](README.md) · **简体中文**
 
 </div>
 
-![Red Bean 的一次会话：推理步骤、工具调用与子 Agent 委派](docs/assets/conversation.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/conversation-dark.png">
+  <img alt="Red Bean 的一次会话：推理步骤、工具调用与子 Agent 委派" src="docs/assets/conversation.png">
+</picture>
 
-## 为什么做这个
+## 为什么会有 Red Bean
 
-大多数 Agent 框架会慢慢长出长尾：这里一个聊天界面、那里一个数据库适配器、再加一个 HTTP 服务 ——
-直到这个「框架」实际上变成一个应用。这既让 Agent 循环很难被嵌入到别处，也让人更难判断一个正在运行的
-Agent 究竟被允许做什么。
+很多 Agent 框架会顺着需求一直长：这里加个聊天界面，那里加个数据库适配器，再补一个 HTTP 服务——
+长到最后，这个「框架」其实已经是个应用了。结果就是 Agent 循环很难嵌到别处去用；一个正在跑的 Agent
+到底能做什么，也变得越来越难看清。
 
-Red Bean 把问题拆成两半：
+Red Bean 的做法是把问题拆成两半：
 
 - **[`red-bean-qing-tuan`](https://github.com/cuteVanilla12138/red-bean-qing-tuan)** —— 可嵌入的 TypeScript
-  运行时 SDK。它负责 Agent 循环、checkpoint、interrupt 和一层厂商中性的观测接缝，对 HTTP、数据库和 UI
-  一无所知。
+  运行时 SDK。它负责 Agent 循环、checkpoint、interrupt 和一层与厂商无关的观测接缝，对 HTTP、数据库
+  和 UI 一无所知。
 - **本仓库** —— 产品侧。负责会话、持久化、认证、HTTP/SSE 接口、定时任务和设计系统。
 
-由此带来三件值得说明的事：
+这么拆带来三个结果：
 
-1. **能力图在启动期固定。** 每个后端实例在启动时组装 runtime、观测适配器、LLM Provider 与工具 Catalog，
-   运行期间不再安装或替换能力。一个实例能做什么是**一次决定**的，而不是逐请求协商的。
-2. **每一次运行都可审计。** 运行被记录进 append-only 的事实日志，并以只读轨迹视图呈现：跑了哪些工具、
-   每一步耗时多久、每次请求花了多少 token。
-3. **Runtime 像依赖一样被版本化。** `runtime.lock` 把 SDK 钉在确切的 commit 上；`make verify` 会拒绝
-   在版本不匹配或有未提交改动的工作区上运行。
+1. **能力图在启动时就定死。** 每个后端实例在启动时把 runtime、观测适配器、LLM Provider 和工具
+   Catalog 组装好，运行期间不再增删或替换。一个实例能做什么，启动那一刻就决定了，不会每个请求再变。
+2. **每次运行都能追溯。** 运行会写进一份只追加的事实日志，再以只读的轨迹视图呈现出来：跑过哪些工具、
+   每一步花了多久、每次请求用掉多少 token。
+3. **Runtime 当成依赖来管版本。** `runtime.lock` 把 SDK 钉死在确切的 commit 上；版本对不上、或者
+   工作区有未提交改动时，`make verify` 会直接拒绝运行。
 
 ## 功能
 
 | 能力 | 说明 |
 | --- | --- |
-| **流式对话** | SSE 流式输出，含推理块；过程时间线会把冗长的工具序列折叠成可读摘要。 |
-| **工具调用** | 静态 `sys_*` 工具集 —— 文件读写、glob、grep、HTTP、时间、待办 —— 启动期注册，按 Agent 授权。 |
-| **子 Agent 委派** | 父运行可以把工作交给子 Agent，并把子执行的进展折叠进自己的时间线。 |
-| **中断与恢复** | 任意工具都可以挂起运行以请求人工确认。interrupt 是执行屏障：确认到达前，同批其他工具不会执行。 |
-| **定时任务** | cron 驱动的运行，带重试策略、投递队列和独立的执行历史。 |
-| **会话轨迹** | 基于运行事实日志的只读审计视图，含每次请求的 token 与耗时核算。 |
-| **设计系统** | Light/Dark 对等的组件库，随一个可运行的展示站一起交付。 |
+| **流式对话** | SSE 流式输出，带推理块；过程时间线会把一长串工具调用折叠成易读的摘要。 |
+| **工具调用** | `sys_*` 静态工具集——文件读写、glob、grep、HTTP、时间、待办——启动时注册，再按 Agent 逐个授权。 |
+| **子 Agent 委派** | 父运行可以把活派给子 Agent，子执行的进展会折叠进父运行自己的时间线。 |
+| **中断与恢复** | 任何工具都能挂起运行、要求人工确认。interrupt 是执行屏障：确认没到之前，同批的其他工具一律不执行。 |
+| **定时任务** | 由 cron 触发的运行，带重试策略、投递队列，以及独立的执行历史。 |
+| **会话轨迹** | 基于运行事实日志的只读审计视图，按请求统计 token 与耗时。 |
+| **设计系统** | 明暗两套主题对等的组件库，附一个可以直接跑起来的展示站。 |
 
-![定时任务：任务定义、计划与最近一次运行并排呈现](docs/assets/scheduled-tasks.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/scheduled-tasks-dark.png">
+  <img alt="定时任务：任务定义、计划与最近一次运行并排呈现" src="docs/assets/scheduled-tasks.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/task-run-dark.png">
+  <img alt="一次定时运行：自动执行的过程同样折叠成与对话一致的阅读方式" src="docs/assets/task-run.png">
+</picture>
 
 ## 架构
 
@@ -66,22 +77,22 @@ Red Bean 把问题拆成两半：
    事实、任务)       锁)             上传)        路由、错误码)    Light/Dark)
 ```
 
-四个 workspace 包加上同级的 SDK：
+四个 workspace 包，加上同级的 SDK：
 
-- **`api-contract/`** —— HTTP 路由、SSE 事件、DTO、错误码与运行时校验的机器可执行唯一来源。前后端都依赖它，
-  任何一侧都不重新声明形状。
-- **`backend/`** —— Fastify、显式 SQL 的 `pg`、一个在启动时一次性完成装配的 composition root，以及
-  `agent` / `task` / `identity` / `storage` / `system` 各模块 —— 模块之间依赖 Port，而不是互相依赖。
-- **`frontend/`** —— React 19 + Vite，消费契约与设计系统。
-- **`design-system/`** —— Quiet Tool UI 组件库，附一个把每个组件在两种主题下都渲染出来的展示站。
-  漂移检查会在「前端 import 了不存在的组件」或「公开组件没有 showcase 页」时直接让构建失败。
+- **`api-contract/`** —— HTTP 路由、SSE 事件、DTO、错误码和运行时校验的唯一事实来源，而且是机器可执行的。
+  前后端都依赖它，谁也不用再各写一份。
+- **`backend/`** —— Fastify、直接写 SQL 的 `pg`、启动时一次性完成装配的 composition root，以及
+  `agent` / `task` / `identity` / `storage` / `system` 各模块——模块之间依赖 Port，而不是互相依赖。
+- **`frontend/`** —— React 19 + Vite，消费契约和设计系统。
+- **`design-system/`** —— Quiet Tool UI 组件库，附一个展示站，把每个组件在明暗两种主题下都渲染一遍。
+  漂移检查会让构建直接失败：只要前端 import 了不存在的组件，或者某个公开组件没有对应的展示页。
 
-后端只通过单一的 `AgentExecutionPort` 触达运行时 SDK。普通聊天、定时任务与子 Agent 共用同一个执行器，
-区别只在于各自的产品生命周期。
+后端只通过一个入口碰运行时 SDK：`AgentExecutionPort`。普通聊天、定时任务和子 Agent 共用同一个执行器，
+区别只在各自的产品生命周期。
 
 ## 快速开始
 
-**前置要求：** Node.js `>=24.9.0 <26`、pnpm 11.x、Docker。执行 `make doctor` 可一次检查全部。
+**环境要求：** Node.js `>=24.9.0 <26`、pnpm 11.x、Docker。跑一次 `make doctor` 可以全部检查。
 
 ```bash
 git clone https://github.com/cuteVanilla12138/red-bean-nian-gao.git
@@ -96,15 +107,15 @@ make run                     # 后端 → http://localhost:8080
 pnpm --filter frontend dev   # 前端 → http://localhost:5173
 ```
 
-`make init` 是唯一的一键入口：检查工具链、把 Runtime SDK 克隆到本仓同级、切到 `runtime.lock`
-锁定的 revision 并构建它、安装 workspace 依赖，并把 `backend/.env.local.example` 复制到位。
-**它从不覆盖已存在的 `.env.local`，重复执行是安全的。**
+`make init` 是唯一的一键入口，它依次做四件事：检查工具链 → 把 Runtime SDK 克隆到本仓同级目录、切到
+`runtime.lock` 锁定的 revision 并构建 → 安装 workspace 依赖 → 把 `backend/.env.local.example`
+复制到位。**它不会覆盖已有的 `.env.local`，重复跑也没问题。**
 
-`make bootstrap` 会把 SDK 克隆到名为 `red-bean-qing-tuan` 的同级目录 —— 后端通过相对路径
-`link:../../red-bean-qing-tuan` 消费它，**目录名是硬约束，GitHub 仓库名则不是**。重复执行是安全的：
-已经正确的检出与构建不会被重复劳动。若你把 SDK 放在别处，传 `SDK_DIR=<路径>`。
+`make bootstrap` 会把 SDK 克隆到名为 `red-bean-qing-tuan` 的同级目录——后端是通过相对路径
+`link:../../red-bean-qing-tuan` 引用它的，**所以这个目录名不能改，GitHub 上的仓库名倒是随意**。
+重复跑也没问题：已经就绪的检出和构建不会白做一遍。SDK 放在别处的话，传 `SDK_DIR=<路径>`。
 
-设计系统展示站同理，且不需要后端、不需要 LLM key：
+设计系统展示站的跑法一样，而且不需要后端，也不需要 LLM key：
 
 ```bash
 pnpm --filter design-system dev   # → http://localhost:5174
@@ -112,7 +123,7 @@ pnpm --filter design-system dev   # → http://localhost:5174
 
 ## 质量门禁
 
-全部在本地离线运行，不依赖任何外部服务。
+以下全部在本地离线运行，不需要任何外部服务。
 
 ```bash
 make doctor         # 工具链版本与 package 声明检查
@@ -123,9 +134,9 @@ make verify         # 后端 + 前端 + 设计系统 + 契约 + 文档 + 同级 
 make verify-full    # 额外要求真实基础设施集成测试与依赖审计
 ```
 
-`make verify` 覆盖四个包与锁定的 SDK。`make fmt` 是唯一会写跟踪文件的命令。
+`make verify` 覆盖四个包和锁定的 SDK。`make fmt` 是唯一会改写被跟踪文件的命令。
 
-可选的 Git hooks，按仓显式安装（从不自动装）：
+Git hooks 是可选的，需要按仓手动安装（永远不会自动装）：
 
 ```bash
 make hooks-install   # pre-commit 跑 verify-quick，pre-push 跑 verify
@@ -154,13 +165,13 @@ red-bean-nian-gao/
 - [`backend/STACK.md`](backend/STACK.md) —— 后端技术选型与理由
 - [`AGENTS.md`](AGENTS.md) —— 本仓遵循的开发规范
 
-## Runtime 是独立的仓库
+## Runtime 为什么单独开一个仓
 
-Agent 循环、checkpoint 语义、interrupt 屏障与工具安全策略都在
-[`red-bean-qing-tuan`](https://github.com/cuteVanilla12138/red-bean-qing-tuan) 里。这个拆分是刻意的：
-Runtime 零生产依赖、对这个产品一无所知，因此可以被嵌进 CLI 或完全不同的宿主。
+Agent 循环、checkpoint 语义、interrupt 屏障和工具安全策略都在
+[`red-bean-qing-tuan`](https://github.com/cuteVanilla12138/red-bean-qing-tuan) 里。这样拆是有意为之：
+Runtime 没有任何生产依赖，也完全不知道这个产品的存在，所以它能嵌进 CLI，或者别的完全不同的宿主。
 
-两个仓只通过 `runtime.lock` 耦合。升级流程：先在 SDK 仓提交，再更新本仓的 lock 文件并运行 `make verify`。
+两个仓只通过 `runtime.lock` 耦合。升级流程：先在 SDK 仓提交，再更新本仓的 lock 文件，然后跑 `make verify`。
 
 ## License
 
