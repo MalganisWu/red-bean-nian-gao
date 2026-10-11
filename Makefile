@@ -3,7 +3,7 @@
 
 # ── 变量 ──────────────────────────────────────────────────────────────────
 SDK_DIR ?= ../red-bean-qing-tuan
-SDK_REPO_URL ?= https://github.com/cuteVanilla12138/red-bean-qing-tuan.git
+SDK_REPO_URL ?= https://github.com/MalganisWu/red-bean-qing-tuan.git
 COMPOSE_FILE := backend/docker-compose.yml
 COMPOSE_ENV_FILE ?= backend/.env.local
 COMPOSE := docker compose --env-file $(COMPOSE_ENV_FILE) -f $(COMPOSE_FILE)

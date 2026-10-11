@@ -32,7 +32,7 @@ jobs:
       - name: Checkout Runtime SDK at pinned revision
         uses: actions/checkout@v4
         with:
-          repository: cuteVanilla12138/red-bean-qing-tuan
+          repository: MalganisWu/red-bean-qing-tuan
           ref: ${{ steps.runtime.outputs.sha }}
           path: red-bean-qing-tuan
 

@@ -6,7 +6,7 @@
 scheduled tasks, and a full audit trail for every run — built on a runtime SDK that can be
 embedded anywhere.
 
-[![CI](https://github.com/cuteVanilla12138/red-bean-nian-gao/actions/workflows/ci.yml/badge.svg)](https://github.com/cuteVanilla12138/red-bean-nian-gao/actions/workflows/ci.yml)
+[![CI](https://github.com/MalganisWu/red-bean-nian-gao/actions/workflows/ci.yml/badge.svg)](https://github.com/MalganisWu/red-bean-nian-gao/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D24.9.0%20%3C26-brightgreen)](package.json)
 
@@ -28,7 +28,7 @@ actually permitted to do.
 
 Red Bean splits the problem in two:
 
-- **[`red-bean-qing-tuan`](https://github.com/cuteVanilla12138/red-bean-qing-tuan)** — an embeddable
+- **[`red-bean-qing-tuan`](https://github.com/MalganisWu/red-bean-qing-tuan)** — an embeddable
   TypeScript runtime SDK. It owns the agent loop, checkpointing, interrupts, and a
   vendor-neutral observability seam. It knows nothing about HTTP, databases, or UI.
 - **This repository** — the product. It owns sessions, persistence, authentication, the
@@ -107,7 +107,7 @@ lifecycle.
 of them at once.
 
 ```bash
-git clone https://github.com/cuteVanilla12138/red-bean-nian-gao.git
+git clone https://github.com/MalganisWu/red-bean-nian-gao.git
 cd red-bean-nian-gao
 make init                # toolchain · pinned runtime SDK · workspace deps · backend/.env.local
 
@@ -183,7 +183,7 @@ red-bean-nian-gao/
 ## The runtime is a separate repository
 
 The agent loop, checkpoint semantics, interrupt barriers, and tool safety policy live in
-[`red-bean-qing-tuan`](https://github.com/cuteVanilla12138/red-bean-qing-tuan). That split is
+[`red-bean-qing-tuan`](https://github.com/MalganisWu/red-bean-qing-tuan). That split is
 deliberate: the runtime has no production dependencies and no knowledge of this product, so
 it can be embedded in a CLI or a different host entirely.
 

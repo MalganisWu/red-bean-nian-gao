@@ -5,7 +5,7 @@
 **一个 AI Agent 对话平台。** 支持流式对话、工具调用、子 Agent 委派、定时任务，并为每次运行留下完整审计轨迹。
 底层是一个可以嵌进任何宿主的运行时 SDK。
 
-[![CI](https://github.com/cuteVanilla12138/red-bean-nian-gao/actions/workflows/ci.yml/badge.svg)](https://github.com/cuteVanilla12138/red-bean-nian-gao/actions/workflows/ci.yml)
+[![CI](https://github.com/MalganisWu/red-bean-nian-gao/actions/workflows/ci.yml/badge.svg)](https://github.com/MalganisWu/red-bean-nian-gao/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D24.9.0%20%3C26-brightgreen)](package.json)
 
@@ -26,7 +26,7 @@
 
 Red Bean 的做法是把问题拆成两半：
 
-- **[`red-bean-qing-tuan`](https://github.com/cuteVanilla12138/red-bean-qing-tuan)** —— 可嵌入的 TypeScript
+- **[`red-bean-qing-tuan`](https://github.com/MalganisWu/red-bean-qing-tuan)** —— 可嵌入的 TypeScript
   运行时 SDK。它负责 Agent 循环、checkpoint、interrupt 和一层与厂商无关的观测接缝，对 HTTP、数据库
   和 UI 一无所知。
 - **本仓库** —— 产品侧。负责会话、持久化、认证、HTTP/SSE 接口、定时任务和设计系统。
@@ -95,7 +95,7 @@ Red Bean 的做法是把问题拆成两半：
 **环境要求：** Node.js `>=24.9.0 <26`、pnpm 11.x、Docker。跑一次 `make doctor` 可以全部检查。
 
 ```bash
-git clone https://github.com/cuteVanilla12138/red-bean-nian-gao.git
+git clone https://github.com/MalganisWu/red-bean-nian-gao.git
 cd red-bean-nian-gao
 make init                # 工具链 · 锁定的 Runtime SDK · workspace 依赖 · backend/.env.local
 
@@ -168,7 +168,7 @@ red-bean-nian-gao/
 ## Runtime 为什么单独开一个仓
 
 Agent 循环、checkpoint 语义、interrupt 屏障和工具安全策略都在
-[`red-bean-qing-tuan`](https://github.com/cuteVanilla12138/red-bean-qing-tuan) 里。这样拆是有意为之：
+[`red-bean-qing-tuan`](https://github.com/MalganisWu/red-bean-qing-tuan) 里。这样拆是有意为之：
 Runtime 没有任何生产依赖，也完全不知道这个产品的存在，所以它能嵌进 CLI，或者别的完全不同的宿主。
 
 两个仓只通过 `runtime.lock` 耦合。升级流程：先在 SDK 仓提交，再更新本仓的 lock 文件，然后跑 `make verify`。
