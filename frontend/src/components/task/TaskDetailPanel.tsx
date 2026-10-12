@@ -61,23 +61,30 @@ export function TaskDetailPanel({
     setPendingAction(null)
   }
 
-  useEffect(() => {
+  useEffect(loadTaskData, [taskId, loadExecutions, loadTaskDetail])
+  useEffect(loadMissingViewStates, [executions, loadExecutionViewStates, taskId])
+  useEffect(clearDeleteTimerOnUnmount, [])
+
+  /** 进入任务详情：并行加载任务本身与它的执行记录。 */
+  function loadTaskData(): void {
     void loadTaskDetail(taskId)
     void loadExecutions(taskId)
-  }, [taskId, loadExecutions, loadTaskDetail])
+  }
 
-  useEffect(() => {
+  /** 执行记录变化后，补齐本次任务的执行展示状态。 */
+  function loadMissingViewStates(): void {
     const ids = executions
       .filter((execution) => execution.TaskID === taskId)
       .map((execution) => execution.ExecutionID)
     if (ids.length > 0) void loadExecutionViewStates(ids)
-  }, [executions, loadExecutionViewStates, taskId])
+  }
 
-  useEffect(() => {
+  /** 卸载时清掉「删除」二次确认的计时器。 */
+  function clearDeleteTimerOnUnmount(): () => void {
     return () => {
       if (deleteTimerRef.current) window.clearTimeout(deleteTimerRef.current)
     }
-  }, [])
+  }
 
   async function handleToggleActive(): Promise<void> {
     if (pendingAction) return

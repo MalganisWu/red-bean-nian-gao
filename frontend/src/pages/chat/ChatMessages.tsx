@@ -46,45 +46,31 @@ export function ChatMessages({
   const [currentNavId, setCurrentNavId] = useState<string | undefined>(undefined)
   const loadExecutionViewStates = useTaskStore((state) => state.loadExecutionViewStates)
 
-  const scheduledExecutions = useMemo(
-    () =>
-      messages.flatMap((message) => {
-        const meta = message.meta?.scheduled_task
-        return meta
-          ? [
-              {
-                taskID: meta.task_id,
-                executionID: meta.execution_id,
-                scheduledAt: meta.scheduled_at,
-              },
-            ]
-          : []
-      }),
-    [messages]
+  const scheduledExecutions = useMemo(() => messages.flatMap(scheduledExecutionsOf), [messages])
+  const latestExecutionByTask = useMemo(
+    () => latestExecutionsByTask(scheduledExecutions),
+    [scheduledExecutions]
   )
-  const latestExecutionByTask = useMemo(() => {
-    const latest = new Map<string, { executionID: string; scheduledAt: number }>()
-    for (const execution of scheduledExecutions) {
-      const current = latest.get(execution.taskID)
-      if (!current || execution.scheduledAt >= current.scheduledAt) {
-        latest.set(execution.taskID, execution)
-      }
-    }
-    return latest
-  }, [scheduledExecutions])
 
-  useEffect(() => {
+  /** 排期变化时预取对应执行的视图状态（已看过/未看过）。 */
+  function prefetchExecutionViewStates(): void {
     if (scheduledExecutions.length === 0) return
     void loadExecutionViewStates(scheduledExecutions.map((execution) => execution.executionID))
-  }, [loadExecutionViewStates, scheduledExecutions])
+  }
+
+  useEffect(prefetchExecutionViewStates, [loadExecutionViewStates, scheduledExecutions])
 
   // 发送后立即跑秒：无响应窗口（占位符）与思考块共用 sentAt 锚点，按整秒稳定刷新。
   const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!isStreaming) return
+
+  /** 流式期间每秒刷新锚点时钟；非流式不启动，停止时清理定时器。 */
+  function tickSecondClock(): (() => void) | undefined {
+    if (!isStreaming) return undefined
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
-  }, [isStreaming])
+  }
+
+  useEffect(tickSecondClock, [isStreaming])
 
   const isEmpty = messages.length === 0 && !isStreaming
 
@@ -110,7 +96,8 @@ export function ChatMessages({
 
   // 点击横杠：平滑滚动到该轮（锚点在 ChatMessageItem 根元素）+ 1.2s 闪烁定位
   // 减动效偏好：瞬时跳转且不闪烁
-  const jumpToRound = (id: string) => {
+  /** 点击横杠：记录当前轮并平滑滚动到该轮（锚点在 ChatMessageItem 根元素）+ 1.2s 闪烁定位。 */
+  function jumpToRound(id: string): void {
     setCurrentNavId(id)
     const el = document.getElementById(id)
     if (!el) return
@@ -122,6 +109,47 @@ export function ChatMessages({
     if (reduceMotion) return
     el.classList.add('round-flash')
     window.setTimeout(() => el.classList.remove('round-flash'), 1200)
+  }
+
+  /** 渲染单条消息：answer 续跑期间把流式续跑 sections 并进目标卡片消息。 */
+  function renderMessage(msg: DisplayMessage, i: number) {
+    // answer 续跑：流式期间就把续跑 sections 并进目标卡片消息（卡片之后），
+    // 与 finalizeStreamingText 落库合并共用 mergeContinuation，视觉连续、结果一致
+    if (i === mergeIdx && isStreaming) {
+      const merged = mergeContinuation(msg.sections ?? [], pendingSections ?? [])
+      return (
+        <ChatMessageItem
+          key={msg.id}
+          message={{ ...msg, sections: merged }}
+          isStreaming
+          onCardConfirm={onCardConfirm}
+          onCardRefuse={onCardRefuse}
+          cardSubmission={cardSubmission}
+          taskExecutionIsLatest={
+            msg.meta?.scheduled_task
+              ? latestExecutionByTask.get(msg.meta.scheduled_task.task_id)?.executionID ===
+                msg.meta.scheduled_task.execution_id
+              : false
+          }
+        />
+      )
+    }
+    return (
+      <ChatMessageItem
+        key={msg.id}
+        message={msg}
+        startsRound={msg.role === 'user' && i > 0}
+        onCardConfirm={onCardConfirm}
+        onCardRefuse={onCardRefuse}
+        cardSubmission={cardSubmission}
+        taskExecutionIsLatest={
+          msg.meta?.scheduled_task
+            ? latestExecutionByTask.get(msg.meta.scheduled_task.task_id)?.executionID ===
+              msg.meta.scheduled_task.execution_id
+            : false
+        }
+      />
+    )
   }
 
   return (
@@ -168,45 +196,7 @@ export function ChatMessages({
               </p>
             </div>
           )}
-          {messages.map((msg, i) => {
-            // answer 续跑：流式期间就把续跑 sections 并进目标卡片消息（卡片之后），
-            // 与 finalizeStreamingText 落库合并共用 mergeContinuation，视觉连续、结果一致
-            if (i === mergeIdx && isStreaming) {
-              const merged = mergeContinuation(msg.sections ?? [], pendingSections ?? [])
-              return (
-                <ChatMessageItem
-                  key={msg.id}
-                  message={{ ...msg, sections: merged }}
-                  isStreaming
-                  onCardConfirm={onCardConfirm}
-                  onCardRefuse={onCardRefuse}
-                  cardSubmission={cardSubmission}
-                  taskExecutionIsLatest={
-                    msg.meta?.scheduled_task
-                      ? latestExecutionByTask.get(msg.meta.scheduled_task.task_id)?.executionID ===
-                        msg.meta.scheduled_task.execution_id
-                      : false
-                  }
-                />
-              )
-            }
-            return (
-              <ChatMessageItem
-                key={msg.id}
-                message={msg}
-                startsRound={msg.role === 'user' && i > 0}
-                onCardConfirm={onCardConfirm}
-                onCardRefuse={onCardRefuse}
-                cardSubmission={cardSubmission}
-                taskExecutionIsLatest={
-                  msg.meta?.scheduled_task
-                    ? latestExecutionByTask.get(msg.meta.scheduled_task.task_id)?.executionID ===
-                      msg.meta.scheduled_task.execution_id
-                    : false
-                }
-              />
-            )
-          })}
+          {messages.map(renderMessage)}
           {/* Streaming assistant message — 无合并目标时才作为独立新消息流式渲染 */}
           {hasStreaming && mergeIdx < 0 && (
             <ChatMessageItem
@@ -239,6 +229,32 @@ export function ChatMessages({
       <div aria-hidden="true" className="hidden w-14 shrink-0 sm:block" />
     </div>
   )
+}
+
+/** 排期锚点：任务 id / 执行 id / 计划时间。 */
+interface ScheduledExecution {
+  taskID: string
+  executionID: string
+  scheduledAt: number
+}
+
+/** 单条消息携带的排期锚点（无 scheduled_task 元信息则为空）。 */
+function scheduledExecutionsOf(message: DisplayMessage): ScheduledExecution[] {
+  const meta = message.meta?.scheduled_task
+  if (!meta) return []
+  return [{ taskID: meta.task_id, executionID: meta.execution_id, scheduledAt: meta.scheduled_at }]
+}
+
+/** 每个任务最近一次排期执行（按 scheduledAt 取最大）。 */
+function latestExecutionsByTask(executions: ScheduledExecution[]): Map<string, ScheduledExecution> {
+  const latest = new Map<string, ScheduledExecution>()
+  for (const execution of executions) {
+    const current = latest.get(execution.taskID)
+    if (!current || execution.scheduledAt >= current.scheduledAt) {
+      latest.set(execution.taskID, execution)
+    }
+  }
+  return latest
 }
 
 // 摘要卡内容截断（粗略定位，多余省略）

@@ -42,23 +42,32 @@ export function ExecutionResultView({ taskId, executionId, onBack }: ExecutionRe
   const loadExecutionViewStates = useTaskStore((state) => state.loadExecutionViewStates)
   const markExecutionSeen = useTaskStore((state) => state.markExecutionSeen)
 
-  useEffect(() => {
+  /** 拉取任务与本次执行详情（首屏加载与失败重试共用）。 */
+  function loadTaskAndExecution(): void {
     void loadTaskDetail(taskId)
     void loadExecutionDetail(taskId, executionId)
-  }, [executionId, loadExecutionDetail, loadTaskDetail, taskId])
+  }
 
-  useEffect(() => {
+  useEffect(loadTaskAndExecution, [executionId, loadExecutionDetail, loadTaskDetail, taskId])
+
+  /** 当前执行详情已就绪时补拉该执行的视图状态（已看过/已折叠）。 */
+  function loadExecutionViewState(): void {
     if (activeExecution?.TaskID !== taskId || activeExecution.ExecutionID !== executionId) return
     void loadExecutionViewStates([executionId])
-  }, [activeExecution, executionId, loadExecutionViewStates, taskId])
+  }
 
-  useEffect(() => {
-    if (!executionViewStateLoaded || executionViewState?.seen_at) return
+  useEffect(loadExecutionViewState, [activeExecution, executionId, loadExecutionViewStates, taskId])
+
+  /** 视图状态就绪且尚未标记已读时，延迟 800ms 上报「已看过」。 */
+  function markSeenWhenReady(): (() => void) | undefined {
+    if (!executionViewStateLoaded || executionViewState?.seen_at) return undefined
     const timer = window.setTimeout(() => {
       void markExecutionSeen(taskId, executionId)
     }, 800)
     return () => window.clearTimeout(timer)
-  }, [
+  }
+
+  useEffect(markSeenWhenReady, [
     executionId,
     executionViewState?.seen_at,
     executionViewStateLoaded,
@@ -81,10 +90,7 @@ export function ExecutionResultView({ taskId, executionId, onBack }: ExecutionRe
             <button
               type="button"
               className="mt-3 min-h-11 cursor-pointer bg-transparent px-0 text-xs text-primary underline underline-offset-2 sm:min-h-0"
-              onClick={() => {
-                void loadTaskDetail(taskId)
-                void loadExecutionDetail(taskId, executionId)
-              }}
+              onClick={loadTaskAndExecution}
             >
               重试
             </button>

@@ -21,6 +21,11 @@ export function TaskDetailPage() {
     setSearchParams(next, { replace: true })
   }
 
+  /** 查看某次执行详情：按任务与执行 id 跳转到执行详情路由。 */
+  function openExecutionDetail(taskId: string, executionId: string): void {
+    void navigate(ROUTES.TASK_EXECUTION_DETAIL.replace(':id', taskId).replace(':eid', executionId))
+  }
+
   return (
     <main className="flex h-dvh bg-background">
       <div className="flex flex-1 flex-col min-w-0 max-w-3xl mx-auto w-full">
@@ -31,11 +36,7 @@ export function TaskDetailPage() {
           onBack={() => void navigate(ROUTES.TASKS)}
           onTabChange={handleTabChange}
           onDeleted={() => void navigate(ROUTES.TASKS)}
-          onViewExecution={(executionId: string) => {
-            void navigate(
-              ROUTES.TASK_EXECUTION_DETAIL.replace(':id', id).replace(':eid', executionId)
-            )
-          }}
+          onViewExecution={(executionId) => openExecutionDetail(id, executionId)}
         />
       </div>
     </main>

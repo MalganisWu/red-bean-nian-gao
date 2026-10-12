@@ -20,11 +20,14 @@ function initialTheme(): Theme {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(initialTheme)
 
-  useEffect(() => {
+  /** 把当前主题同步到 `documentElement` 与 localStorage。 */
+  function applyTheme(): void {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     document.documentElement.style.colorScheme = theme
     window.localStorage.setItem(STORAGE_KEY, theme)
-  }, [theme])
+  }
+
+  useEffect(applyTheme, [theme])
 
   return (
     <ThemeContext.Provider

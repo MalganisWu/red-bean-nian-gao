@@ -13,8 +13,9 @@ export function RequireAuth(): React.ReactElement {
   const [attempt, setAttempt] = useState(0)
   const [loadState, setLoadState] = useState<'loading' | 'error'>('loading')
 
-  useEffect(() => {
-    if (!isAuthenticated || user) return
+  /** 未认证或缺用户信息时拉取当前用户；卸载后丢弃回填结果。 */
+  function restoreUser(): (() => void) | undefined {
+    if (!isAuthenticated || user) return undefined
 
     let active = true
     void fetchMe().catch(() => {
@@ -24,7 +25,15 @@ export function RequireAuth(): React.ReactElement {
     return () => {
       active = false
     }
-  }, [attempt, fetchMe, isAuthenticated, user])
+  }
+
+  useEffect(restoreUser, [attempt, fetchMe, isAuthenticated, user])
+
+  /** 重试加载账户信息：先回到加载态，再触发一次重新拉取。 */
+  function retryLoad(): void {
+    setLoadState('loading')
+    setAttempt((value) => value + 1)
+  }
 
   if (!isAuthenticated) return <Navigate to={ROUTES.LOGIN} replace />
   if (user) return <Outlet />
@@ -37,10 +46,7 @@ export function RequireAuth(): React.ReactElement {
           <button
             type="button"
             className="mt-3 min-h-11 cursor-pointer border-0 bg-transparent px-2 text-xs font-medium text-action-confirm hover:text-action-confirm-hover"
-            onClick={() => {
-              setLoadState('loading')
-              setAttempt((value) => value + 1)
-            }}
+            onClick={retryLoad}
           >
             重试
           </button>

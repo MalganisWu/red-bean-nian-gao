@@ -38,7 +38,8 @@ export function collapseToProcessFold(
   let pendingSteps: ProcessStepItem[] = []
   let pendingTs = 0
 
-  const flushProcess = () => {
+  /** 把已累积的步骤收束成一个 process section；没有步骤时不产出。 */
+  function flushProcess(): void {
     if (pendingSteps.length === 0) return
     out.push({
       type: 'process',
@@ -48,7 +49,9 @@ export function collapseToProcessFold(
     pendingSteps = []
     pendingTs = 0
   }
-  const pushStep = (step: ProcessStepItem, ts: number) => {
+
+  /** 追加一个过程步骤；稳定业务 ID 重复的节点只保留一次。 */
+  function pushStep(step: ProcessStepItem, ts: number): void {
     // answer 续跑期间，已收束的 process 与原始 card 会短暂同时存在。
     // 稳定业务 ID 相同的节点只保留一次，避免确认卡片重复渲染。
     if (
@@ -128,13 +131,15 @@ function attachSubAgentsToParents(steps: ProcessStepItem[]): ProcessStepItem[] {
   const toolIndexByCallID = new Map<string, number>()
   const attachedSubAgentIndexes = new Set<number>()
 
-  grouped.forEach((step, index) => {
+  /** 记录每个 callId 首次出现的工具步骤下标。 */
+  function collectToolIndex(step: ProcessStepItem, index: number): void {
     if (step.kind === 'tool' && step.tool?.callId && !toolIndexByCallID.has(step.tool.callId)) {
       toolIndexByCallID.set(step.tool.callId, index)
     }
-  })
+  }
 
-  grouped.forEach((step, index) => {
+  /** 把子 Agent 步骤挂到其父工具上，并记下被挂载的下标以便随后剔除。 */
+  function attachSubAgentToParent(step: ProcessStepItem, index: number): void {
     if (step.kind !== 'sub_agent' || !step.subAgent?.parent_call_id) return
     const parentIndex = toolIndexByCallID.get(step.subAgent.parent_call_id)
     if (parentIndex === undefined) return
@@ -143,7 +148,10 @@ function attachSubAgentsToParents(steps: ProcessStepItem[]): ProcessStepItem[] {
     if (!parent || parent.kind !== 'tool' || parent.subAgent) return
     grouped[parentIndex] = { ...parent, subAgent: step.subAgent }
     attachedSubAgentIndexes.add(index)
-  })
+  }
+
+  grouped.forEach(collectToolIndex)
+  grouped.forEach(attachSubAgentToParent)
 
   return grouped.filter((_, index) => !attachedSubAgentIndexes.has(index))
 }
@@ -193,24 +201,27 @@ export function toolDurationLabel(t: ToolCard): string | undefined {
 export function normalizePersistedSections(
   sections: readonly PersistedMessageSection[]
 ): MessageSection[] {
-  return sections.map((s) => {
-    if (s.type === 'tool_group') {
-      return { ...s, tools: s.tools.map(normalizeTool) }
+  return sections.map(normalizePersistedSection)
+}
+
+/** 归一化单个持久化 section：转换工具耗时字段并递归处理子 Agent 内层 sections。 */
+function normalizePersistedSection(s: PersistedMessageSection): MessageSection {
+  if (s.type === 'tool_group') {
+    return { ...s, tools: s.tools.map(normalizeTool) }
+  }
+  if (s.type === 'reason') {
+    return {
+      ...s,
+      items: s.items.map(normalizeReasonItem),
     }
-    if (s.type === 'reason') {
-      return {
-        ...s,
-        items: s.items.map(normalizeReasonItem),
-      }
+  }
+  if (s.type === 'sub_agent') {
+    return {
+      ...s,
+      items: normalizeSubAgent(s.items),
     }
-    if (s.type === 'sub_agent') {
-      return {
-        ...s,
-        items: normalizeSubAgent(s.items),
-      }
-    }
-    return s
-  })
+  }
+  return s
 }
 
 function normalizeReasonItem(item: ReasonItemDto): ReasonItem {

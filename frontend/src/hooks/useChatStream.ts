@@ -103,52 +103,70 @@ export function useChatStream(agentId = DEFAULT_AGENT_ID): ChatStreamControls {
   const tokenBufferRef = useRef('')
   const flushTimerRef = useRef<number | null>(null)
 
-  const flushTokenBuffer = useCallback(() => {
-    if (tokenBufferRef.current) {
-      appendToken(tokenBufferRef.current)
-      tokenBufferRef.current = ''
-    }
-    if (flushTimerRef.current) {
-      clearInterval(flushTimerRef.current)
-      flushTimerRef.current = null
-    }
-  }, [appendToken])
+  const flushTokenBuffer = useCallback(
+    /** 把缓冲中的增量 token 写入 store，并停止 flush 定时器。 */
+    function flushPendingTokens(): void {
+      if (tokenBufferRef.current) {
+        appendToken(tokenBufferRef.current)
+        tokenBufferRef.current = ''
+      }
+      if (flushTimerRef.current) {
+        clearInterval(flushTimerRef.current)
+        flushTimerRef.current = null
+      }
+    },
+    [appendToken]
+  )
 
-  const discardTokenBuffer = useCallback(() => {
-    tokenBufferRef.current = ''
-    if (flushTimerRef.current) {
-      clearInterval(flushTimerRef.current)
-      flushTimerRef.current = null
-    }
-  }, [])
+  const discardTokenBuffer = useCallback(
+    /** 丢弃尚未 flush 的 token 缓冲，并停止 flush 定时器。 */
+    function discardPendingTokens(): void {
+      tokenBufferRef.current = ''
+      if (flushTimerRef.current) {
+        clearInterval(flushTimerRef.current)
+        flushTimerRef.current = null
+      }
+    },
+    []
+  )
 
   // 会话导航不是一次普通的流结束：必须先让所有旧回调失效，再 abort，且不能把旧 token
   // 缓冲 flush 到刚清空/刚切入的会话。Zustand subscribe 在 action set 时同步触发，避免
   // 等 React 重渲染/effect 后才处理而留下迟到 START/TOKEN/DONE 的竞态窗口。
-  const invalidateActiveStream = useCallback(() => {
-    streamSequenceRef.current += 1
-    if (ctrlRef.current) {
-      ctrlRef.current.abort()
-      ctrlRef.current = null
-    }
-    discardTokenBuffer()
-    lastRequestRef.current = null
-  }, [discardTokenBuffer])
-
-  useEffect(() => {
-    const unsubscribe = useChatStore.subscribe((state, previous) => {
-      if (state.streamNavigationEpoch !== previous.streamNavigationEpoch) {
-        invalidateActiveStream()
+  const invalidateActiveStream = useCallback(
+    /** 让当前连接的迟到回调全部失效并中止连接，同时丢弃未 flush 的 token 缓冲。 */
+    function invalidateStream(): void {
+      streamSequenceRef.current += 1
+      if (ctrlRef.current) {
+        ctrlRef.current.abort()
+        ctrlRef.current = null
       }
-    })
-    return () => {
+      discardTokenBuffer()
+      lastRequestRef.current = null
+    },
+    [discardTokenBuffer]
+  )
+
+  useEffect(subscribeToStreamNavigation, [invalidateActiveStream])
+
+  /** 订阅 store 的会话导航序号：切会话时同步失效当前流，不等 React 重渲染。 */
+  function subscribeToStreamNavigation(): () => void {
+    const unsubscribe = useChatStore.subscribe(
+      function handleNavigationEpochChange(state, previous): void {
+        if (state.streamNavigationEpoch !== previous.streamNavigationEpoch) {
+          invalidateActiveStream()
+        }
+      }
+    )
+    return function unsubscribeAndInvalidateStream(): void {
       unsubscribe()
       invalidateActiveStream()
     }
-  }, [invalidateActiveStream])
+  }
 
   const handleEvent = useCallback(
-    (event: ParsedSSEEvent) => {
+    /** 把一条 SSE 事件同时投影到 trajectory-store（轨迹）与 chat-store（主展示）。 */
+    function applyStreamEvent(event: ParsedSSEEvent): void {
       /* 轨迹实时投影：同一批 SSE 事件的第二个投影（chat-store 为主投影）。
          轨迹 store 内部按需要自行校验，此处透传原始事件。 */
       useTrajectoryStore.getState().applyEvent(event)
@@ -164,7 +182,7 @@ export function useChatStream(agentId = DEFAULT_AGENT_ID): ChatStreamControls {
           acceptCardSubmission()
           startStreaming(event.data.request_id, event.data.session_id)
           // 启动 token 批量 flush 定时器（100ms 节流写入 store）
-          flushTimerRef.current = window.setInterval(() => {
+          flushTimerRef.current = window.setInterval(function pushBufferedToken(): void {
             if (tokenBufferRef.current) {
               appendToken(tokenBufferRef.current)
               tokenBufferRef.current = ''
@@ -284,7 +302,8 @@ export function useChatStream(agentId = DEFAULT_AGENT_ID): ChatStreamControls {
 
   // 发起一条 SSE 流（send / answer / retry 共用同一组回调与 onError 处理）
   const openStream = useCallback(
-    (url: string | undefined, request: ChatRequest | AnswerRequest) => {
+    /** 发起一条 SSE 流，并把这次请求登记为「最近一次请求」供 retry 原样重发。 */
+    function startStream(url: string | undefined, request: ChatRequest | AnswerRequest): void {
       lastRequestRef.current = { url, request, started: false }
       const streamSequence = ++streamSequenceRef.current
       // 取消既有连接（若存在）
@@ -293,11 +312,11 @@ export function useChatStream(agentId = DEFAULT_AGENT_ID): ChatStreamControls {
       ctrlRef.current = connectSSE({
         url,
         request,
-        onEvent: (event) => {
+        onEvent: function handleStreamEvent(event): void {
           if (streamSequence !== streamSequenceRef.current) return
           handleEvent(event)
         },
-        onError: (err) => {
+        onError: function handleStreamError(err): void {
           if (streamSequence !== streamSequenceRef.current) return
           flushTokenBuffer()
           const submission = useChatStore.getState().cardSubmission
@@ -313,7 +332,7 @@ export function useChatStream(agentId = DEFAULT_AGENT_ID): ChatStreamControls {
           if (submission?.state === 'accepted') completeCardSubmission()
           setError({ code: 500, message: err.message })
         },
-        onClose: () => {
+        onClose: function handleStreamClose(): void {
           if (streamSequence !== streamSequenceRef.current) return
           flushTokenBuffer()
           const state = useChatStore.getState()
@@ -347,7 +366,8 @@ export function useChatStream(agentId = DEFAULT_AGENT_ID): ChatStreamControls {
   )
 
   const send = useCallback(
-    (messages: ChatMessage[], sessionId?: string) => {
+    /** 发送一轮用户消息：定位会话、乐观追加用户气泡，随后发起 SSE 流。 */
+    function sendMessage(messages: ChatMessage[], sessionId?: string): void {
       // 已有会话的历史由服务端按 session_id 加载，请求只携带本轮 user 消息。
       // 这里兼容仍传入完整历史的旧调用方，避免历史被再次追加进持久化上下文。
       const lastUserMsg = messages.findLast((message) => message.role === 'user')
@@ -377,66 +397,75 @@ export function useChatStream(agentId = DEFAULT_AGENT_ID): ChatStreamControls {
     []
   )
 
-  const retry = useCallback((): boolean => {
-    const last = lastRequestRef.current
-    if (!last || last.started) return false
-    if (last.url === API_ROUTES.CHAT_ANSWER.path && cardSubmission) {
-      beginCardSubmission(cardSubmission.interactionId, {
-        answers: cardSubmission.answers,
-        refused: cardSubmission.refused,
-      })
-    }
-    markSent()
-    openStream(last.url, last.request)
-    return true
-  }, [cardSubmission, beginCardSubmission, markSent, openStream])
-
-  const cancel = useCallback(async () => {
-    // 先失效当前连接回调，再 abort；避免 abort 触发的迟到 onClose 被当成异常断线。
-    const cancelSequence = ++streamSequenceRef.current
-    if (ctrlRef.current) {
-      ctrlRef.current.abort()
-      ctrlRef.current = null
-    }
-    flushTokenBuffer()
-    if (cardSubmission?.state === 'submitting') {
-      failCardSubmission('已停止，可重新确认。')
-    } else {
-      settleIncompleteTools()
-      /* 轨迹投影同构收尾：仍 running 的行收成 incomplete，否则终态页面
-         会永久显示「正在执行」（interrupting 工具与被打断的工具都不会有 tool_result） */
-      useTrajectoryStore.getState().settleIncomplete()
-      stopStreaming('cancelled')
-      if (cardSubmission?.state === 'accepted') completeCardSubmission()
-    }
-    if (requestId) {
-      try {
-        await cancelChat({ request_id: requestId })
-      } catch (err) {
-        // 本地流已经安全停止。只有期间未开启新流/切换会话时才展示取消 API 错误，
-        // 避免迟到的失败反过来污染用户刚开始的新一轮。
-        if (cancelSequence !== streamSequenceRef.current) return
-        const message = err instanceof Error ? err.message : '未知错误'
-        setError({
-          code: 500,
-          message: `已停止本地生成，但通知服务端取消失败：${message}`,
+  const retry = useCallback(
+    /** 原样重发最近一次请求；已收到 START 的流不允许重放。 */
+    function retryLastRequest(): boolean {
+      const last = lastRequestRef.current
+      if (!last || last.started) return false
+      if (last.url === API_ROUTES.CHAT_ANSWER.path && cardSubmission) {
+        beginCardSubmission(cardSubmission.interactionId, {
+          answers: cardSubmission.answers,
+          refused: cardSubmission.refused,
         })
       }
-    }
-  }, [
-    requestId,
-    cardSubmission,
-    failCardSubmission,
-    flushTokenBuffer,
-    settleIncompleteTools,
-    stopStreaming,
-    completeCardSubmission,
-    setError,
-  ])
+      markSent()
+      openStream(last.url, last.request)
+      return true
+    },
+    [cardSubmission, beginCardSubmission, markSent, openStream]
+  )
+
+  const cancel = useCallback(
+    /** 取消当前流：先失效连接回调再 abort，随后通知服务端取消。 */
+    async function cancelActiveStream(): Promise<void> {
+      // 先失效当前连接回调，再 abort；避免 abort 触发的迟到 onClose 被当成异常断线。
+      const cancelSequence = ++streamSequenceRef.current
+      if (ctrlRef.current) {
+        ctrlRef.current.abort()
+        ctrlRef.current = null
+      }
+      flushTokenBuffer()
+      if (cardSubmission?.state === 'submitting') {
+        failCardSubmission('已停止，可重新确认。')
+      } else {
+        settleIncompleteTools()
+        /* 轨迹投影同构收尾：仍 running 的行收成 incomplete，否则终态页面
+         会永久显示「正在执行」（interrupting 工具与被打断的工具都不会有 tool_result） */
+        useTrajectoryStore.getState().settleIncomplete()
+        stopStreaming('cancelled')
+        if (cardSubmission?.state === 'accepted') completeCardSubmission()
+      }
+      if (requestId) {
+        try {
+          await cancelChat({ request_id: requestId })
+        } catch (err) {
+          // 本地流已经安全停止。只有期间未开启新流/切换会话时才展示取消 API 错误，
+          // 避免迟到的失败反过来污染用户刚开始的新一轮。
+          if (cancelSequence !== streamSequenceRef.current) return
+          const message = err instanceof Error ? err.message : '未知错误'
+          setError({
+            code: 500,
+            message: `已停止本地生成，但通知服务端取消失败：${message}`,
+          })
+        }
+      }
+    },
+    [
+      requestId,
+      cardSubmission,
+      failCardSubmission,
+      flushTokenBuffer,
+      settleIncompleteTools,
+      stopStreaming,
+      completeCardSubmission,
+      setError,
+    ]
+  )
 
   // answer：提交询问卡片答案/拒绝 → POST /answer → 续跑 SSE（与 send 同一条 handleEvent）
   const answer = useCallback(
-    (interactionId: string, payload: AnswerPayload) => {
+    /** 提交询问卡片的答案/拒绝，随后用同一条 handleEvent 续跑 SSE。 */
+    function submitAnswer(interactionId: string, payload: AnswerPayload): void {
       // storeSessionId 只在活流（startStreaming）时设置；刷新恢复/侧栏切会话时
       // sessionId 为 null，此时用 activeSessionId 定位会话
       const sid = storeSessionId ?? activeSessionId

@@ -14,13 +14,17 @@ export function useInfiniteScroll(
 ): InfiniteScrollControls {
   const listRef = useRef<HTMLDivElement>(null)
 
-  const handleScroll = useCallback(() => {
-    const el = listRef.current
-    if (!el || loading || !hasMore) return
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 50) {
-      loadMore()
-    }
-  }, [loading, hasMore, loadMore])
+  const handleScroll = useCallback(
+    /** 滚动到底部（剩余 <50px）且仍有下一页时触发 loadMore。 */
+    function handleListScroll(): void {
+      const el = listRef.current
+      if (!el || loading || !hasMore) return
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 50) {
+        loadMore()
+      }
+    },
+    [loading, hasMore, loadMore]
+  )
 
   return { listRef, handleScroll }
 }

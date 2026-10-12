@@ -36,12 +36,15 @@ export function SessionTaskListView({
     if (activeSessionId) void loadSessionTasks(activeSessionId)
   }, [activeSessionId, loadSessionTasks])
 
-  useEffect(() => {
+  /** 预取本会话各任务最近一次执行的视图状态（无执行记录的任务跳过）。 */
+  function prefetchExecutionViewStates(): void {
     const executionIds = sessionTasks.flatMap((task) =>
       task.latest_execution ? [task.latest_execution.ExecutionID] : []
     )
     if (executionIds.length > 0) void loadExecutionViewStates(executionIds)
-  }, [loadExecutionViewStates, sessionTasks])
+  }
+
+  useEffect(prefetchExecutionViewStates, [loadExecutionViewStates, sessionTasks])
 
   const items = sessionTasks.map((task) =>
     toScheduledTaskListItem(

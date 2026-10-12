@@ -123,6 +123,234 @@ function currentTurn(turns: readonly LiveTurn[]): LiveTurn | undefined {
   return turns.at(-1)
 }
 
+/** 发送即开轮：建立本轮实时轮次，轮次号续在已终结的历史轮次之后。 */
+function beginTurnState(
+  state: TrajectoryLiveState,
+  content: string,
+  sessionId: string | null | undefined
+): Partial<TrajectoryLiveState> {
+  const now = Date.now()
+  const turn: LiveTurn = {
+    turn: state.turnBase + 1,
+    startedAt: clock(now),
+    startedAtMs: now,
+    records: [
+      {
+        id: nextId(),
+        seq: 1,
+        kind: 'user',
+        at: clock(now),
+        summary: content,
+      },
+    ],
+  }
+  /* 只保留"当前进行中的一轮"：已结束的轮次以持久化历史为准，实时侧不留存——
+     否则视图重新打开时同一个 run 会既出现在历史里、又出现在实时投影里（重复轮次）。 */
+  return {
+    liveTurns: [turn],
+    recordStartTimes: {},
+    /* 新会话此时还没有 session_id（START 才带回），先记已知值，START 会补齐 */
+    liveSessionId: sessionId ?? null,
+  }
+}
+
+/** 把一条 SSE 事件并入实时轨迹投影；未知类型与乱序事件原样返回，不产生更新。 */
+function reduceTrajectoryEvent(
+  state: TrajectoryLiveState,
+  event: ParsedSSEEvent
+): Partial<TrajectoryLiveState> {
+  const turns = state.liveTurns.map((t) => ({ ...t, records: [...t.records] }))
+  const turn = currentTurn(turns)
+  switch (event.eventType) {
+    case SSE_EVENT_TYPES.START: {
+      if (!isStartEvent(event.data)) return state
+      return {
+        streamingSessionId: event.data.session_id,
+        liveSessionId: event.data.session_id,
+        liveTurns: turns,
+      }
+    }
+    case SSE_EVENT_TYPES.REASON: {
+      if (!turn || !isReasonEvent(event.data)) return state
+      const step = ensureCall(turn)
+      step.thinking = (step.thinking ?? '') + event.data.content
+      step.summary = callSummary(step)
+      return { liveTurns: turns }
+    }
+    case SSE_EVENT_TYPES.TOKEN: {
+      if (!turn || !isTokenEvent(event.data)) return state
+      const step = ensureCall(turn)
+      step.reply = (step.reply ?? '') + event.data.content
+      /* 摘要必须跟随回答一起增长，且与持久化投影同口径（有回答取回答首行）。
+         只更新 reply 会让记录行在整个作答期间一动不动——看起来像轨迹停住了。 */
+      step.summary = callSummary(step)
+      return { liveTurns: turns }
+    }
+    case SSE_EVENT_TYPES.STATUS: {
+      if (!turn || !isStatusEvent(event.data)) return state
+      const code = event.data.code
+      if (code === 'llm_retry' || code === 'llm_empty_response_retry') {
+        const step = ensureCall(turn)
+        /* 上一次尝试以失败告终，新一次尝试开始 */
+        const attempts: TrajectoryAttempt[] = [...(step.attempts ?? [])]
+        const prev = attempts.at(-1)
+        if (prev?.status === 'running') {
+          attempts[attempts.length - 1] = settleAttempt(prev, 'error', event.data.content)
+        }
+        attempts.push({
+          id: nextReqId(),
+          seq: (prev?.seq ?? 0) + 1,
+          model: '',
+          attempt: `${event.data.attempt ?? attempts.length + 1}/${event.data.max_attempts ?? '?'}`,
+          durationMs: 0,
+          status: 'running',
+          at: clock(Date.now()),
+        })
+        step.attempts = attempts
+      }
+      return { liveTurns: turns }
+    }
+    case SSE_EVENT_TYPES.TOOL_START: {
+      if (!turn || !isToolStartEvent(event.data)) return state
+      turn.currentCall = undefined
+      const recordId = nextId()
+      turn.records.push({
+        id: recordId,
+        seq: nextSeqValue(turns),
+        kind: 'tool',
+        at: clock(Date.now()),
+        summary: event.data.tool_name,
+        name: event.data.tool_name,
+        status: 'running',
+        ...(event.data.params !== null && event.data.params !== undefined
+          ? { params: JSON.stringify(event.data.params) }
+          : {}),
+      })
+      return {
+        liveTurns: turns,
+        recordStartTimes: { ...state.recordStartTimes, [recordId]: Date.now() },
+      }
+    }
+    case SSE_EVENT_TYPES.TOOL_RESULT: {
+      if (!turn || !isToolResultEvent(event.data)) return state
+      const data = event.data
+      const idx = turn.records.findIndex(
+        (r) => r.kind === 'tool' && r.status === 'running' && r.name === data.tool_name
+      )
+      const target = idx >= 0 ? turn.records[idx] : undefined
+      if (target !== undefined) {
+        const failed = data.error !== undefined && data.error !== ''
+        const settled: LiveRecord = {
+          ...target,
+          status: failed ? 'error' : 'success',
+          result: failed ? data.error : data.content,
+          /* 失败摘要与持久化投影同口径（带错误首行），否则流式与回放两态对不上 */
+          summary: failed
+            ? `${data.tool_name} 失败：${firstLine(data.error ?? '')}`
+            : firstLine(data.content || data.tool_name),
+        }
+        /* 计时起点在 recordStartTimes 侧表（记录本体不带流式计时字段） */
+        const startedAt = state.recordStartTimes[target.id]
+        if (startedAt !== undefined) {
+          settled.durationMs = Math.max(0, Date.now() - startedAt)
+        }
+        turn.records[idx] = settled
+        const nextTimes = { ...state.recordStartTimes }
+        delete nextTimes[target.id]
+        return { liveTurns: turns, recordStartTimes: nextTimes }
+      }
+      return { liveTurns: turns }
+    }
+    case SSE_EVENT_TYPES.COMPACTION: {
+      if (!turn || !isCompactionEvent(event.data)) return state
+      turn.records.push({
+        id: nextId(),
+        seq: nextSeqValue(turns),
+        kind: 'tool',
+        at: clock(Date.now()),
+        summary: `上下文压缩：${event.data.pre_tokens.toLocaleString('en-US')} → ${event.data.post_tokens.toLocaleString('en-US')} tok`,
+        name: 'compaction',
+        status: 'success',
+      })
+      return { liveTurns: turns }
+    }
+    case SSE_EVENT_TYPES.AGENT_EVENT: {
+      if (!turn || !isSubAgentEnvelope(event.data)) return state
+      const data = event.data
+      const existing = turn.records.find((r) => r.kind === 'subagent' && r.name === data.agent_name)
+      if (existing === undefined) {
+        const recordId = nextId()
+        turn.records.push({
+          id: recordId,
+          seq: nextSeqValue(turns),
+          kind: 'subagent',
+          at: clock(Date.now()),
+          summary: data.agent_name,
+          name: data.agent_name,
+          status: 'running',
+        })
+        return {
+          liveTurns: turns,
+          recordStartTimes: { ...state.recordStartTimes, [recordId]: Date.now() },
+        }
+      }
+      return { liveTurns: turns }
+    }
+    case SSE_EVENT_TYPES.DONE: {
+      if (!turn || !isDoneEvent(event.data)) return state
+      turn.records.push({
+        id: nextId(),
+        seq: nextSeqValue(turns),
+        kind: 'turn-end',
+        at: clock(Date.now()),
+        summary: `轮次 ${turn.turn} 结束 · 完成`,
+      })
+      return { streamingSessionId: null, liveTurns: turns }
+    }
+    case SSE_EVENT_TYPES.ERROR: {
+      /* 流式错误：本轮以失败终态收尾（轨迹如实记录失败，不做成功伪装） */
+      if (!turn) return state
+      turn.records.push({
+        id: nextId(),
+        seq: nextSeqValue(turns),
+        kind: 'turn-end',
+        at: clock(Date.now()),
+        summary: `轮次 ${turn.turn} 结束 · 失败`,
+      })
+      return { streamingSessionId: null, liveTurns: turns }
+    }
+    case SSE_EVENT_TYPES.CARD: {
+      /* 审批挂起：LLM 决定调用 interrupting 工具，服务端在流结束前发 card 事件。
+             轨迹侧据此合成一行「工具 · 等待审批」——否则这次调用在实时视图里完全不存在
+             （interrupting 工具不发 tool_start / tool_result），与持久化视图对不上。
+             `interaction_id` 就是 callId，与持久化侧按 callId 重建出的行同源。 */
+      if (!turn || !isCardEvent(event.data)) return state
+      const card = event.data
+      if (card.status !== 'pending') return state
+      const existing = turn.records.find(
+        (r) => r.kind === 'tool' && r.name === APPROVAL_ROW_NAME && r.id === card.interaction_id
+      )
+      if (existing !== undefined) return state
+      const firstQuestion = card.questions.at(0)
+      turn.records.push({
+        id: card.interaction_id,
+        seq: nextSeqValue(turns),
+        kind: 'tool',
+        at: clock(Date.now()),
+        summary: firstQuestion?.text ?? '等待用户确认',
+        name: APPROVAL_ROW_NAME,
+        status: 'interrupt',
+      })
+      return { liveTurns: turns }
+    }
+    /* heartbeat（心跳）由 chat 主投影承担，轨迹投影不消费 */
+    case SSE_EVENT_TYPES.HEARTBEAT:
+      return state
+    default:
+      return state
+  }
+}
+
 /** 轨迹专用 store；与 chat 主投影消费同一批 SSE 事件，但各自维护独立投影。 */
 export const useTrajectoryStore = create<TrajectoryLiveState>()((set) => ({
   streamingSessionId: null,
@@ -131,32 +359,7 @@ export const useTrajectoryStore = create<TrajectoryLiveState>()((set) => ({
   turnBase: 0,
   recordStartTimes: {},
 
-  beginUserTurn: (content, sessionId) =>
-    set((state) => {
-      const now = Date.now()
-      const turn: LiveTurn = {
-        turn: state.turnBase + 1,
-        startedAt: clock(now),
-        startedAtMs: now,
-        records: [
-          {
-            id: nextId(),
-            seq: 1,
-            kind: 'user',
-            at: clock(now),
-            summary: content,
-          },
-        ],
-      }
-      /* 只保留"当前进行中的一轮"：已结束的轮次以持久化历史为准，实时侧不留存——
-         否则视图重新打开时同一个 run 会既出现在历史里、又出现在实时投影里（重复轮次）。 */
-      return {
-        liveTurns: [turn],
-        recordStartTimes: {},
-        /* 新会话此时还没有 session_id（START 才带回），先记已知值，START 会补齐 */
-        liveSessionId: sessionId ?? null,
-      }
-    }),
+  beginUserTurn: (content, sessionId) => set((state) => beginTurnState(state, content, sessionId)),
 
   alignToHistory: (base) =>
     set((state) => ({
@@ -169,201 +372,7 @@ export const useTrajectoryStore = create<TrajectoryLiveState>()((set) => ({
 
   clearLiveTurns: () => set({ liveTurns: [], recordStartTimes: {}, liveSessionId: null }),
 
-  applyEvent: (event) =>
-    set((state) => {
-      const turns = state.liveTurns.map((t) => ({ ...t, records: [...t.records] }))
-      const turn = currentTurn(turns)
-      switch (event.eventType) {
-        case SSE_EVENT_TYPES.START: {
-          if (!isStartEvent(event.data)) return state
-          return {
-            streamingSessionId: event.data.session_id,
-            liveSessionId: event.data.session_id,
-            liveTurns: turns,
-          }
-        }
-        case SSE_EVENT_TYPES.REASON: {
-          if (!turn || !isReasonEvent(event.data)) return state
-          const step = ensureCall(turn)
-          step.thinking = (step.thinking ?? '') + event.data.content
-          step.summary = callSummary(step)
-          return { liveTurns: turns }
-        }
-        case SSE_EVENT_TYPES.TOKEN: {
-          if (!turn || !isTokenEvent(event.data)) return state
-          const step = ensureCall(turn)
-          step.reply = (step.reply ?? '') + event.data.content
-          /* 摘要必须跟随回答一起增长，且与持久化投影同口径（有回答取回答首行）。
-             只更新 reply 会让记录行在整个作答期间一动不动——看起来像轨迹停住了。 */
-          step.summary = callSummary(step)
-          return { liveTurns: turns }
-        }
-        case SSE_EVENT_TYPES.STATUS: {
-          if (!turn || !isStatusEvent(event.data)) return state
-          const code = event.data.code
-          if (code === 'llm_retry' || code === 'llm_empty_response_retry') {
-            const step = ensureCall(turn)
-            /* 上一次尝试以失败告终，新一次尝试开始 */
-            const attempts: TrajectoryAttempt[] = [...(step.attempts ?? [])]
-            const prev = attempts.at(-1)
-            if (prev?.status === 'running') {
-              attempts[attempts.length - 1] = settleAttempt(prev, 'error', event.data.content)
-            }
-            attempts.push({
-              id: nextReqId(),
-              seq: (prev?.seq ?? 0) + 1,
-              model: '',
-              attempt: `${event.data.attempt ?? attempts.length + 1}/${event.data.max_attempts ?? '?'}`,
-              durationMs: 0,
-              status: 'running',
-              at: clock(Date.now()),
-            })
-            step.attempts = attempts
-          }
-          return { liveTurns: turns }
-        }
-        case SSE_EVENT_TYPES.TOOL_START: {
-          if (!turn || !isToolStartEvent(event.data)) return state
-          turn.currentCall = undefined
-          const recordId = nextId()
-          turn.records.push({
-            id: recordId,
-            seq: nextSeqValue(turns),
-            kind: 'tool',
-            at: clock(Date.now()),
-            summary: event.data.tool_name,
-            name: event.data.tool_name,
-            status: 'running',
-            ...(event.data.params !== null && event.data.params !== undefined
-              ? { params: JSON.stringify(event.data.params) }
-              : {}),
-          })
-          return {
-            liveTurns: turns,
-            recordStartTimes: { ...state.recordStartTimes, [recordId]: Date.now() },
-          }
-        }
-        case SSE_EVENT_TYPES.TOOL_RESULT: {
-          if (!turn || !isToolResultEvent(event.data)) return state
-          const data = event.data
-          const idx = turn.records.findIndex(
-            (r) => r.kind === 'tool' && r.status === 'running' && r.name === data.tool_name
-          )
-          const target = idx >= 0 ? turn.records[idx] : undefined
-          if (target !== undefined) {
-            const failed = data.error !== undefined && data.error !== ''
-            const settled: LiveRecord = {
-              ...target,
-              status: failed ? 'error' : 'success',
-              result: failed ? data.error : data.content,
-              /* 失败摘要与持久化投影同口径（带错误首行），否则流式与回放两态对不上 */
-              summary: failed
-                ? `${data.tool_name} 失败：${firstLine(data.error ?? '')}`
-                : firstLine(data.content || data.tool_name),
-            }
-            /* 计时起点在 recordStartTimes 侧表（记录本体不带流式计时字段） */
-            const startedAt = state.recordStartTimes[target.id]
-            if (startedAt !== undefined) {
-              settled.durationMs = Math.max(0, Date.now() - startedAt)
-            }
-            turn.records[idx] = settled
-            const nextTimes = { ...state.recordStartTimes }
-            delete nextTimes[target.id]
-            return { liveTurns: turns, recordStartTimes: nextTimes }
-          }
-          return { liveTurns: turns }
-        }
-        case SSE_EVENT_TYPES.COMPACTION: {
-          if (!turn || !isCompactionEvent(event.data)) return state
-          turn.records.push({
-            id: nextId(),
-            seq: nextSeqValue(turns),
-            kind: 'tool',
-            at: clock(Date.now()),
-            summary: `上下文压缩：${event.data.pre_tokens.toLocaleString('en-US')} → ${event.data.post_tokens.toLocaleString('en-US')} tok`,
-            name: 'compaction',
-            status: 'success',
-          })
-          return { liveTurns: turns }
-        }
-        case SSE_EVENT_TYPES.AGENT_EVENT: {
-          if (!turn || !isSubAgentEnvelope(event.data)) return state
-          const data = event.data
-          const existing = turn.records.find(
-            (r) => r.kind === 'subagent' && r.name === data.agent_name
-          )
-          if (existing === undefined) {
-            const recordId = nextId()
-            turn.records.push({
-              id: recordId,
-              seq: nextSeqValue(turns),
-              kind: 'subagent',
-              at: clock(Date.now()),
-              summary: data.agent_name,
-              name: data.agent_name,
-              status: 'running',
-            })
-            return {
-              liveTurns: turns,
-              recordStartTimes: { ...state.recordStartTimes, [recordId]: Date.now() },
-            }
-          }
-          return { liveTurns: turns }
-        }
-        case SSE_EVENT_TYPES.DONE: {
-          if (!turn || !isDoneEvent(event.data)) return state
-          turn.records.push({
-            id: nextId(),
-            seq: nextSeqValue(turns),
-            kind: 'turn-end',
-            at: clock(Date.now()),
-            summary: `轮次 ${turn.turn} 结束 · 完成`,
-          })
-          return { streamingSessionId: null, liveTurns: turns }
-        }
-        case SSE_EVENT_TYPES.ERROR: {
-          /* 流式错误：本轮以失败终态收尾（轨迹如实记录失败，不做成功伪装） */
-          if (!turn) return state
-          turn.records.push({
-            id: nextId(),
-            seq: nextSeqValue(turns),
-            kind: 'turn-end',
-            at: clock(Date.now()),
-            summary: `轮次 ${turn.turn} 结束 · 失败`,
-          })
-          return { streamingSessionId: null, liveTurns: turns }
-        }
-        case SSE_EVENT_TYPES.CARD: {
-          /* 审批挂起：LLM 决定调用 interrupting 工具，服务端在流结束前发 card 事件。
-             轨迹侧据此合成一行「工具 · 等待审批」——否则这次调用在实时视图里完全不存在
-             （interrupting 工具不发 tool_start / tool_result），与持久化视图对不上。
-             `interaction_id` 就是 callId，与持久化侧按 callId 重建出的行同源。 */
-          if (!turn || !isCardEvent(event.data)) return state
-          const card = event.data
-          if (card.status !== 'pending') return state
-          const existing = turn.records.find(
-            (r) => r.kind === 'tool' && r.name === APPROVAL_ROW_NAME && r.id === card.interaction_id
-          )
-          if (existing !== undefined) return state
-          const firstQuestion = card.questions.at(0)
-          turn.records.push({
-            id: card.interaction_id,
-            seq: nextSeqValue(turns),
-            kind: 'tool',
-            at: clock(Date.now()),
-            summary: firstQuestion?.text ?? '等待用户确认',
-            name: APPROVAL_ROW_NAME,
-            status: 'interrupt',
-          })
-          return { liveTurns: turns }
-        }
-        /* heartbeat（心跳）由 chat 主投影承担，轨迹投影不消费 */
-        case SSE_EVENT_TYPES.HEARTBEAT:
-          return state
-        default:
-          return state
-      }
-    }),
+  applyEvent: (event) => set((state) => reduceTrajectoryEvent(state, event)),
 
   settleIncomplete: () =>
     set((state) => ({

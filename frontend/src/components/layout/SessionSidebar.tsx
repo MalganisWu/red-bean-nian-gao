@@ -31,7 +31,8 @@ function groupSessionsByUpdatedAt(sessions: SessionSummary[], now = new Date()):
   const older: SessionGroup = { label: '更早', sessions: [] }
   const groups: SessionGroup[] = [today, recent, older]
 
-  sessions.forEach((session) => {
+  /** 把单个会话按 updated_at 落入今天 / 最近 7 天 / 更早分组；时间无法解析时归入更早。 */
+  function addSessionToGroup(session: SessionSummary): void {
     const updatedAt = new Date(session.updated_at)
     if (Number.isNaN(updatedAt.getTime())) {
       older.sessions.push(session)
@@ -48,7 +49,9 @@ function groupSessionsByUpdatedAt(sessions: SessionSummary[], now = new Date()):
     if (daysAgo <= 0) today.sessions.push(session)
     else if (daysAgo < 7) recent.sessions.push(session)
     else older.sessions.push(session)
-  })
+  }
+
+  sessions.forEach(addSessionToGroup)
 
   return groups.filter((group) => group.sessions.length > 0)
 }
@@ -100,6 +103,29 @@ export function SessionSidebar({ onNavigate }: SessionSidebarProps): React.React
   async function handleLogout(): Promise<void> {
     await logout()
     void navigate(ROUTES.LOGIN)
+  }
+
+  /** 渲染单条历史会话：标题、绝对时间，以及当前会话的高亮态。 */
+  function renderSessionItem(session: SessionSummary): React.ReactElement {
+    const active = session.id === activeSessionId
+    const title = session.title || '新会话'
+    return (
+      <button
+        key={session.id}
+        type="button"
+        aria-current={active ? 'page' : undefined}
+        title={`${title} · ${formatShortDateTime(session.updated_at)}`}
+        onClick={() => handleSelectSession(session.id)}
+        className={cn(
+          'relative flex min-h-11 w-full cursor-pointer items-center rounded-sm border-0 bg-transparent px-2.5 text-left font-sans text-[13px] transition-colors sm:min-h-9',
+          active
+            ? 'bg-muted font-medium text-foreground before:absolute before:bottom-2.5 before:left-0 before:top-2.5 before:w-0.5 before:rounded-sm before:bg-brand-indicator'
+            : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground'
+        )}
+      >
+        <span className="block min-w-0 flex-1 truncate">{title}</span>
+      </button>
+    )
   }
 
   const displayName = user?.display_name || user?.username || '用户'
@@ -181,27 +207,7 @@ export function SessionSidebar({ onNavigate }: SessionSidebarProps): React.React
             <h2 className="mx-2 mb-1.5 font-sans text-xs font-medium text-foreground-faint">
               {group.label}
             </h2>
-            {group.sessions.map((session) => {
-              const active = session.id === activeSessionId
-              const title = session.title || '新会话'
-              return (
-                <button
-                  key={session.id}
-                  type="button"
-                  aria-current={active ? 'page' : undefined}
-                  title={`${title} · ${formatShortDateTime(session.updated_at)}`}
-                  onClick={() => handleSelectSession(session.id)}
-                  className={cn(
-                    'relative flex min-h-11 w-full cursor-pointer items-center rounded-sm border-0 bg-transparent px-2.5 text-left font-sans text-[13px] transition-colors sm:min-h-9',
-                    active
-                      ? 'bg-muted font-medium text-foreground before:absolute before:bottom-2.5 before:left-0 before:top-2.5 before:w-0.5 before:rounded-sm before:bg-brand-indicator'
-                      : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground'
-                  )}
-                >
-                  <span className="block min-w-0 flex-1 truncate">{title}</span>
-                </button>
-              )
-            })}
+            {group.sessions.map(renderSessionItem)}
           </section>
         ))}
 

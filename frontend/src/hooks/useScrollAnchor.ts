@@ -8,11 +8,14 @@ export function useScrollAnchor(
 ): RefObject<HTMLDivElement | null> {
   const ref = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
+  useEffect(anchorToBottom, [messagesDependency, pendingDependency])
+
+  /** 依赖变化时把容器滚到底部。 */
+  function anchorToBottom(): void {
     if (ref.current) {
       ref.current.scrollTop = ref.current.scrollHeight
     }
-  }, [messagesDependency, pendingDependency])
+  }
 
   return ref
 }

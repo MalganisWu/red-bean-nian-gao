@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { StateCreator } from 'zustand'
 import type { ExecutionViewState, Task, TaskExecution, TaskListItem } from '@/types/task'
 import { AppError, extractErrorMessage } from '@/lib/errors'
 import {
@@ -79,6 +80,39 @@ const EMPTY_VIEW_STATE = (executionId: string): ExecutionViewState => ({
   updated_at: null,
 })
 
+/**
+ * 把批量拉回的视图状态并入本地。
+ * GET 发出后若用户已产生本地更新，不能再用旧快照覆盖它，因此只用 `returned` 覆盖
+ * 那些既未加载过、也未标记失败的条目；其余三张索引表同步置为「已加载、未在途、未失败」。
+ */
+function withLoadedViewStates(
+  current: TaskState,
+  missingIDs: readonly string[],
+  returned: ReadonlyMap<string, ExecutionViewState>
+): Partial<TaskState> {
+  const executionViewStates = { ...current.executionViewStates }
+  const executionViewStatesLoaded = { ...current.executionViewStatesLoaded }
+  const executionViewStatesLoading = { ...current.executionViewStatesLoading }
+  const executionViewStatesFailed = { ...current.executionViewStatesFailed }
+  for (const executionId of missingIDs) {
+    if (
+      !current.executionViewStatesLoaded[executionId] ||
+      current.executionViewStatesFailed[executionId]
+    ) {
+      executionViewStates[executionId] = returned.get(executionId) ?? EMPTY_VIEW_STATE(executionId)
+    }
+    executionViewStatesLoaded[executionId] = true
+    executionViewStatesLoading[executionId] = false
+    executionViewStatesFailed[executionId] = false
+  }
+  return {
+    executionViewStates,
+    executionViewStatesLoaded,
+    executionViewStatesLoading,
+    executionViewStatesFailed,
+  }
+}
+
 function laterTimestamp(current: string | null, incoming: string | null): string | null {
   if (!current) return incoming
   if (!incoming) return current
@@ -92,11 +126,17 @@ let executionDetailRequestSerial = 0
 let taskDetailRequestSerial = 0
 let executionListRequestSerial = 0
 
-/** 任务 store：会话内任务、任务详情与执行列表；每类请求带自增序号，用于丢弃过期响应。 */
-export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
-  ...initialState,
+type TaskStore = TaskState & TaskActions
 
-  loadSessionTasks: async (sessionId) => {
+/** 任务 store：会话内任务、任务详情与执行列表；每类请求带自增序号，用于丢弃过期响应。 */
+export const useTaskStore = create<TaskStore>()(createTaskStore)
+
+function createTaskStore(
+  set: Parameters<StateCreator<TaskStore>>[0],
+  get: Parameters<StateCreator<TaskStore>>[1]
+): TaskStore {
+  /** 拉取某个会话下的任务列表。 */
+  async function loadSessionTasks(sessionId: string): Promise<void> {
     set({ sessionTasksLoading: true, error: null })
     try {
       const tasks = await fetchSessionTasks(sessionId)
@@ -106,9 +146,10 @@ export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
     } finally {
       set({ sessionTasksLoading: false })
     }
-  },
+  }
 
-  loadTasks: async (cursor) => {
+  /** 拉取任务列表：带游标时追加，否则整体替换；正在加载时跳过。 */
+  async function loadTasks(cursor?: string): Promise<void> {
     const { tasksLoading } = get()
     if (tasksLoading) return
     set({ tasksLoading: true, error: null })
@@ -123,9 +164,10 @@ export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
     } finally {
       set({ tasksLoading: false })
     }
-  },
+  }
 
-  loadTaskDetail: async (taskId) => {
+  /** 拉取任务详情；响应回来时若已有更新的请求，则整条结果丢弃。 */
+  async function loadTaskDetail(taskId: string): Promise<void> {
     const requestSerial = ++taskDetailRequestSerial
     set({ currentTask: null, currentTaskLoading: true, error: null })
     try {
@@ -141,9 +183,10 @@ export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
         set({ currentTaskLoading: false })
       }
     }
-  },
+  }
 
-  loadExecutions: async (taskId, cursor) => {
+  /** 拉取某任务的执行列表；首屏先清空旧列表，响应回来时丢弃过期请求。 */
+  async function loadExecutions(taskId: string, cursor?: string): Promise<void> {
     const requestSerial = ++executionListRequestSerial
     set({
       ...(cursor ? {} : { executions: [], executionsNextCursor: null }),
@@ -166,9 +209,10 @@ export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
         set({ executionsLoading: false })
       }
     }
-  },
+  }
 
-  loadExecutionDetail: async (taskId, executionId) => {
+  /** 拉取执行详情；响应回来时若已有更新的请求，则整条结果丢弃。 */
+  async function loadExecutionDetail(taskId: string, executionId: string): Promise<void> {
     const requestSerial = ++executionDetailRequestSerial
     set({ activeExecution: null, activeExecutionLoading: true, error: null })
     try {
@@ -184,9 +228,10 @@ export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
         set({ activeExecutionLoading: false })
       }
     }
-  },
+  }
 
-  loadExecutionViewStates: async (executionIds) => {
+  /** 批量补拉执行视图状态（未加载或加载失败的），失败重试两次后退化为默认态。 */
+  async function loadExecutionViewStates(executionIds: string[]): Promise<void> {
     const uniqueIDs = [...new Set(executionIds)].filter(Boolean)
     const current = get()
     const missingIDs = uniqueIDs.filter(
@@ -220,31 +265,7 @@ export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
       }
       if (!states) return
       const returned = new Map(states.map((state) => [state.execution_id, state]))
-      set((current) => {
-        const executionViewStates = { ...current.executionViewStates }
-        const executionViewStatesLoaded = { ...current.executionViewStatesLoaded }
-        const executionViewStatesLoading = { ...current.executionViewStatesLoading }
-        const executionViewStatesFailed = { ...current.executionViewStatesFailed }
-        for (const executionId of missingIDs) {
-          // GET 发出后若用户已产生本地更新，不能再用旧快照覆盖它。
-          if (
-            !current.executionViewStatesLoaded[executionId] ||
-            current.executionViewStatesFailed[executionId]
-          ) {
-            executionViewStates[executionId] =
-              returned.get(executionId) ?? EMPTY_VIEW_STATE(executionId)
-          }
-          executionViewStatesLoaded[executionId] = true
-          executionViewStatesLoading[executionId] = false
-          executionViewStatesFailed[executionId] = false
-        }
-        return {
-          executionViewStates,
-          executionViewStatesLoaded,
-          executionViewStatesLoading,
-          executionViewStatesFailed,
-        }
-      })
+      set((current) => withLoadedViewStates(current, missingIDs, returned))
     } catch {
       // 三次读取仍失败时退化为默认状态，不能让正文永久空白；后续 PUT 仍可恢复持久化。
       set((current) => ({
@@ -268,9 +289,10 @@ export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
         },
       }))
     }
-  },
+  }
 
-  markExecutionSeen: async (taskId, executionId) => {
+  /** 标记执行已读；已读过则直接返回成功，否则写服务端并以回执落状态。 */
+  async function markExecutionSeen(taskId: string, executionId: string): Promise<boolean> {
     const previous = get().executionViewStates[executionId] ?? EMPTY_VIEW_STATE(executionId)
     if (previous.seen_at) return true
     try {
@@ -300,9 +322,14 @@ export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
     } catch {
       return false
     }
-  },
+  }
 
-  setExecutionCollapsed: async (taskId, executionId, collapsed) => {
+  /** 设置执行折叠态：先乐观写入，服务端回执或失败后各自回填。 */
+  async function setExecutionCollapsed(
+    taskId: string,
+    executionId: string,
+    collapsed: boolean
+  ): Promise<boolean> {
     const previous = get().executionViewStates[executionId] ?? EMPTY_VIEW_STATE(executionId)
     set((current) => ({
       executionViewStates: {
@@ -348,9 +375,10 @@ export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
       }))
       return false
     }
-  },
+  }
 
-  toggleTaskActive: async (taskId) => {
+  /** 切换任务启用态，并把新状态同步到详情与各列表项。 */
+  async function toggleTaskActive(taskId: string): Promise<void> {
     const task = get().currentTask
     if (!task) return
     set({ error: null })
@@ -367,9 +395,10 @@ export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
     } catch (e) {
       set({ error: extractErrorMessage(e) })
     }
-  },
+  }
 
-  deleteTask: async (taskId) => {
+  /** 删除任务，并从会话任务列表与任务列表中一并移除。 */
+  async function deleteTask(taskId: string): Promise<void> {
     set({ error: null })
     try {
       await deleteTaskApi(taskId)
@@ -381,10 +410,25 @@ export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
     } catch (e) {
       set({ error: extractErrorMessage(e) })
     }
-  },
+  }
 
-  reset: () => set(initialState),
-}))
+  return {
+    ...initialState,
+
+    loadSessionTasks,
+    loadTasks,
+    loadTaskDetail,
+    loadExecutions,
+    loadExecutionDetail,
+    loadExecutionViewStates,
+    markExecutionSeen,
+    setExecutionCollapsed,
+    toggleTaskActive,
+    deleteTask,
+
+    reset: () => set(initialState),
+  }
+}
 
 /* store 一律不做热替换：React Fast Refresh 只重建"接受更新"的组件边界，没被重建的模块
    （如 useChatStream）会继续持有旧 store 实例，于是写入方与读取方各绑一份 state——

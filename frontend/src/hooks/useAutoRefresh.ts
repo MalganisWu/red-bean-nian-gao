@@ -8,10 +8,14 @@ export function useAutoRefresh(): void {
   const { token, setToken, clearAuth, isAuthenticated } = useAuthStore()
   const intervalRef = useRef<number | null>(null)
 
-  useEffect(() => {
-    if (!isAuthenticated || !token) return
+  useEffect(watchTokenExpiry, [isAuthenticated, token, setToken, clearAuth])
 
-    intervalRef.current = window.setInterval(async () => {
+  /** 每 60s 检查一次 token，过期前 5 分钟自动 refresh；退出登录或卸载时清除定时器。 */
+  function watchTokenExpiry(): (() => void) | undefined {
+    if (!isAuthenticated || !token) return undefined
+
+    /** 检查当前 token：已过期则刷新，失败即登出；临期则刷新，失败继续沿用。 */
+    async function refreshTokenIfNeeded(): Promise<void> {
       const currentToken = useAuthStore.getState().token
       if (!currentToken) return
 
@@ -31,10 +35,12 @@ export function useAutoRefresh(): void {
           // Refresh 失败但 token 还没过期，继续使用
         }
       }
-    }, 60_000)
+    }
+
+    intervalRef.current = window.setInterval(refreshTokenIfNeeded, 60_000)
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [isAuthenticated, token, setToken, clearAuth])
+  }
 }

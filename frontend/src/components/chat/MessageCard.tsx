@@ -34,34 +34,38 @@ interface MessageCardProps {
 
 function hasInterruptedSubAgent(subAgent: SubAgentSectionData): boolean {
   if (subAgent.status === 'cancelled' || subAgent.status === 'incomplete') return true
-  return (subAgent.sections ?? []).some((section) => {
-    if (section.type === 'tool_group') {
-      return section.tools.some(
-        (tool) => tool.status === 'cancelled' || tool.status === 'incomplete'
-      )
-    }
-    if (section.type === 'reason') {
-      return section.items.some(
-        (item) =>
-          item.itemType === 'tool' &&
-          (item.tool?.status === 'cancelled' || item.tool?.status === 'incomplete')
-      )
-    }
-    if (section.type === 'sub_agent') {
-      return hasInterruptedSubAgent(section.items)
-    }
-    if (section.type === 'process') return hasInterruptedWork(section.steps)
-    return false
-  })
+  return (subAgent.sections ?? []).some(isInterruptedSection)
+}
+
+/** 单个 section 内是否有被取消或未结束的工具、推理步骤或子 Agent。 */
+function isInterruptedSection(section: MessageSection): boolean {
+  if (section.type === 'tool_group') {
+    return section.tools.some((tool) => tool.status === 'cancelled' || tool.status === 'incomplete')
+  }
+  if (section.type === 'reason') {
+    return section.items.some(
+      (item) =>
+        item.itemType === 'tool' &&
+        (item.tool?.status === 'cancelled' || item.tool?.status === 'incomplete')
+    )
+  }
+  if (section.type === 'sub_agent') {
+    return hasInterruptedSubAgent(section.items)
+  }
+  if (section.type === 'process') return hasInterruptedWork(section.steps)
+  return false
 }
 
 function hasInterruptedWork(steps: ProcessStepItem[]): boolean {
-  return steps.some((step) => {
-    const interruptedTool =
-      step.kind === 'tool' &&
-      (step.tool?.status === 'cancelled' || step.tool?.status === 'incomplete')
-    return interruptedTool || (step.subAgent ? hasInterruptedSubAgent(step.subAgent) : false)
-  })
+  return steps.some(isInterruptedStep)
+}
+
+/** 单个 Process 步骤是否被取消或未结束（工具本身，或它挂载的子 Agent）。 */
+function isInterruptedStep(step: ProcessStepItem): boolean {
+  const interruptedTool =
+    step.kind === 'tool' &&
+    (step.tool?.status === 'cancelled' || step.tool?.status === 'incomplete')
+  return interruptedTool || (step.subAgent ? hasInterruptedSubAgent(step.subAgent) : false)
 }
 
 /**
@@ -84,13 +88,17 @@ export function MessageCard({
 
   // 流式中总耗时按整秒更新：从首个有效 section 时间戳起计（≈ 收到首个事件）
   const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!isStreaming) return
+  useEffect(tickNowWhileStreaming, [isStreaming])
+
+  /** 流式期间每秒刷新一次 now，驱动总耗时按整秒跳动。 */
+  function tickNowWhileStreaming(): (() => void) | undefined {
+    if (!isStreaming) return undefined
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
-  }, [isStreaming])
+  }
 
-  const totalDuration = (() => {
+  /** 本轮总耗时文案：流式中按 now 与起点实时算，结束后按包络公式定格。 */
+  function computeTotalDuration(): string | undefined {
     if (!sections) return undefined
     if (isStreaming) {
       // 流式起点：meta.run_started_at = 前端发起本轮请求的时刻（含连接/鉴权等待），
@@ -102,11 +110,14 @@ export function MessageCard({
     }
     const total = roundTotalDurationMs(sections, meta)
     return total !== undefined ? formatDurationMs(total) : undefined
-  })()
+  }
+
+  const totalDuration = computeTotalDuration()
 
   // 子 Agent 委派块：嵌套 sections 按主消息同规则收束——
   // process 步骤平铺为旁注 items（内层不再有自己的折叠区，spec §6.4），content 合并为最终输出
-  const renderDelegation = (d: SubAgentSectionData) => {
+  /** 子 Agent 委派块：内层 sections 按主消息同规则收束为旁注 items 与最终输出。 */
+  function renderDelegation(d: SubAgentSectionData): React.ReactElement {
     const inner = normalizeSections(d.sections ?? [], { isStreaming })
     const items: ReasonItem[] = []
     let output = ''
@@ -133,7 +144,8 @@ export function MessageCard({
     )
   }
 
-  const renderApproval = (card: CardSectionData) => {
+  /** 确认卡片：按卡片状态与提交状态推导展示态与回调。 */
+  function renderApproval(card: CardSectionData): React.ReactElement {
     const submission =
       cardSubmission?.interactionId === card.interaction_id ? cardSubmission : undefined
     const displayStatus =
@@ -162,7 +174,8 @@ export function MessageCard({
     )
   }
 
-  const toFoldStep = (step: ProcessStepItem, active: boolean): ProcessStep => {
+  /** 把一个过程步骤投影成 ProcessFold 的展示步骤（工具 / 委派 / 确认 / 叙述）。 */
+  function toFoldStep(step: ProcessStepItem, active: boolean): ProcessStep {
     switch (step.kind) {
       case 'tool':
         return step.tool
@@ -235,7 +248,8 @@ export function MessageCard({
   // 总耗时挂在唯一 Process 标签上（包络是整回合的）
   const lastProcessIdx = normalized?.map((s) => s.type).lastIndexOf('process') ?? -1
 
-  const resolveProcessStatus = (steps: ProcessStepItem[]): ProcessStatus => {
+  /** 推断整条 Process 的展示状态：待确认 > 流式中 > 终态。 */
+  function resolveProcessStatus(steps: ProcessStepItem[]): ProcessStatus {
     if (
       steps.some(
         (step) =>
@@ -261,40 +275,50 @@ export function MessageCard({
     return 'completed'
   }
 
+  /**
+   * 渲染归一化后的单个 section：process 折叠区、最终正文或确认卡片。
+   * 形参顺序对齐 `Array.prototype.map`，可直接作为其回调；`sections` 即被遍历的数组本身。
+   */
+  function renderSection(
+    section: MessageSection,
+    i: number,
+    sections: MessageSection[]
+  ): React.ReactNode {
+    switch (section.type) {
+      case 'process': {
+        return (
+          <ProcessFold
+            key={i}
+            steps={section.steps.map((step, si) =>
+              toFoldStep(step, Boolean(isStreaming) && si === section.steps.length - 1)
+            )}
+            status={resolveProcessStatus(section.steps)}
+            totalDuration={i === lastProcessIdx ? totalDuration : undefined}
+          />
+        )
+      }
+      case 'content': {
+        const afterProcess = sections.slice(0, i).some((s) => s.type === 'process')
+        return (
+          <div key={i} className={cn(afterProcess && 'mt-5')}>
+            <MarkdownAnswer content={section.content} />
+          </div>
+        )
+      }
+      case 'card':
+        return <div key={i}>{renderApproval(section.card)}</div>
+      case 'reason':
+      case 'tool_group':
+      case 'sub_agent':
+        return null
+    }
+  }
+
   return (
     <div className="py-1">
       {normalized && normalized.length > 0
         ? // 线性渲染：单一 process → ProcessFold，最终 content → MarkdownAnswer。
-          normalized.map((section, i) => {
-            switch (section.type) {
-              case 'process': {
-                return (
-                  <ProcessFold
-                    key={i}
-                    steps={section.steps.map((step, si) =>
-                      toFoldStep(step, Boolean(isStreaming) && si === section.steps.length - 1)
-                    )}
-                    status={resolveProcessStatus(section.steps)}
-                    totalDuration={i === lastProcessIdx ? totalDuration : undefined}
-                  />
-                )
-              }
-              case 'content': {
-                const afterProcess = normalized.slice(0, i).some((s) => s.type === 'process')
-                return (
-                  <div key={i} className={cn(afterProcess && 'mt-5')}>
-                    <MarkdownAnswer content={section.content} />
-                  </div>
-                )
-              }
-              case 'card':
-                return <div key={i}>{renderApproval(section.card)}</div>
-              case 'reason':
-              case 'tool_group':
-              case 'sub_agent':
-                return null
-            }
-          })
+          normalized.map(renderSection)
         : content && <MarkdownAnswer content={content} />}
     </div>
   )

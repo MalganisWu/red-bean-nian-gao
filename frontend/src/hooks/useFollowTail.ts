@@ -38,21 +38,25 @@ export function useFollowTail({ active, contentKey }: FollowTailOptions): Follow
   const containerRef = useRef<HTMLDivElement>(null)
   const followRef = useRef(true)
 
+  useEffect(resetFollowIntent, [active])
+  useEffect(scrollToBottom, [active, contentKey])
+
   /* 跟随窗口关闭时复位跟随意图：避免上一轮的「用户上滚」状态带进下一轮流 */
-  useEffect(() => {
+  function resetFollowIntent(): void {
     if (active) return
     followRef.current = true
-  }, [active])
+  }
 
   /* 内容增长时贴底：仅在跟随生效且用户未上滚暂停时执行 */
-  useEffect(() => {
+  function scrollToBottom(): void {
     if (!active || !followRef.current) return
     const el = containerRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
-  }, [active, contentKey])
+  }
 
-  const onScroll = (event: UIEvent<HTMLDivElement>) => {
+  /** 滚动事件：按距底距离判定用户上滚暂停 / 回底恢复跟随。 */
+  function onScroll(event: UIEvent<HTMLDivElement>): void {
     const el = event.currentTarget
     const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     /* 程序化贴底后该距离为 0，不会误判为上滚 */

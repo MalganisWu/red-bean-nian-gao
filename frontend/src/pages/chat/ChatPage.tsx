@@ -11,7 +11,8 @@ import { SessionTaskListView } from './SessionTaskListView'
 import { SessionTaskDetailView } from './SessionTaskDetailView'
 import { SessionTrajectoryView } from './SessionTrajectoryView'
 import { ExecutionResultView } from './ExecutionResultView'
-import type { ChatMessage, CardSectionData } from '@/types/chat'
+import type { ChatMessage, CardSectionData, DisplayMessage } from '@/types/chat'
+import type { ErrorEvent } from '@/types/events'
 import type { QuestionCardAnswer } from '@/components/retroui/QuestionCard'
 import type { ScheduledTaskDetailTab } from '@/components/retroui/scheduledTaskTypes'
 import { trapTabFocus } from '@/lib/focus-trap'
@@ -38,13 +39,7 @@ export function ChatPage() {
 
   // 待回答卡片：扫已加载 DisplayMessages 的 sections 里 type="card" 且 status=="pending"
   // （刷新/跨端恢复由此重建）
-  const pendingCard = useMemo<CardSectionData | null>(() => {
-    for (const m of chat.messages) {
-      const card = (m.sections ?? []).find((s) => s.type === 'card' && s.card.status === 'pending')
-      if (card && card.type === 'card') return card.card
-    }
-    return null
-  }, [chat.messages])
+  const pendingCard = useMemo(() => findPendingCard(chat.messages), [chat.messages])
 
   const answerCard = chat.answer
 
@@ -74,7 +69,8 @@ export function ChatPage() {
 
   // 抽屉焦点管理：开启移入、关闭归还触发钮；开启时锁 body 滚动、关闭恢复
   // （Escape 处理在遮罩 onKeyDown）
-  useEffect(() => {
+  /** 抽屉开合副作用：焦点归位 + body 滚动锁；卸载时恢复滚动。 */
+  function syncDrawerFocus(): () => void {
     if (sidebarOpen) {
       drawerRef.current?.focus()
       document.body.style.overflow = 'hidden'
@@ -85,37 +81,48 @@ export function ChatPage() {
     return () => {
       document.body.style.overflow = ''
     }
-  }, [sidebarOpen])
+  }
+
+  useEffect(syncDrawerFocus, [sidebarOpen])
   const sessionTasks = useTaskStore((s) => s.sessionTasks)
   const loadSessionTasks = useTaskStore((s) => s.loadSessionTasks)
 
-  useEffect(() => {
+  function loadActiveSessionTasks(): void {
     if (activeSessionId) {
       void loadSessionTasks(activeSessionId)
     }
-  }, [activeSessionId, loadSessionTasks])
+  }
+
+  useEffect(loadActiveSessionTasks, [activeSessionId, loadSessionTasks])
 
   // 流结束后刷新会话列表（更新侧栏标题/排序）
-  useEffect(() => {
+  /** 比较前后两次流式状态：由流式转为空闲时重拉会话列表，并记录本轮流式状态。 */
+  function refreshSessionsAfterStream(): void {
     if (prevStreamingRef.current && !chat.isStreaming) {
       void loadSessions()
     }
     prevStreamingRef.current = chat.isStreaming
-  }, [chat.isStreaming, loadSessions])
+  }
+
+  useEffect(refreshSessionsAfterStream, [chat.isStreaming, loadSessions])
 
   // 订阅 store 事件（非 effect 体内同步 setState）：
   // START 受理（isStreaming↑）→ 清草稿（期间用户新打的字不清）+ 解锁；失败（error↑）→ 解锁，草稿留在输入框
-  useEffect(() => {
-    return useChatStore.subscribe((s, prev) => {
-      if (s.isStreaming && !prev.isStreaming) {
-        setAwaiting(false)
-        setInput((cur) => (cur === lastDraftRef.current ? '' : cur))
-      }
-      if (s.error && !prev.error) {
-        setAwaiting(false)
-      }
-    })
-  }, [])
+  /** 处理 store 状态变化：START 受理时清草稿并解锁，出错时解锁（草稿留在输入框）。 */
+  function handleStoreChange(
+    state: { isStreaming: boolean; error: ErrorEvent | null },
+    prev: { isStreaming: boolean; error: ErrorEvent | null }
+  ): void {
+    if (state.isStreaming && !prev.isStreaming) {
+      setAwaiting(false)
+      setInput((cur) => (cur === lastDraftRef.current ? '' : cur))
+    }
+    if (state.error && !prev.error) {
+      setAwaiting(false)
+    }
+  }
+
+  useEffect(() => useChatStore.subscribe(handleStoreChange), [])
 
   function handleSend() {
     if (!input.trim() || chat.isStreaming || awaiting || pendingCard) return
@@ -132,13 +139,16 @@ export function ChatPage() {
   // awaiting 兜底：请求发出后若 START/error 均迟迟不到（连接半开等异常），
   // 30s 后强制复位等待窗，避免输入框与页面状态被永久锁死（fetch-sse 首事件看门狗
   // 会并行报错，这里保证 UI 状态绝不悬挂）。
-  useEffect(() => {
-    if (!awaiting) return
+  /** 等待窗超时兜底：awaiting 期间超过阈值未收到确认即强制复位。 */
+  function resetAwaitingAfterTimeout(): (() => void) | undefined {
+    if (!awaiting) return undefined
     const timer = window.setTimeout(() => {
       setAwaiting(false)
     }, AWAITING_TIMEOUT_MS)
     return () => window.clearTimeout(timer)
-  }, [awaiting])
+  }
+
+  useEffect(resetAwaitingAfterTimeout, [awaiting])
 
   // 错误横幅「重试」：原样重发上一请求（useChatStream.retry 内部不重复追加用户消息）。
   // 草稿同样等 START 确认后才清（复用上面的订阅）
@@ -153,6 +163,40 @@ export function ChatPage() {
     void chat.cancel()
     // START 前取消：abort 静默（无 error/START 事件），订阅不会触发——这里显式解锁
     setAwaiting(false)
+  }
+
+  /** 会话任务列表选中任务：进入任务详情（停在概览页签）。 */
+  function handleOpenTask(taskId: string): void {
+    setSelectedTaskId(taskId)
+    setSelectedTaskTab('overview')
+    setSessionView('task-detail')
+  }
+
+  /** 会话任务列表选中一次执行：进入执行详情（停在历史页签）。 */
+  function handleOpenExecution(taskId: string, executionId: string): void {
+    setSelectedTaskId(taskId)
+    setSelectedExecutionId(executionId)
+    setSelectedTaskTab('history')
+    setSessionView('execution')
+  }
+
+  /** 任务详情返回：回到会话任务列表并清空选中任务。 */
+  function handleBackToTaskList(): void {
+    setSelectedTaskId(null)
+    setSessionView('task-list')
+  }
+
+  /** 任务详情查看某次执行：进入执行详情。 */
+  function handleViewExecution(executionId: string): void {
+    setSelectedExecutionId(executionId)
+    setSessionView('execution')
+  }
+
+  /** 执行详情返回：回到任务详情的历史页签。 */
+  function handleBackToTaskDetail(): void {
+    setSelectedExecutionId(null)
+    setSelectedTaskTab('history')
+    setSessionView('task-detail')
   }
 
   return (
@@ -260,17 +304,8 @@ export function ChatPage() {
         {sessionView === 'task-list' && (
           <SessionTaskListView
             onBack={() => setSessionView('chat')}
-            onSelectTask={(taskId: string) => {
-              setSelectedTaskId(taskId)
-              setSelectedTaskTab('overview')
-              setSessionView('task-detail')
-            }}
-            onSelectExecution={(taskId: string, executionId: string) => {
-              setSelectedTaskId(taskId)
-              setSelectedExecutionId(executionId)
-              setSelectedTaskTab('history')
-              setSessionView('execution')
-            }}
+            onSelectTask={handleOpenTask}
+            onSelectExecution={handleOpenExecution}
           />
         )}
 
@@ -278,15 +313,9 @@ export function ChatPage() {
           <SessionTaskDetailView
             taskId={selectedTaskId}
             activeTab={selectedTaskTab}
-            onBack={() => {
-              setSelectedTaskId(null)
-              setSessionView('task-list')
-            }}
+            onBack={handleBackToTaskList}
             onTabChange={setSelectedTaskTab}
-            onViewExecution={(executionId: string) => {
-              setSelectedExecutionId(executionId)
-              setSessionView('execution')
-            }}
+            onViewExecution={handleViewExecution}
           />
         )}
 
@@ -298,14 +327,21 @@ export function ChatPage() {
           <ExecutionResultView
             taskId={selectedTaskId}
             executionId={selectedExecutionId}
-            onBack={() => {
-              setSelectedExecutionId(null)
-              setSelectedTaskTab('history')
-              setSessionView('task-detail')
-            }}
+            onBack={handleBackToTaskDetail}
           />
         )}
       </div>
     </div>
   )
+}
+
+/** 扫描已加载消息，取第一张待回答卡片（刷新/跨端恢复据此重建卡片状态）。 */
+function findPendingCard(messages: DisplayMessage[]): CardSectionData | null {
+  for (const message of messages) {
+    const card = (message.sections ?? []).find(
+      (section) => section.type === 'card' && section.card.status === 'pending'
+    )
+    if (card && card.type === 'card') return card.card
+  }
+  return null
 }

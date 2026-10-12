@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 
 import { BackLink } from '@/components/layout/BackLink'
 import { TrajectoryInspector } from '@/components/retroui/TrajectoryInspector'
@@ -11,7 +11,7 @@ import type {
   TrajectoryTurn,
 } from '@/components/retroui/TrajectoryLedger'
 import { useFollowTail } from '@/hooks/useFollowTail'
-import { fetchSessionTrajectory } from '@/services/api/trajectory'
+import { fetchSessionTrajectory, type SessionTrajectoryDto } from '@/services/api/trajectory'
 import { useChatStore } from '@/stores/chat-store'
 import { useTrajectoryStore, type LiveTurn } from '@/stores/trajectory-store'
 
@@ -85,18 +85,21 @@ function liveTurnToTurn(
   seqStart: number
 ): SessionTrajectoryView['turns'][number] {
   let seq = seqStart
-  const records = t.records.map((record): TrajectoryRecord => {
+  const records: TrajectoryRecord[] = []
+  for (const record of t.records) {
     seq += 1
     const next: TrajectoryRecord = { ...record, seq }
     if (record.attempts !== undefined) {
       /* 尝试明细展开在所属调用下方，序号按同一展示顺序续接 */
-      next.attempts = record.attempts.map((attempt) => {
+      const attempts: TrajectoryAttempt[] = []
+      for (const attempt of record.attempts) {
         seq += 1
-        return { ...attempt, seq }
-      })
+        attempts.push({ ...attempt, seq })
+      }
+      next.attempts = attempts
     }
-    return next
-  })
+    records.push(next)
+  }
   return {
     turn: turnNo,
     startedAt: t.startedAt,
@@ -115,23 +118,84 @@ function settledTurnsOf(turns: readonly TrajectoryTurn[]): TrajectoryTurn[] {
   return turns.filter((turn, index) => index !== turns.length - 1 || turn.endState !== undefined)
 }
 
+/** 单条记录与其请求子记录中的最大序号。 */
+function maxSeqOfRecord(record: TrajectoryRecord): number {
+  let max = record.seq ?? 0
+  for (const request of record.attempts ?? []) {
+    max = Math.max(max, request.seq ?? 0)
+  }
+  return max
+}
+
+/** 单个轮次内全部记录（含展开的请求子记录）的最大序号。 */
+function maxSeqOfTurn(turn: TrajectoryTurn): number {
+  let max = 0
+  for (const record of turn.records) {
+    max = Math.max(max, maxSeqOfRecord(record))
+  }
+  return max
+}
+
 /** 轮次集合里的最大记录序号（含展开的请求子记录）。 */
 function maxRecordSeq(turns: readonly TrajectoryTurn[]): number {
-  return turns.reduce((max, turn) => {
-    const inner = turn.records.reduce((acc, record) => {
-      const nested = (record.attempts ?? []).reduce(
-        (n, request) => Math.max(n, request.seq ?? 0),
-        acc
-      )
-      return Math.max(nested, record.seq ?? 0)
-    }, max)
-    return Math.max(max, inner)
-  }, 0)
+  let max = 0
+  for (const turn of turns) {
+    max = Math.max(max, maxSeqOfTurn(turn))
+  }
+  return max
 }
 
 /** 轮次在展示上的记录条数（含请求子记录），用于给后续实时轮次推移序号。 */
 function liveRecordCount(turn: LiveTurn): number {
   return turn.records.reduce((n, record) => n + 1 + (record.attempts?.length ?? 0), 0)
+}
+
+/**
+ * 展示轮次 = 已终结的历史轮次 + 实时轮次的续接投影。
+ * 有实时轮次时（流式进行中，或流刚结束但持久化重拉尚未落地）才叠加，否则直接用历史。
+ */
+function buildDisplayTurns(
+  view: SessionTrajectoryView | null,
+  hasLiveTurn: boolean,
+  liveTurns: readonly LiveTurn[],
+  nowTick: number
+): TrajectoryTurn[] {
+  const historical = view?.turns ?? []
+  if (!hasLiveTurn) return historical
+  const settled = settledTurnsOf(historical)
+  const seqBase = maxRecordSeq(settled)
+  let consumed = 0
+  const live: TrajectoryTurn[] = []
+  for (const [index, turn] of liveTurns.entries()) {
+    const mapped = liveTurnToTurn(turn, nowTick, settled.length + index + 1, seqBase + consumed)
+    consumed += liveRecordCount(turn)
+    live.push(mapped)
+  }
+  return [...settled, ...live]
+}
+
+/**
+ * 应用拉取到的持久化轨迹：更新视图，并按轮次位置决定是否丢弃实时轮次、对齐轮次号。
+ * 实时轮次交接判定见 `load` 上方的注释。
+ */
+function applyLoadedTrajectory(
+  dto: SessionTrajectoryDto,
+  sessionId: string,
+  setView: Dispatch<SetStateAction<SessionTrajectoryView | null>>,
+  setLoadedFor: Dispatch<SetStateAction<string | null>>
+): void {
+  const mapped = mapSessionTrajectory(dto)
+  const store = useTrajectoryStore.getState()
+  const liveTurnNo = store.liveTurns.at(-1)?.turn
+  const settledCount = settledTurnsOf(mapped.turns).length
+  setView(mapped)
+  setLoadedFor(sessionId)
+  if (liveTurnNo !== undefined && settledCount >= liveTurnNo) {
+    store.clearLiveTurns()
+    return
+  }
+  // 对齐轮次号：实时投影续接已终结的历史轮次，同一个 run 在两侧拿到同一个编号
+  store.alignToHistory({ turnBase: settledCount })
 }
 
 /**
@@ -177,55 +241,40 @@ export function SessionTrajectoryView({ onBack }: SessionTrajectoryViewProps) {
    */
   const load = (sessionId: string): Promise<void> =>
     fetchSessionTrajectory(sessionId)
-      .then((dto) => {
-        const mapped = mapSessionTrajectory(dto)
-        const store = useTrajectoryStore.getState()
-        const liveTurnNo = store.liveTurns.at(-1)?.turn
-        const settledCount = settledTurnsOf(mapped.turns).length
-        setView(mapped)
-        setLoadedFor(sessionId)
-        if (liveTurnNo !== undefined && settledCount >= liveTurnNo) {
-          store.clearLiveTurns()
-          return
-        }
-        // 对齐轮次号：实时投影续接已终结的历史轮次，同一个 run 在两侧拿到同一个编号
-        store.alignToHistory({ turnBase: settledCount })
-      })
+      .then((dto) => applyLoadedTrajectory(dto, sessionId, setView, setLoadedFor))
       .catch((cause: unknown) => {
         setError(cause instanceof Error ? cause.message : '加载轨迹失败')
       })
 
-  useEffect(() => {
-    if (!activeSessionId) return
-    if (loadedFor === activeSessionId) return
+  /** 当前会话尚未加载成功时，排一次微任务读取持久化轨迹（避免在 effect 体内同步 setState）。 */
+  function loadTrajectoryOnce(): (() => void) | undefined {
+    if (!activeSessionId) return undefined
+    if (loadedFor === activeSessionId) return undefined
     const handle = setTimeout(() => {
       void load(activeSessionId)
     }, 0)
     return () => clearTimeout(handle)
-  }, [activeSessionId, loadedFor])
+  }
+
+  useEffect(loadTrajectoryOnce, [activeSessionId, loadedFor])
 
   /* 展示轮次 = 历史轮次 + 实时轮次（流式进行中，或流刚结束但持久化重拉尚未落地）；
      时钟由 1s 跳秒驱动（不在 render/useMemo 里直接调 Date.now） */
   const [nowTick, setNowTick] = useState(0)
-  useEffect(() => {
-    if (!streaming) return
+
+  /** 流式期间每秒跳秒，驱动实时轮次耗时与跟随尾部（不在 render/useMemo 里直接读 Date.now）。 */
+  function tickWhileStreaming(): (() => void) | undefined {
+    if (!streaming) return undefined
     const timer = window.setInterval(() => setNowTick(Date.now()), 1000)
     return () => window.clearInterval(timer)
-  }, [streaming])
+  }
 
-  const displayTurns = useMemo(() => {
-    const historical = view?.turns ?? []
-    if (!hasLiveTurn) return historical
-    const settled = settledTurnsOf(historical)
-    const seqBase = maxRecordSeq(settled)
-    let consumed = 0
-    const live = liveTurns.map((turn, index) => {
-      const mapped = liveTurnToTurn(turn, nowTick, settled.length + index + 1, seqBase + consumed)
-      consumed += liveRecordCount(turn)
-      return mapped
-    })
-    return [...settled, ...live]
-  }, [view, hasLiveTurn, liveTurns, nowTick])
+  useEffect(tickWhileStreaming, [streaming])
+
+  const displayTurns = useMemo(
+    () => buildDisplayTurns(view, hasLiveTurn, liveTurns, nowTick),
+    [view, hasLiveTurn, liveTurns, nowTick]
+  )
 
   /* 选中解析必须在 displayTurns（历史 + 实时）上做：流式期间实时轮次不在 view 里。 */
   const selectedRecord = useMemo(
@@ -242,9 +291,10 @@ export function SessionTrajectoryView({ onBack }: SessionTrajectoryViewProps) {
 
   /* 检查器 Esc 关闭（与 × 等价，设计文档承诺的交互）。
      只在检查器打开时监听，避免常驻键盘钩子；泳道的 Esc 复位范围选择由泳道自己处理。 */
-  useEffect(() => {
-    if (!inspectorOpen) return
-    const onKeyDown = (event: KeyboardEvent): void => {
+  /** 检查器打开时监听 Esc 关闭（忽略可编辑元素内的 Esc）；返回解绑函数。 */
+  function listenInspectorEscape(): (() => void) | undefined {
+    if (!inspectorOpen) return undefined
+    function handleKeyDown(event: KeyboardEvent): void {
       if (event.key !== 'Escape') return
       /* 输入框/可编辑元素里的 Esc 属于该控件自己（清空、取消输入），不该关面板。
          没有这条守卫时，在搜索框里按 Esc 会误关检查器。 */
@@ -257,11 +307,13 @@ export function SessionTrajectoryView({ onBack }: SessionTrajectoryViewProps) {
       }
       setSelectedId(undefined)
     }
-    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', handleKeyDown)
     return () => {
-      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [inspectorOpen])
+  }
+
+  useEffect(listenInspectorEscape, [inspectorOpen])
 
   /* 流式结束后必须重拉：中途取到的历史快照必然缺少终态、token 与请求子记录，
      以持久化数据为准，否则页面会停在"没有结束标记"的中间态。
@@ -269,7 +321,9 @@ export function SessionTrajectoryView({ onBack }: SessionTrajectoryViewProps) {
      重拉失败则保留实时轮次——宁可展示内存里的真实投影，也不退回旧快照或空态。
      用 ref 记录"本会话曾进入流式"，避免在 effect 里同步 setState 引发级联渲染。 */
   const streamedSessionRef = useRef<string | null>(null)
-  useEffect(() => {
+
+  /** 流结束时重拉轨迹：本会话曾进入流式，则由持久化数据接管实时投影。 */
+  function reloadTrajectoryAfterStream(): void {
     if (streaming) {
       streamedSessionRef.current = streamingSessionId
       return
@@ -278,7 +332,9 @@ export function SessionTrajectoryView({ onBack }: SessionTrajectoryViewProps) {
     if (streamed === null) return
     streamedSessionRef.current = null
     void load(streamed)
-  }, [streaming, streamingSessionId, activeSessionId])
+  }
+
+  useEffect(reloadTrajectoryAfterStream, [streaming, streamingSessionId, activeSessionId])
 
   const hasContent = displayTurns.length > 0
   const showLoading = loading && !hasLiveTurn
@@ -288,6 +344,18 @@ export function SessionTrajectoryView({ onBack }: SessionTrajectoryViewProps) {
     active: streaming,
     contentKey: displayTurns,
   })
+
+  /** 加载失败重试：清空错误并重拉当前会话轨迹。 */
+  function retryLoadTrajectory(): void {
+    setError(null)
+    if (activeSessionId) void load(activeSessionId)
+  }
+
+  /** 记录表选中一行：带上 tab 停留该详情，再次点击同一行（无 tab）则取消选中。 */
+  function handleLedgerSelect(id: string, tab?: string): void {
+    setSelectedTab(tab)
+    setSelectedId((cur) => (cur === id && tab === undefined ? undefined : id))
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -310,10 +378,7 @@ export function SessionTrajectoryView({ onBack }: SessionTrajectoryViewProps) {
           <p className="text-sm text-danger-text">{error}</p>
           <button
             type="button"
-            onClick={() => {
-              setError(null)
-              if (activeSessionId) void load(activeSessionId)
-            }}
+            onClick={retryLoadTrajectory}
             className="cursor-pointer text-xs text-brand-text hover:underline"
           >
             重试
@@ -398,10 +463,7 @@ export function SessionTrajectoryView({ onBack }: SessionTrajectoryViewProps) {
                   sessionEnd={hasLiveTurn ? undefined : view?.sessionEnd}
                   filterText={filter}
                   selectedId={selectedId}
-                  onSelect={(id, tab) => {
-                    setSelectedTab(tab)
-                    setSelectedId((cur) => (cur === id && tab === undefined ? undefined : id))
-                  }}
+                  onSelect={handleLedgerSelect}
                   focusIds={focusIds}
                 />
               </div>

@@ -1,4 +1,10 @@
-import type { MessageSection, ReasonItem, SubAgentSectionData, ToolCard } from '@/types/chat'
+import type {
+  MessageSection,
+  ProcessStepItem,
+  ReasonItem,
+  SubAgentSectionData,
+  ToolCard,
+} from '@/types/chat'
 
 /**
  * 流式 section 组装纯函数：从 chat-store 的实时组装动作抽取，
@@ -95,25 +101,32 @@ function mapTool(
   callId: string,
   patch: (t: ToolCard) => Partial<ToolCard>
 ): MessageSection[] {
-  return sections.map((s) => {
-    if (s.type === 'tool_group') {
-      return {
-        ...s,
-        tools: s.tools.map((t) => (t.callId === callId ? { ...t, ...patch(t) } : t)),
-      }
+  return sections.map((section) => mapToolInSection(section, callId, patch))
+}
+
+/** 在单个 section 内按 callId 打补丁：tool_group 与 reason 内嵌工具两处都可能命中。 */
+function mapToolInSection(
+  section: MessageSection,
+  callId: string,
+  patch: (t: ToolCard) => Partial<ToolCard>
+): MessageSection {
+  if (section.type === 'tool_group') {
+    return {
+      ...section,
+      tools: section.tools.map((t) => (t.callId === callId ? { ...t, ...patch(t) } : t)),
     }
-    if (s.type === 'reason') {
-      return {
-        ...s,
-        items: s.items.map((item) =>
-          item.itemType === 'tool' && item.tool && item.tool.callId === callId
-            ? { ...item, tool: { ...item.tool, ...patch(item.tool) } }
-            : item
-        ),
-      }
+  }
+  if (section.type === 'reason') {
+    return {
+      ...section,
+      items: section.items.map((item) =>
+        item.itemType === 'tool' && item.tool && item.tool.callId === callId
+          ? { ...item, tool: { ...item.tool, ...patch(item.tool) } }
+          : item
+      ),
     }
-    return s
-  })
+  }
+  return section
 }
 
 /** 按 callId 把工具标记为成功并写入结果，同时结算耗时。 */
@@ -145,49 +158,55 @@ function settleRunningTool(tool: ToolCard): ToolCard {
  * 同时把仍为 running 的委派标为 incomplete，避免终态页面永久显示“正在执行”。
  */
 export function settleIncompleteTools(sections: MessageSection[]): MessageSection[] {
-  return sections.map((section) => {
-    if (section.type === 'tool_group') {
-      return { ...section, tools: section.tools.map(settleRunningTool) }
+  return sections.map(settleIncompleteSection)
+}
+
+/** 兜底结算单个 section：把其中仍 running 的工具与委派标为 incomplete。 */
+function settleIncompleteSection(section: MessageSection): MessageSection {
+  if (section.type === 'tool_group') {
+    return { ...section, tools: section.tools.map(settleRunningTool) }
+  }
+  if (section.type === 'reason') {
+    return {
+      ...section,
+      items: section.items.map((item) =>
+        item.itemType === 'tool' && item.tool
+          ? { ...item, tool: settleRunningTool(item.tool) }
+          : item
+      ),
     }
-    if (section.type === 'reason') {
-      return {
-        ...section,
-        items: section.items.map((item) =>
-          item.itemType === 'tool' && item.tool
-            ? { ...item, tool: settleRunningTool(item.tool) }
-            : item
-        ),
-      }
+  }
+  if (section.type === 'sub_agent') {
+    return {
+      ...section,
+      items: settleSubAgent(section.items),
     }
-    if (section.type === 'sub_agent') {
-      return {
-        ...section,
-        items: settleSubAgent(section.items),
-      }
+  }
+  if (section.type === 'process') {
+    return {
+      ...section,
+      steps: section.steps.map(settleIncompleteStep),
     }
-    if (section.type === 'process') {
-      return {
-        ...section,
-        steps: section.steps.map((step) => {
-          if (step.kind === 'tool' && step.tool) {
-            return {
-              ...step,
-              tool: settleRunningTool(step.tool),
-              subAgent: step.subAgent ? settleSubAgent(step.subAgent) : undefined,
-            }
-          }
-          if (step.kind === 'sub_agent' && step.subAgent) {
-            return {
-              ...step,
-              subAgent: settleSubAgent(step.subAgent),
-            }
-          }
-          return step
-        }),
-      }
+  }
+  return section
+}
+
+/** 兜底结算单个 Process 步骤：工具本身与它挂载的委派都要收成终态。 */
+function settleIncompleteStep(step: ProcessStepItem): ProcessStepItem {
+  if (step.kind === 'tool' && step.tool) {
+    return {
+      ...step,
+      tool: settleRunningTool(step.tool),
+      subAgent: step.subAgent ? settleSubAgent(step.subAgent) : undefined,
     }
-    return section
-  })
+  }
+  if (step.kind === 'sub_agent' && step.subAgent) {
+    return {
+      ...step,
+      subAgent: settleSubAgent(step.subAgent),
+    }
+  }
+  return step
 }
 
 function settleSubAgent(data: SubAgentSectionData): SubAgentSectionData {

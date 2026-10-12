@@ -31,17 +31,23 @@ export function TasksPage() {
     tasksLoading
   )
 
-  useEffect(() => {
+  /** 首屏初始化：清空分页状态后加载第一页任务。 */
+  function initializeTasks(): void {
     reset()
     void loadTasks()
-  }, [loadTasks, reset])
+  }
 
-  useEffect(() => {
+  useEffect(initializeTasks, [loadTasks, reset])
+
+  /** 预取各任务最近一次执行的视图状态（无执行记录的任务跳过）。 */
+  function prefetchExecutionViewStates(): void {
     const executionIds = tasks.flatMap((task) =>
       task.latest_execution ? [task.latest_execution.ExecutionID] : []
     )
     if (executionIds.length > 0) void loadExecutionViewStates(executionIds)
-  }, [loadExecutionViewStates, tasks])
+  }
+
+  useEffect(prefetchExecutionViewStates, [loadExecutionViewStates, tasks])
 
   const items = tasks.map((task) =>
     toScheduledTaskListItem(

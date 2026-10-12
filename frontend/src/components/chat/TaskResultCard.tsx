@@ -36,7 +36,10 @@ export function TaskResultCard({ message, isLatest = false }: TaskResultCardProp
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [detailsError, setDetailsError] = useState<string | null>(null)
   // 服务端状态返回前不渲染结果，避免已读历史内容先展开、随后突然收起。
-  const [resultCollapsed, setResultCollapsed] = useState<boolean | null>(() => {
+  const [resultCollapsed, setResultCollapsed] = useState<boolean | null>(initialResultCollapsed)
+
+  /** 结果区的初始折叠态：服务端状态尚未返回时保持 null，等状态就绪后再定。 */
+  function initialResultCollapsed(): boolean | null {
     if (!executionID) return false
     const state = useTaskStore.getState()
     if (!state.executionViewStatesLoaded[executionID]) return null
@@ -45,7 +48,7 @@ export function TaskResultCard({ message, isLatest = false }: TaskResultCardProp
       isLatest,
       viewState: state.executionViewStates[executionID],
     })
-  })
+  }
   const [collapseSaving, setCollapseSaving] = useState(false)
   const [collapseError, setCollapseError] = useState<string | null>(null)
   const readTargetRef = useRef<HTMLElement>(null)
@@ -59,7 +62,10 @@ export function TaskResultCard({ message, isLatest = false }: TaskResultCardProp
   const markExecutionSeen = useTaskStore((state) => state.markExecutionSeen)
   const setExecutionCollapsed = useTaskStore((state) => state.setExecutionCollapsed)
 
-  useEffect(() => {
+  useEffect(restoreServerCollapsedState, [isLatest, meta, viewState, viewStateLoaded])
+
+  /** 服务端状态就绪后用它覆盖一次折叠态；之后只由用户操作驱动，不再跟随服务端。 */
+  function restoreServerCollapsedState(): void {
     if (!meta || !viewStateLoaded || collapseInitialized.current) return
     setResultCollapsed(
       getTaskResultDefaultCollapsed({
@@ -69,9 +75,18 @@ export function TaskResultCard({ message, isLatest = false }: TaskResultCardProp
       })
     )
     collapseInitialized.current = true
-  }, [isLatest, meta, viewState, viewStateLoaded])
+  }
 
-  useEffect(() => {
+  useEffect(markResultSeenWhenVisible, [
+    executionID,
+    markExecutionSeen,
+    meta,
+    viewState?.seen_at,
+    viewStateLoaded,
+  ])
+
+  /** 结果区滚入视口时把本次执行标记为已读；标记失败最多重试 3 次。 */
+  function markResultSeenWhenVisible(): (() => void) | undefined {
     if (
       !meta ||
       !viewStateLoaded ||
@@ -79,65 +94,75 @@ export function TaskResultCard({ message, isLatest = false }: TaskResultCardProp
       seenAttempts.current >= 3 ||
       !readTargetRef.current
     )
-      return
+      return undefined
+    // 上面已排除 undefined；取成本地常量，供下方嵌套函数按已收窄的类型使用。
+    const taskId = meta.task_id
     let visibilityTimer: ReturnType<typeof setTimeout> | undefined
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     let disposed = false
     let visible = false
 
-    const clearTimers = () => {
+    /** 清掉两个可能待触发的计时器。 */
+    function clearTimers(): void {
       if (visibilityTimer) clearTimeout(visibilityTimer)
       if (retryTimer) clearTimeout(retryTimer)
       visibilityTimer = undefined
       retryTimer = undefined
     }
-    const attemptMarkSeen = async () => {
+
+    /** 标记本次执行已读；失败且仍可见时按已尝试次数递增退避重试。 */
+    async function attemptMarkSeen(): Promise<void> {
       visibilityTimer = undefined
       retryTimer = undefined
       if (disposed || !visible || useTaskStore.getState().executionViewStates[executionID]?.seen_at)
         return
       seenAttempts.current += 1
-      const saved = await markExecutionSeen(meta.task_id, executionID)
+      const saved = await markExecutionSeen(taskId, executionID)
       if (!saved && !disposed && visible && seenAttempts.current < 3) {
         retryTimer = setTimeout(() => void attemptMarkSeen(), 1000 * seenAttempts.current)
       }
     }
-    const scheduleInitialAttempt = () => {
+
+    /** 安排一次首次标记（800ms 后）；已有待触发计时器时不重复安排。 */
+    function scheduleInitialAttempt(): void {
       if (!visibilityTimer && !retryTimer) {
         visibilityTimer = setTimeout(() => void attemptMarkSeen(), 800)
       }
     }
 
+    /** 卸载清理：停止计时器，并让在途的标记回调失效。 */
+    function dispose(): void {
+      disposed = true
+      clearTimers()
+    }
+
     if (typeof IntersectionObserver === 'undefined') {
       visible = true
       scheduleInitialAttempt()
-      return () => {
-        disposed = true
+      return dispose
+    }
+
+    /** 可见性变化：进入 60% 视口才安排标记，移出视口则撤掉计时器。 */
+    function handleIntersection(entries: IntersectionObserverEntry[]): void {
+      const entry = entries[0]
+      if (!entry) return
+      visible = entry.isIntersecting && entry.intersectionRatio >= 0.6
+      if (visible) {
+        scheduleInitialAttempt()
+      } else {
         clearTimers()
       }
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0]
-        if (!entry) return
-        visible = entry.isIntersecting && entry.intersectionRatio >= 0.6
-        if (visible) {
-          scheduleInitialAttempt()
-        } else {
-          clearTimers()
-        }
-      },
-      { threshold: [0.6] }
-    )
+    const observer = new IntersectionObserver(handleIntersection, { threshold: [0.6] })
     // 只观察固定高度的任务头。完整 section 可能高于 1.67 个视口，永远达不到 60%。
     observer.observe(readTargetRef.current)
-    return () => {
+    return function disconnectObserver(): void {
       disposed = true
       observer.disconnect()
       clearTimers()
     }
-  }, [executionID, markExecutionSeen, meta, viewState?.seen_at, viewStateLoaded])
+  }
 
   if (!meta) return null
 

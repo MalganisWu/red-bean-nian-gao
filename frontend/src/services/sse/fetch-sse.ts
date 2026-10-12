@@ -33,16 +33,50 @@ export function connectSSE(options: SSEConnectionOptions): AbortController {
   // 若迟迟收不到任何事件（连接半开、代理吞帧），按连接失败处理并中止，
   // 避免前端 isStreaming/awaiting 永久悬挂。
   let firstEventTimer: number | undefined
-  const clearFirstEventTimer = (): void => {
+
+  /** 解除首事件看门狗（幂等）。 */
+  function clearFirstEventTimer(): void {
     if (firstEventTimer === undefined) return
     window.clearTimeout(firstEventTimer)
     firstEventTimer = undefined
   }
-  firstEventTimer = window.setTimeout((): void => {
+
+  /** 首事件超时：按连接失败上报，并中止连接。 */
+  function handleFirstEventTimeout(): void {
     firstEventTimer = undefined
     options.onError(new Error('连接超时：服务端长时间未响应，请重试。'))
     ctrl.abort()
-  }, FIRST_EVENT_TIMEOUT_MS)
+  }
+
+  firstEventTimer = window.setTimeout(handleFirstEventTimeout, FIRST_EVENT_TIMEOUT_MS)
+
+  /** onopen：非 2xx 时取业务 message（失败回退状态码文案）上报错误，并中止连接。 */
+  async function handleOpen(response: Response): Promise<void> {
+    if (response.ok) {
+      // HTTP 头已到：首个事件仍由看门狗覆盖（onopen 不等同于事件流可用）
+      return
+    }
+    // 非 2xx：优先解析 body 里的业务 message（如 409「交互不存在或已处理」），
+    // 解析失败回退到状态码文案（中文 + 状态码，错误横幅直接展示）。
+    let message = `连接失败（HTTP ${response.status}），请重试`
+    try {
+      const body = await readJson(response)
+      if (
+        typeof body === 'object' &&
+        body !== null &&
+        'message' in body &&
+        typeof body.message === 'string' &&
+        body.message
+      ) {
+        message = body.message
+      }
+    } catch {
+      // body 不是 JSON 或不可读，用状态码文案兜底
+    }
+    clearFirstEventTimer()
+    options.onError(new Error(message))
+    ctrl.abort()
+  }
 
   void fetchEventSource(options.url ?? API_ROUTES.CHAT.path, {
     method: 'POST',
@@ -53,32 +87,7 @@ export function connectSSE(options: SSEConnectionOptions): AbortController {
     body: JSON.stringify(options.request),
     signal: ctrl.signal,
 
-    onopen: async (response) => {
-      if (response.ok) {
-        // HTTP 头已到：首个事件仍由看门狗覆盖（onopen 不等同于事件流可用）
-        return
-      }
-      // 非 2xx：优先解析 body 里的业务 message（如 409「交互不存在或已处理」），
-      // 解析失败回退到状态码文案（中文 + 状态码，错误横幅直接展示）。
-      let message = `连接失败（HTTP ${response.status}），请重试`
-      try {
-        const body = await readJson(response)
-        if (
-          typeof body === 'object' &&
-          body !== null &&
-          'message' in body &&
-          typeof body.message === 'string' &&
-          body.message
-        ) {
-          message = body.message
-        }
-      } catch {
-        // body 不是 JSON 或不可读，用状态码文案兜底
-      }
-      clearFirstEventTimer()
-      options.onError(new Error(message))
-      ctrl.abort()
-    },
+    onopen: handleOpen,
 
     onmessage(msg) {
       // Microsoft fetch-event-source 已解析 event:/data: 行
