@@ -1,5 +1,10 @@
 import { API_ROUTES, trajectoryParamsSchema } from '@red-bean/api-contract'
-import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify'
+import type {
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+  preHandlerAsyncHookHandler,
+} from 'fastify'
 
 import { bindRoute } from '../../../../shared/http/bind-route.js'
 import { authenticatedPrincipal } from '../../../../shared/http/authenticated-request.js'
@@ -28,17 +33,24 @@ export function registerTrajectoryRoutes(
   // 链路：auth → controller.get → 信封
   bindRoute(server, API_ROUTES.SESSION_TRAJECTORY, {
     auth: authenticate,
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await controller.get(
-            authenticatedPrincipal(request).userId,
-            parseTrajectorySessionId(request.params),
-            requestAbortSignal(request)
-          )
-        )
-      )
-    },
+    handler: (request, reply) => getSessionTrajectory(controller, request, reply),
   })
+}
+
+/** GET /api/sessions/:id/trajectory：返回单个会话的轨迹投影。 */
+async function getSessionTrajectory(
+  controller: TrajectoryController,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(
+      await controller.get(
+        authenticatedPrincipal(request).userId,
+        parseTrajectorySessionId(request.params),
+        requestAbortSignal(request)
+      )
+    )
+  )
 }

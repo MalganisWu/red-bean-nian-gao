@@ -39,36 +39,57 @@ export function registerChatRoutes(
   // 链路：auth → zod 校验(parseChatRequestDto) → controller.start → SSE 帧流
   bindRoute(server, API_ROUTES.CHAT, {
     auth: authenticate,
-    handler: async (request, reply): Promise<void> => {
-      const run = await controller.start(parseChatRequestDto(request.body), chatContext(request))
-      await sendSse(reply, requestAbortSignal(request), run)
-    },
+    handler: (request, reply) => startChat(controller, request, reply),
   })
   // POST /api/agent/chat/cancel → ChatController.cancel
   // 链路：auth → zod 校验(parseCancelRequestDto) → controller.cancel → 信封
   bindRoute(server, API_ROUTES.CHAT_CANCEL, {
     auth: authenticate,
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await controller.cancel(
-            authenticatedPrincipal(request).userId,
-            parseCancelRequestDto(request.body).request_id
-          )
-        )
-      )
-    },
+    handler: (request, reply) => cancelChat(controller, request, reply),
   })
   // POST /api/agent/chat/answer → ChatController.answer（interrupt 应答 / card 提交）
   // 链路：auth → zod 校验(parseAnswerRequestDto) → controller.answer → SSE 帧流
   bindRoute(server, API_ROUTES.CHAT_ANSWER, {
     auth: authenticate,
-    handler: async (request, reply): Promise<void> => {
-      const run = await controller.answer(parseAnswerRequestDto(request.body), chatContext(request))
-      await sendSse(reply, requestAbortSignal(request), run)
-    },
+    handler: (request, reply) => answerChat(controller, request, reply),
   })
+}
+
+/** POST /api/agent/chat：发起一轮流式对话，把运行结果投影为 SSE 帧流。 */
+async function startChat(
+  controller: ChatController,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  const run = await controller.start(parseChatRequestDto(request.body), chatContext(request))
+  await sendSse(reply, requestAbortSignal(request), run)
+}
+
+/** POST /api/agent/chat/cancel：按当前用户与 request_id 取消单个请求，返回成功信封。 */
+async function cancelChat(
+  controller: ChatController,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(
+      await controller.cancel(
+        authenticatedPrincipal(request).userId,
+        parseCancelRequestDto(request.body).request_id
+      )
+    )
+  )
+}
+
+/** POST /api/agent/chat/answer：提交询问卡片答案，把恢复运行投影为 SSE 帧流。 */
+async function answerChat(
+  controller: ChatController,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  const run = await controller.answer(parseAnswerRequestDto(request.body), chatContext(request))
+  await sendSse(reply, requestAbortSignal(request), run)
 }
 
 /** 组装认证与链路上下文，三个端点共用。 */
@@ -89,7 +110,8 @@ async function sendSse(
   disconnectSignal: AbortSignal,
   run: StartedChatRun
 ): Promise<void> {
-  const onDisconnect = (): void => {
+  /** 客户端断连：以断连原因关闭运行句柄；收尾失败无需再向已不可写的响应发数据。 */
+  function onDisconnect(): void {
     void run.handle.close('client_disconnected').catch((): void => {
       // 断连后的运行收尾失败只记录，不向不可写的响应再发数据。
     })

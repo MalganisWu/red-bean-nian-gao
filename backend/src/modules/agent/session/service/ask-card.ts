@@ -150,23 +150,30 @@ export function resolveCard(
   messages: readonly DisplayMessage[],
   marker: AnswerMarker
 ): DisplayMessage[] {
-  return messages.map((message): DisplayMessage => {
-    const sections = sectionsFrom(message)
-    if (sections.length === 0) return message
-    let changed = false
-    const updated = sections.map((section): AgentJsonValue => {
-      const card = cardFromSection(section)
-      if (card?.interactionId !== marker.interactionId || !isJsonObject(section)) return section
-      const rawCard = section['card']
-      if (!isJsonObject(rawCard)) return section
-      changed = true
-      const resolved: AgentJsonObject = marker.refused
-        ? { ...rawCard, status: 'refused' }
-        : { ...rawCard, status: 'answered', answers: toAgentJsonValue(marker.answers) }
-      return { ...section, card: resolved }
-    })
-    return changed ? { ...message, sections: updated } : message
-  })
+  return messages.map((message): DisplayMessage => resolveCardInMessage(message, marker))
+}
+
+/** 处理单条消息：无 section 或未命中卡片时原样返回，命中时重写该 section 的卡片状态。 */
+function resolveCardInMessage(message: DisplayMessage, marker: AnswerMarker): DisplayMessage {
+  const sections = sectionsFrom(message)
+  if (sections.length === 0) return message
+  let changed = false
+
+  /** 重写单个 section 的卡片状态：未命中原样返回，命中则复制并置位 `changed`。 */
+  function answerSection(section: AgentJsonValue): AgentJsonValue {
+    const card = cardFromSection(section)
+    if (card?.interactionId !== marker.interactionId || !isJsonObject(section)) return section
+    const rawCard = section['card']
+    if (!isJsonObject(rawCard)) return section
+    changed = true
+    const resolved: AgentJsonObject = marker.refused
+      ? { ...rawCard, status: 'refused' }
+      : { ...rawCard, status: 'answered', answers: toAgentJsonValue(marker.answers) }
+    return { ...section, card: resolved }
+  }
+
+  const updated = sections.map((section): AgentJsonValue => answerSection(section))
+  return changed ? { ...message, sections: updated } : message
 }
 
 /**
@@ -187,7 +194,12 @@ export function mergeContinuation(
   if (continuation.length === 0) return [...messages]
 
   let merged = false
-  return messages.map((message): DisplayMessage => {
+
+  /**
+   * 在当前消息里插入 continuation：只插一次（`merged` 置位后其余消息原样返回），
+   * 未找到卡片 section 的消息也原样返回。
+   */
+  function mergeIntoMessage(message: DisplayMessage): DisplayMessage {
     if (merged) return message
     const sections = sectionsFrom(message)
     const cardIndex = sections.findIndex(
@@ -203,7 +215,9 @@ export function mergeContinuation(
         ...sections.slice(cardIndex + 1),
       ],
     }
-  })
+  }
+
+  return messages.map((message): DisplayMessage => mergeIntoMessage(message))
 }
 
 /**

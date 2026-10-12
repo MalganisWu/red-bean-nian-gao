@@ -284,15 +284,18 @@ export function executionPage(
 ): TaskPage<AgentTaskExecution> {
   const hasMore = rows.length > limit
   const selected = hasMore ? rows.slice(0, limit) : rows
-  const parsed = selected.map((row: unknown): z.infer<typeof executionRowSchema> => {
-    const result = executionRowSchema.safeParse(row)
-    if (!result.success) throw new Error('执行记录行数据无效', { cause: result.error })
-    return result.data
-  })
+  const parsed = selected.map(parseExecutionRow)
   return {
     items: parsed.map(mapExecutionRow),
     nextCursor: hasMore ? (parsed.at(-1)?.created_at.toISOString() ?? '') : '',
   }
+}
+
+/** 校验单条执行记录行；任一行非法即抛错，坏行不会被静默跳过。 */
+function parseExecutionRow(row: unknown): z.infer<typeof executionRowSchema> {
+  const result = executionRowSchema.safeParse(row)
+  if (!result.success) throw new Error('执行记录行数据无效', { cause: result.error })
+  return result.data
 }
 
 function truncateOptionalText(value: string | null, maxLength: number): string | undefined {

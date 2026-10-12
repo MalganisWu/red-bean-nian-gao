@@ -113,13 +113,21 @@ export class ProductAgentRunService implements AgentRunServicePort {
     const sections = new SectionCollector()
     // Loader 加载期事件出口：只进展示投影。事实日志由执行期的 ChatRunObserver 观察者接入
     // （子 Agent envelope 属 agent_event，本就不进主 run 事实）。
-    const emit = (event: AgentStreamEvent): void => {
+    function emit(event: AgentStreamEvent): void {
       if (event.type !== 'agent_event') sections.collect(event)
       handle.publish(event)
     }
     const config = executableConfig(
       await this.#loader.load(request.agentId, signal, { eventSink: emit })
     )
+    /** 事实写入失败只影响审计日志：记录 run 维度上下文，不打断会话主流程。 */
+    const reportFactWriteError = (error: Error): void => {
+      this.#logger?.error('session run 事实日志写入失败', {
+        error,
+        run_id: request.runId,
+        session_id: request.sessionId,
+      })
+    }
     // 事实日志写入器按 run 创建，随 run 生命周期终结（R7）。
     const facts =
       this.#runFacts === undefined
@@ -136,13 +144,7 @@ export class ProductAgentRunService implements AgentRunServicePort {
             },
             signal,
             repository: this.#runFacts,
-            onError: (error): void => {
-              this.#logger?.error('session run 事实日志写入失败', {
-                error,
-                run_id: request.runId,
-                session_id: request.sessionId,
-              })
-            },
+            onError: reportFactWriteError,
           })
     // 会话阶段：在 Runtime 启动前取得 lease、恢复 checkpoint 与未提交消息。
     const loadRequest: SessionLoadRequest = {

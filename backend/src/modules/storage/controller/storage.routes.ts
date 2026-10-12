@@ -1,5 +1,10 @@
 import { API_ROUTES } from '@red-bean/api-contract'
-import type { FastifyInstance, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify'
+import type {
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+  preHandlerAsyncHookHandler,
+} from 'fastify'
 
 import { bindRoute } from '../../../shared/http/bind-route.js'
 import { authenticatedPrincipal } from '../../../shared/http/authenticated-request.js'
@@ -28,18 +33,7 @@ export function registerStorageRoutes(
   // 链路：auth → multipart 解析(≤20MiB) → controller.upload → 信封
   bindRoute(server, API_ROUTES.STORAGE_UPLOAD, {
     auth: authenticate,
-    handler: async (request, reply): Promise<void> => {
-      const file = await parseUploadFile(request)
-      await sendOk(
-        reply,
-        envelope(
-          await controller.upload(
-            { userId: authenticatedPrincipal(request).userId, ...file },
-            requestAbortSignal(request)
-          )
-        )
-      )
-    },
+    handler: (request, reply) => uploadObject(controller, request, reply),
   })
 
   // GET /api/storage/download/* → StorageController.download → StorageService.download
@@ -47,76 +41,122 @@ export function registerStorageRoutes(
   // 通配 `*` 为 Fastify splat，对象 key 可含斜杠；参数键为 `'*'`（见 api-contract objectPathSchema）
   bindRoute(server, API_ROUTES.STORAGE_DOWNLOAD, {
     auth: authenticate,
-    handler: async (request, reply): Promise<void> => {
-      const download = await controller.download(
-        authenticatedPrincipal(request).userId,
-        parseObjectPath(request.params),
-        requestAbortSignal(request)
-      )
-      reply.header('content-type', download.info.contentType)
-      reply.header('content-length', String(download.info.size))
-      reply.header('etag', download.info.etag)
-      await reply.status(200).send(download.body)
-    },
+    handler: (request, reply) => downloadObject(controller, request, reply),
   })
 
   // DELETE /api/storage/objects/* → StorageController.delete → StorageService.delete
   // 链路：auth → zod 校验(parseObjectPath) → controller.delete → 信封
   bindRoute(server, API_ROUTES.STORAGE_OBJECTS, {
     auth: authenticate,
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await controller.delete(
-            authenticatedPrincipal(request).userId,
-            parseObjectPath(request.params),
-            requestAbortSignal(request)
-          )
-        )
-      )
-    },
+    handler: (request, reply) => deleteObject(controller, request, reply),
   })
 
   // POST /api/storage/presign/get → StorageController.presignGet（预签名下载）
   // 链路：auth → zod 校验(parsePresignRequest) → controller.presignGet → 信封
   bindRoute(server, API_ROUTES.STORAGE_PRESIGN_GET, {
     auth: authenticate,
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await controller.presignGet(
-            {
-              userId: authenticatedPrincipal(request).userId,
-              ...parsePresignRequest(request.body),
-            },
-            requestAbortSignal(request)
-          )
-        )
-      )
-    },
+    handler: (request, reply) => presignObjectGet(controller, request, reply),
   })
 
   // POST /api/storage/presign/put → StorageController.presignPut（预签名上传）
   // 链路：auth → zod 校验(parsePresignRequest) → controller.presignPut → 信封
   bindRoute(server, API_ROUTES.STORAGE_PRESIGN_PUT, {
     auth: authenticate,
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await controller.presignPut(
-            {
-              userId: authenticatedPrincipal(request).userId,
-              ...parsePresignRequest(request.body),
-            },
-            requestAbortSignal(request)
-          )
-        )
-      )
-    },
+    handler: (request, reply) => presignObjectPut(controller, request, reply),
   })
+}
+
+/** POST /api/storage/upload：解析 multipart 文件并写入对象存储。 */
+async function uploadObject(
+  controller: StorageController,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  const file = await parseUploadFile(request)
+  await sendOk(
+    reply,
+    envelope(
+      await controller.upload(
+        { userId: authenticatedPrincipal(request).userId, ...file },
+        requestAbortSignal(request)
+      )
+    )
+  )
+}
+
+/** GET /api/storage/download/*：取回对象并把字节流投影为 HTTP 响应。 */
+async function downloadObject(
+  controller: StorageController,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  const download = await controller.download(
+    authenticatedPrincipal(request).userId,
+    parseObjectPath(request.params),
+    requestAbortSignal(request)
+  )
+  reply.header('content-type', download.info.contentType)
+  reply.header('content-length', String(download.info.size))
+  reply.header('etag', download.info.etag)
+  await reply.status(200).send(download.body)
+}
+
+/** DELETE /api/storage/objects/*：删除当前用户拥有的对象。 */
+async function deleteObject(
+  controller: StorageController,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(
+      await controller.delete(
+        authenticatedPrincipal(request).userId,
+        parseObjectPath(request.params),
+        requestAbortSignal(request)
+      )
+    )
+  )
+}
+
+/** POST /api/storage/presign/get：签发下载预签名 URL。 */
+async function presignObjectGet(
+  controller: StorageController,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(
+      await controller.presignGet(
+        {
+          userId: authenticatedPrincipal(request).userId,
+          ...parsePresignRequest(request.body),
+        },
+        requestAbortSignal(request)
+      )
+    )
+  )
+}
+
+/** POST /api/storage/presign/put：签发上传预签名 URL。 */
+async function presignObjectPut(
+  controller: StorageController,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(
+      await controller.presignPut(
+        {
+          userId: authenticatedPrincipal(request).userId,
+          ...parsePresignRequest(request.body),
+        },
+        requestAbortSignal(request)
+      )
+    )
+  )
 }
 
 /** 读取并校验 multipart 上传文件；对象归属与 size 限制属于传输层约束。 */

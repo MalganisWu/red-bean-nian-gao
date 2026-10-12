@@ -27,30 +27,37 @@ export function authenticatedRequest(
   authService: TokenValidator,
   options: AuthenticationOptions = {}
 ): preHandlerAsyncHookHandler {
-  return async (request): Promise<void> => {
-    const authorization = firstHeader(request.headers.authorization)
-    if (authorization === undefined || authorization === '') {
-      throw unauthorizedError('缺少认证凭证')
-    }
-    // 长度判断排除 `Authorization: Bearer `（有前缀但没 token），否则会把空串当凭证交给校验器。
-    if (!authorization.startsWith('Bearer ') || authorization.length === 'Bearer '.length) {
-      throw unauthorizedError(options.malformedMessage ?? '认证头格式错误，应为 Bearer <token>')
-    }
-    /*
-     * 校验失败统一映射为「无效或已过期」，**不区分**签名错、过期、用户不存在等具体原因——
-     * 区分它们等于给攻击者一个探测 token 状态的接口。
-     * 空 userId 也走这里：校验器返回空串说明实现有问题，但对外仍是同一个不可用的结论。
-     */
-    try {
-      const userId = await authService.validateToken(
-        authorization.slice('Bearer '.length),
-        requestAbortSignal(request)
-      )
-      if (userId === '') throw new Error('认证结果缺少用户 ID')
-      requestPrincipals.set(request, Object.freeze({ userId }))
-    } catch {
-      throw unauthorizedError('认证凭证无效或已过期')
-    }
+  return (request): Promise<void> => authenticateRequest(authService, options, request)
+}
+
+/** 解析 Bearer 凭证并校验 token；成功后把身份绑定到当前请求，失败统一抛 401。 */
+async function authenticateRequest(
+  authService: TokenValidator,
+  options: AuthenticationOptions,
+  request: FastifyRequest
+): Promise<void> {
+  const authorization = firstHeader(request.headers.authorization)
+  if (authorization === undefined || authorization === '') {
+    throw unauthorizedError('缺少认证凭证')
+  }
+  // 长度判断排除 `Authorization: Bearer `（有前缀但没 token），否则会把空串当凭证交给校验器。
+  if (!authorization.startsWith('Bearer ') || authorization.length === 'Bearer '.length) {
+    throw unauthorizedError(options.malformedMessage ?? '认证头格式错误，应为 Bearer <token>')
+  }
+  /*
+   * 校验失败统一映射为「无效或已过期」，**不区分**签名错、过期、用户不存在等具体原因——
+   * 区分它们等于给攻击者一个探测 token 状态的接口。
+   * 空 userId 也走这里：校验器返回空串说明实现有问题，但对外仍是同一个不可用的结论。
+   */
+  try {
+    const userId = await authService.validateToken(
+      authorization.slice('Bearer '.length),
+      requestAbortSignal(request)
+    )
+    if (userId === '') throw new Error('认证结果缺少用户 ID')
+    requestPrincipals.set(request, Object.freeze({ userId }))
+  } catch {
+    throw unauthorizedError('认证凭证无效或已过期')
   }
 }
 

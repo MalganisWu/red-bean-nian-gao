@@ -5,8 +5,10 @@ import multipart from '@fastify/multipart'
 import fastify, {
   LogController,
   type FastifyInstance,
+  type FastifyReply,
   type FastifyRequest,
   type FastifyServerOptions,
+  type HookHandlerDoneFunction,
   type preHandlerAsyncHookHandler,
 } from 'fastify'
 import { normalizeError } from '../errors/normalize-error.js'
@@ -68,6 +70,13 @@ interface RateLimitDecision {
   readonly retryAfterSeconds: number
 }
 
+/** trace 钩子依赖；由 `createHttpServer` 从选项解析后一次性预构建，避免在注册处现场组装。 */
+interface TraceHookDependencies {
+  readonly extractor: TraceContextExtractorPort | undefined
+  readonly generateTraceId: () => string
+  readonly tracer: TracerPort
+}
+
 /*
  * 请求级状态挂在 WeakMap 上，而不是塞进 request 对象或某个全局 Map。
  * WeakMap 的键是请求对象本身：请求结束、没有别的引用之后条目自动消失，
@@ -113,110 +122,27 @@ export function createHttpServer(options: HttpServerOptions): FastifyInstance {
   configureContentTypes(server, jsonBodyLimit)
   void server.register(multipart)
 
-  server.addHook('onRequest', async (request, reply): Promise<void> => {
-    /*
-     * 两种断连必须都覆盖，只监听一个会漏掉一半的取消来源：
-     * - `aborted`：请求还没读完客户端就断了。
-     * - `close` + `writableFinished === false`：响应还没写完连接就关了（SSE 场景里这是最常见的）。
-     *   加 `writableFinished` 判断是因为正常结束也会触发 `close`，不加就会把每次正常请求都当成取消。
-     */
-    const controller = new AbortController()
-    if (request.raw.aborted) controller.abort(new Error('HTTP request aborted'))
-    else {
-      request.raw.once('aborted', (): void => {
-        controller.abort(new Error('HTTP request aborted'))
-      })
-    }
-    reply.raw.once('close', (): void => {
-      if (!reply.raw.writableFinished) {
-        controller.abort(new Error('HTTP response disconnected'))
-      }
-    })
-    requestAbortControllers.set(request, controller)
-    reply.header(REQUEST_ID_HEADER, request.id)
-    const origin = firstHeader(request.headers.origin)
-    if (origin === undefined || allowedOrigins.length === 0) return
+  server.addHook('onRequest', (request, reply): Promise<void> =>
+    beginRequestContext(request, reply, allowedOrigins, allowAllOrigins)
+  )
 
-    if (allowAllOrigins) {
-      reply.header('access-control-allow-origin', '*')
-    } else if (allowedOrigins.includes(origin)) {
-      reply.header('access-control-allow-origin', origin)
-      reply.header('vary', 'Origin')
-      reply.header('access-control-allow-credentials', 'true')
-    }
-    reply.header('access-control-allow-methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
-    reply.header(
-      'access-control-allow-headers',
-      'Origin, Content-Type, Accept, Authorization, X-Request-ID'
-    )
-    reply.header('access-control-expose-headers', 'X-Request-ID, X-Trace-ID')
-    if (request.method === 'OPTIONS') await reply.status(204).send()
-  })
+  // trace 钩子的依赖先具名预构建，注册处只做单行转发。
+  const traceDependencies: TraceHookDependencies = {
+    extractor: options.traceContextExtractor,
+    generateTraceId: traceIdGenerator,
+    tracer,
+  }
+  server.addHook('onRequest', (request, reply, done): void =>
+    attachTraceContext(request, reply, done, traceDependencies)
+  )
 
-  server.addHook('onRequest', (request, reply, done): void => {
-    if (reply.sent) {
-      done()
-      return
-    }
-    const extracted = options.traceContextExtractor?.extract(request.headers)
-    const traceId =
-      extracted?.traceId === '' || extracted === undefined ? traceIdGenerator() : extracted.traceId
-    requestTraceIds.set(request, traceId)
-    reply.header(TRACE_ID_HEADER, traceId)
+  server.addHook('onError', (request, _reply, error, done): void =>
+    recordRequestError(request, error, done)
+  )
 
-    const attributes = [
-      { key: 'request.id', value: request.id },
-      { key: 'trace.id', value: traceId },
-      { key: 'http.method', value: request.method },
-      { key: 'http.path', value: request.url },
-    ]
-    if (extracted?.parentSpanId !== undefined && extracted.parentSpanId !== '') {
-      attributes.push({ key: 'trace.parent_span_id', value: extracted.parentSpanId })
-    }
-    if (extracted?.traceFlags !== undefined) {
-      attributes.push({ key: 'trace.flags', value: String(extracted.traceFlags) })
-    }
-    if (extracted?.traceState !== undefined && extracted.traceState !== '') {
-      attributes.push({ key: 'trace.state', value: extracted.traceState })
-    }
-    const span = tracer.start({ name: 'http.request', attributes })
-    requestSpans.set(request, span)
-    /*
-     * 用 `span.within` 包住 `done()` 而不是直接调用：`within` 会把该 span 设为异步上下文里的活跃 span，
-     * 后续 handler 里新建的 span（LLM、工具、DB）才能自动挂到它下面。
-     * 这也解释了为什么必须用 `void ... .catch`：`within` 返回 Promise，而 Fastify 的 done 回调风格
-     * 要求同步返回，只能把异步失败转回 `done(error)`。
-     */
-    void span
-      .within((): Promise<void> => {
-        done()
-        return Promise.resolve()
-      })
-      .catch((error: unknown): void => {
-        done(normalizeError(error))
-      })
-  })
-
-  server.addHook('onError', (request, _reply, error, done): void => {
-    requestErrors.set(request, error)
-    done()
-  })
-
-  server.addHook('onResponse', (request, reply, done): void => {
-    const span = requestSpans.get(request)
-    if (span !== undefined) {
-      span.setAttributes(
-        { key: 'http.route', value: request.routeOptions.url ?? '' },
-        { key: 'http.status_code', value: String(reply.statusCode) }
-      )
-      span.end(requestErrors.get(request))
-      requestSpans.delete(request)
-      requestErrors.delete(request)
-      requestTraceIds.delete(request)
-    }
-    requestAbortControllers.delete(request)
-    done()
-  })
+  server.addHook('onResponse', (request, reply, done): void =>
+    finishRequestSpan(request, reply, done)
+  )
 
   /**
    * 统一错误出口。**日志级别按「这是不是我们预期的错误」分层**：
@@ -224,26 +150,170 @@ export function createHttpServer(options: HttpServerOptions): FastifyInstance {
    * 而 `AppError` 是业务主动抛的（404、限流、校验失败），走 debug——
    * 把用户输错参数记成 error 会让真正的故障淹没在噪声里。
    */
-  server.setErrorHandler((error, request, reply): void => {
-    const safeError = normalizeHttpError(error, jsonBodyLimit)
-    if (safeError.cause !== undefined) {
-      request.log.error(
-        { err: normalizeError(safeError.cause), path: request.url },
-        safeError.logMessage ?? 'unhandled error'
-      )
-    } else if (!(error instanceof AppError)) {
-      request.log.error({ err: normalizeError(error), path: request.url }, 'unhandled error')
-    } else {
-      request.log.debug({ err: error, path: request.url }, 'request error')
-    }
-    const response = errorResponse(safeError)
-    void reply.status(response.status).send(response.body)
-  })
+  server.setErrorHandler((error, request, reply): void =>
+    handleRequestError(error, request, reply, jsonBodyLimit)
+  )
 
   server.setNotFoundHandler((): never => {
     throw notFoundError('资源不存在')
   })
   return server
+}
+
+/**
+ * onRequest 钩子 #1：建立请求级取消信号（断连 → 全链路取消）、写入 request id，
+ * 并按 CORS 白名单放行或短路 OPTIONS。
+ */
+async function beginRequestContext(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  allowedOrigins: readonly string[],
+  allowAllOrigins: boolean
+): Promise<void> {
+  /*
+   * 两种断连必须都覆盖，只监听一个会漏掉一半的取消来源：
+   * - `aborted`：请求还没读完客户端就断了。
+   * - `close` + `writableFinished === false`：响应还没写完连接就关了（SSE 场景里这是最常见的）。
+   *   加 `writableFinished` 判断是因为正常结束也会触发 `close`，不加就会把每次正常请求都当成取消。
+   */
+  const controller = new AbortController()
+  if (request.raw.aborted) controller.abort(new Error('HTTP request aborted'))
+  else {
+    request.raw.once('aborted', (): void => {
+      controller.abort(new Error('HTTP request aborted'))
+    })
+  }
+  /** 连接关闭且响应未写完：视为客户端断连，中止整条链路。 */
+  function onResponseClose(): void {
+    if (!reply.raw.writableFinished) {
+      controller.abort(new Error('HTTP response disconnected'))
+    }
+  }
+  reply.raw.once('close', onResponseClose)
+  requestAbortControllers.set(request, controller)
+  reply.header(REQUEST_ID_HEADER, request.id)
+  const origin = firstHeader(request.headers.origin)
+  if (origin === undefined || allowedOrigins.length === 0) return
+
+  if (allowAllOrigins) {
+    reply.header('access-control-allow-origin', '*')
+  } else if (allowedOrigins.includes(origin)) {
+    reply.header('access-control-allow-origin', origin)
+    reply.header('vary', 'Origin')
+    reply.header('access-control-allow-credentials', 'true')
+  }
+  reply.header('access-control-allow-methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
+  reply.header(
+    'access-control-allow-headers',
+    'Origin, Content-Type, Accept, Authorization, X-Request-ID'
+  )
+  reply.header('access-control-expose-headers', 'X-Request-ID, X-Trace-ID')
+  if (request.method === 'OPTIONS') await reply.status(204).send()
+}
+
+/** onRequest 钩子 #2：提取或生成 trace ID，起 `http.request` span，并在其异步上下文里放行后续处理。 */
+function attachTraceContext(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  done: HookHandlerDoneFunction,
+  dependencies: TraceHookDependencies
+): void {
+  if (reply.sent) {
+    done()
+    return
+  }
+  const extracted = dependencies.extractor?.extract(request.headers)
+  const traceId =
+    extracted?.traceId === '' || extracted === undefined
+      ? dependencies.generateTraceId()
+      : extracted.traceId
+  requestTraceIds.set(request, traceId)
+  reply.header(TRACE_ID_HEADER, traceId)
+
+  const attributes = [
+    { key: 'request.id', value: request.id },
+    { key: 'trace.id', value: traceId },
+    { key: 'http.method', value: request.method },
+    { key: 'http.path', value: request.url },
+  ]
+  if (extracted?.parentSpanId !== undefined && extracted.parentSpanId !== '') {
+    attributes.push({ key: 'trace.parent_span_id', value: extracted.parentSpanId })
+  }
+  if (extracted?.traceFlags !== undefined) {
+    attributes.push({ key: 'trace.flags', value: String(extracted.traceFlags) })
+  }
+  if (extracted?.traceState !== undefined && extracted.traceState !== '') {
+    attributes.push({ key: 'trace.state', value: extracted.traceState })
+  }
+  const span = dependencies.tracer.start({ name: 'http.request', attributes })
+  requestSpans.set(request, span)
+  /*
+   * 用 `span.within` 包住 `done()` 而不是直接调用：`within` 会把该 span 设为异步上下文里的活跃 span，
+   * 后续 handler 里新建的 span（LLM、工具、DB）才能自动挂到它下面。
+   * 这也解释了为什么必须用 `void ... .catch`：`within` 返回 Promise，而 Fastify 的 done 回调风格
+   * 要求同步返回，只能把异步失败转回 `done(error)`。
+   */
+  /** 在 span 的异步上下文里放行 `done`，使后续新建的 span 自动挂到它下面。 */
+  function continueWithinSpan(): Promise<void> {
+    done()
+    return Promise.resolve()
+  }
+  void span.within(continueWithinSpan).catch((error: unknown): void => {
+    done(normalizeError(error))
+  })
+}
+
+/** onError 钩子：暂存本次请求的错误，供 onResponse 收尾 span 时取用。 */
+function recordRequestError(
+  request: FastifyRequest,
+  error: Error,
+  done: HookHandlerDoneFunction
+): void {
+  requestErrors.set(request, error)
+  done()
+}
+
+/** onResponse 钩子：收尾 `http.request` span（补 route 与状态码）并释放请求级引用。 */
+function finishRequestSpan(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  done: HookHandlerDoneFunction
+): void {
+  const span = requestSpans.get(request)
+  if (span !== undefined) {
+    span.setAttributes(
+      { key: 'http.route', value: request.routeOptions.url ?? '' },
+      { key: 'http.status_code', value: String(reply.statusCode) }
+    )
+    span.end(requestErrors.get(request))
+    requestSpans.delete(request)
+    requestErrors.delete(request)
+    requestTraceIds.delete(request)
+  }
+  requestAbortControllers.delete(request)
+  done()
+}
+
+/** setErrorHandler 处理器：把任意错误归一化为错误信封，并按「是否预期」分层记录日志。 */
+function handleRequestError(
+  error: unknown,
+  request: FastifyRequest,
+  reply: FastifyReply,
+  jsonBodyLimit: number
+): void {
+  const safeError = normalizeHttpError(error, jsonBodyLimit)
+  if (safeError.cause !== undefined) {
+    request.log.error(
+      { err: normalizeError(safeError.cause), path: request.url },
+      safeError.logMessage ?? 'unhandled error'
+    )
+  } else if (!(error instanceof AppError)) {
+    request.log.error({ err: normalizeError(error), path: request.url }, 'unhandled error')
+  } else {
+    request.log.debug({ err: error, path: request.url }, 'request error')
+  }
+  const response = errorResponse(safeError)
+  void reply.status(response.status).send(response.body)
 }
 
 /** 取本次请求的 trace ID；请求没走到 trace hook 时返回空串。 */
@@ -275,12 +345,14 @@ export class FixedWindowRateLimiter {
   }
 
   public preHandler(): preHandlerAsyncHookHandler {
-    return async (request, reply): Promise<void> => {
+    /** 按客户端 IP 判定配额；超限时写 `retry-after` 并抛 429。 */
+    const rateLimitGuard = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const decision = this.allow(request.ip, this.#now())
       if (decision.allowed) return
       reply.header('retry-after', String(decision.retryAfterSeconds))
       throw rateLimitError('请求过于频繁，请稍后再试')
     }
+    return rateLimitGuard
   }
 
   private allow(key: string, now: number): RateLimitDecision {

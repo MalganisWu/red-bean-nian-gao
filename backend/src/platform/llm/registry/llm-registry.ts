@@ -93,7 +93,8 @@ export class LlmProviderRegistry {
    * 静默放过会让 Runtime 拿到一个不是 adapter 的东西，报错位置离根因很远。
    */
   public adapterFactory(): LlmAdapterFactory {
-    return (
+    /** 按归一化后的 provider 名查表并构造 adapter；名字为空、查不到或工厂返回空都算失败。 */
+    const createAdapter = (
       rawProvider: string,
       apiKey: string,
       baseUrl: string,
@@ -123,6 +124,7 @@ export class LlmProviderRegistry {
       }
       return adapter
     }
+    return createAdapter
   }
 }
 

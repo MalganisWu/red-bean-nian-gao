@@ -24,6 +24,7 @@ import { createStorageModule } from '../modules/storage/public-api.js'
 import { createTaskModule, createTaskPersistence } from '../modules/task/public-api.js'
 import { bootstrapDatabase } from './bootstrap.js'
 import { FastifyHttpServer } from './fastify-http-server.js'
+import type { Lifecycle } from './lifecycle.js'
 import { registerApplicationRoutes } from './http-routes.js'
 import { routeCatalogChecker } from '../shared/http/route-catalog-check.js'
 import { ServerApplication, buildManaged } from './server-application.js'
@@ -53,7 +54,10 @@ export function buildApplication(
   startupSignal: AbortSignal,
   options: BuildApplicationOptions = {}
 ): Promise<ServerApplication> {
-  return buildManaged(async (lifecycle): Promise<ServerApplication> => {
+  return buildManaged(buildServerApplication)
+
+  /** 在受管生命周期内按上述五步顺序完成组装，任一步失败都会反向释放已建资源。 */
+  async function buildServerApplication(lifecycle: Lifecycle): Promise<ServerApplication> {
     // 1. 建立进程级基础设施，并把关闭责任登记到统一生命周期。
     const logger = createLogger({ format: config.server.logFormat, level: config.server.logLevel })
     const database = await connectPostgres(config.database.url, startupSignal)
@@ -174,7 +178,7 @@ export function buildApplication(
       backgroundTasks: tasks.backgroundTasks,
       shutdownTasks: [(signal): Promise<void> => agent.chatLifecycle.shutdown(signal)],
     })
-  })
+  }
 }
 
 /**

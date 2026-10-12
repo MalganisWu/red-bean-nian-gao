@@ -122,18 +122,20 @@ export class TaskExecutionService {
         { key: 'task.id', value: taskId },
       ],
     })
+    /** 在 span 内完成「加载状态 → 执行 Agent → 落库」，并把 Agent 失败向外抛出。 */
+    const executeRun = async (): Promise<void> => {
+      const state = await this.#loadRunState(taskId, lease, traceId, signal)
+      const outcome = await this.#executeAgent(state, lease, signal)
+      await this.#commit(
+        state,
+        outcome.result,
+        outcome.error,
+        AbortSignal.timeout(PERSISTENCE_TIMEOUT_MILLISECONDS)
+      )
+      if (outcome.error !== undefined) throw outcome.error
+    }
     try {
-      await span.within(async (): Promise<void> => {
-        const state = await this.#loadRunState(taskId, lease, traceId, signal)
-        const outcome = await this.#executeAgent(state, lease, signal)
-        await this.#commit(
-          state,
-          outcome.result,
-          outcome.error,
-          AbortSignal.timeout(PERSISTENCE_TIMEOUT_MILLISECONDS)
-        )
-        if (outcome.error !== undefined) throw outcome.error
-      })
+      await span.within(executeRun)
       span.end()
     } catch (cause: unknown) {
       const error = normalizeError(cause)

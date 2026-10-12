@@ -1,7 +1,7 @@
 import type { DisplayMessage } from '../../presentation/model/display-message.js'
 import type { SessionRunRecord } from '../../run-facts/model/session-run.js'
 import { SESSION_RUN_STATUSES } from '../../run-facts/model/session-run.js'
-import { RUN_TOOL_STATUSES } from '../../run-facts/model/run-fact.js'
+import { RUN_TOOL_STATUSES, type RunFact } from '../../run-facts/model/run-fact.js'
 import type { AgentJsonObject } from '../../model/json-value.js'
 import type {
   RunAssistantFact,
@@ -393,10 +393,13 @@ function runEndState(
 
 /** run 已落库事实的时间下界：工具事实用结束时刻，其余事实用发生时刻。 */
 function lastFactAt(run: SessionRunRecord): number | undefined {
-  return run.facts.reduce<number | undefined>((acc, fact) => {
-    const at = fact.type === 'tool' ? fact.startedAt + fact.durationMs : fact.at
-    return acc === undefined || at > acc ? at : acc
-  }, undefined)
+  return run.facts.reduce<number | undefined>((acc, fact) => latestOfFact(acc, fact), undefined)
+}
+
+/** 取累计下界与单条事实时刻的较大者：工具事实用结束时刻，其余事实用发生时刻。 */
+function latestOfFact(acc: number | undefined, fact: RunFact): number | undefined {
+  const at = fact.type === 'tool' ? fact.startedAt + fact.durationMs : fact.at
+  return acc === undefined || at > acc ? at : acc
 }
 
 function finalizeTurn(turn: MutableTurn): TrajectoryTurn {

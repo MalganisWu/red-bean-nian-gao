@@ -307,11 +307,13 @@ export class RunFactRecorder implements AgentExecutionEventSink {
 
   /** 所有仓储写入的唯一入口：串行 + 尽力语义，首次失败上报并停写。 */
   #enqueue(operation: () => Promise<void>): void {
+    /** 写入失败收尾：标记停写，并把归一化后的错误交给诊断回调（缺省即静默降级）。 */
+    const onWriteFailure = (cause: unknown): void => {
+      this.#broken = true
+      this.#onError?.(normalizeError(cause))
+    }
     this.#queue = this.#queue
       .then((): Promise<void> => (this.#broken ? Promise.resolve() : operation()))
-      .catch((cause: unknown): void => {
-        this.#broken = true
-        this.#onError?.(normalizeError(cause))
-      })
+      .catch(onWriteFailure)
   }
 }

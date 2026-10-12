@@ -133,6 +133,23 @@ export class RuntimeSubAgentToolFactory {
         },
       },
     })
+    /** 把子运行事件包成父运行的 agent_event，投递到本次加载记录的事件出口。 */
+    function publishChildEvent(
+      executionId: string,
+      parentCallId: string,
+      event: AgentRuntimeEvent
+    ): void {
+      request.loadContext.eventSink?.({
+        type: 'agent_event',
+        agentId: definition.agentId,
+        agentName: definition.name,
+        executionId,
+        parentCallId,
+        eventType: event.type,
+        event,
+      })
+    }
+
     let runner: AgentChildRunner = new RuntimeChildRunner({
       executor: this.#options.executor,
       executionPrefix: 'SAEX',
@@ -154,17 +171,8 @@ export class RuntimeSubAgentToolFactory {
       createSectionCollector: (): SectionCollector => new SectionCollector(),
       stream:
         (executionId, parentCallId): ((event: AgentRuntimeEvent) => void) =>
-        (event: AgentRuntimeEvent): void => {
-          request.loadContext.eventSink?.({
-            type: 'agent_event',
-            agentId: definition.agentId,
-            agentName: definition.name,
-            executionId,
-            parentCallId,
-            eventType: event.type,
-            event,
-          })
-        },
+        (event: AgentRuntimeEvent): void =>
+          publishChildEvent(executionId, parentCallId, event),
     })
     for (const decorator of this.#options.decorators ?? []) {
       runner = decorator.wrapChildRunner?.(runner) ?? runner

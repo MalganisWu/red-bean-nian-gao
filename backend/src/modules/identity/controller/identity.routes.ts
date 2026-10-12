@@ -1,5 +1,10 @@
 import { API_ROUTES } from '@red-bean/api-contract'
-import type { FastifyInstance, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify'
+import type {
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+  preHandlerAsyncHookHandler,
+} from 'fastify'
 
 import { bindRoute } from '../../../shared/http/bind-route.js'
 import { authenticatedPrincipal, firstHeader } from '../../../shared/http/authenticated-request.js'
@@ -35,121 +40,173 @@ export function registerUserRoutes(server: FastifyInstance, bindings: IdentityRo
   // 链路：限流(5/h) → zod 校验(parseRegisterUserDto) → controller.register → 信封(201)
   bindRoute(server, API_ROUTES.REGISTER, {
     preHandler: [bindings.limitRegistration],
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await bindings.controller.register(
-            parseRegisterUserDto(request.body),
-            requestAbortSignal(request)
-          )
-        ),
-        201
-      )
-    },
+    handler: (request, reply) => registerUser(bindings, request, reply),
   })
 
   // POST /api/login → IdentityController.login → DefaultAuthService.login
   // 链路：限流(10/h) → zod 校验(parseLoginDto) → controller.login → 信封
   bindRoute(server, API_ROUTES.LOGIN, {
     preHandler: [bindings.limitLogin],
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await bindings.controller.login(parseLoginDto(request.body), requestAbortSignal(request))
-        )
-      )
-    },
+    handler: (request, reply) => loginUser(bindings, request, reply),
   })
 
   // POST /api/logout → IdentityController.logout → DefaultAuthService.logout
   // 链路：Bearer 解析(bearerToken) → controller.logout → 信封
   bindRoute(server, API_ROUTES.LOGOUT, {
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await bindings.controller.logout(bearerToken(request), requestAbortSignal(request))
-        )
-      )
-    },
+    handler: (request, reply) => logoutUser(bindings, request, reply),
   })
 
   // POST /api/refresh → IdentityController.refresh → DefaultAuthService.refresh
   // 链路：Bearer 解析(bearerToken) → controller.refresh → 信封
   bindRoute(server, API_ROUTES.REFRESH, {
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await bindings.controller.refresh(bearerToken(request), requestAbortSignal(request))
-        )
-      )
-    },
+    handler: (request, reply) => refreshSession(bindings, request, reply),
   })
 
   // GET /api/me → IdentityController.self → IdentityProfileService
   // 链路：auth → controller.self(userId) → 信封
   bindRoute(server, API_ROUTES.ME, {
     auth: bindings.authenticate,
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await bindings.controller.self(
-            authenticatedPrincipal(request).userId,
-            requestAbortSignal(request)
-          )
-        )
-      )
-    },
+    handler: (request, reply) => getSelfProfile(bindings, request, reply),
   })
 
   // PUT /api/me → IdentityController.updateSelf → IdentityProfileService
   // 链路：auth → zod 校验(parseUpdateSelfDto) → controller.updateSelf → 信封
   bindRoute(server, API_ROUTES.ME_UPDATE, {
     auth: bindings.authenticate,
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await bindings.controller.updateSelf(
-            parseUpdateSelfDto(request.body),
-            authenticatedPrincipal(request).userId,
-            requestAbortSignal(request)
-          )
-        )
-      )
-    },
+    handler: (request, reply) => updateSelfProfile(bindings, request, reply),
   })
 
   // GET /api/users/:id → IdentityController.detail → IdentityProfileService
   // 链路：auth → zod 校验(parseUserId) → controller.detail → 信封
   bindRoute(server, API_ROUTES.USER, {
     auth: bindings.authenticate,
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await bindings.controller.detail(parseUserId(request.params), requestAbortSignal(request))
-        )
-      )
-    },
+    handler: (request, reply) => getUserDetail(bindings, request, reply),
   })
 
   // GET /api/users → IdentityController.list → IdentityProfileService
   // 链路：auth → zod 校验(parseUserPagination) → controller.list → 信封
   bindRoute(server, API_ROUTES.USERS, {
     auth: bindings.authenticate,
-    handler: async (request, reply): Promise<void> => {
-      const { offset, limit } = parseUserPagination(request.query)
-      await sendOk(
-        reply,
-        envelope(await bindings.controller.list(offset, limit, requestAbortSignal(request)))
-      )
-    },
+    handler: (request, reply) => listUsers(bindings, request, reply),
   })
+}
+
+/** POST /api/register：注册新用户并返回 201 信封。 */
+async function registerUser(
+  bindings: IdentityRouteBindings,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(
+      await bindings.controller.register(
+        parseRegisterUserDto(request.body),
+        requestAbortSignal(request)
+      )
+    ),
+    201
+  )
+}
+
+/** POST /api/login：校验凭据并签发令牌。 */
+async function loginUser(
+  bindings: IdentityRouteBindings,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(
+      await bindings.controller.login(parseLoginDto(request.body), requestAbortSignal(request))
+    )
+  )
+}
+
+/** POST /api/logout：按 Bearer token 注销当前会话。 */
+async function logoutUser(
+  bindings: IdentityRouteBindings,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(await bindings.controller.logout(bearerToken(request), requestAbortSignal(request)))
+  )
+}
+
+/** POST /api/refresh：按 Bearer token 续签令牌。 */
+async function refreshSession(
+  bindings: IdentityRouteBindings,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(await bindings.controller.refresh(bearerToken(request), requestAbortSignal(request)))
+  )
+}
+
+/** GET /api/me：读取当前登录用户的资料。 */
+async function getSelfProfile(
+  bindings: IdentityRouteBindings,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(
+      await bindings.controller.self(
+        authenticatedPrincipal(request).userId,
+        requestAbortSignal(request)
+      )
+    )
+  )
+}
+
+/** PUT /api/me：按 DTO 更新当前登录用户的资料。 */
+async function updateSelfProfile(
+  bindings: IdentityRouteBindings,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(
+      await bindings.controller.updateSelf(
+        parseUpdateSelfDto(request.body),
+        authenticatedPrincipal(request).userId,
+        requestAbortSignal(request)
+      )
+    )
+  )
+}
+
+/** GET /api/users/:id：按 id 读取用户公开资料。 */
+async function getUserDetail(
+  bindings: IdentityRouteBindings,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(
+      await bindings.controller.detail(parseUserId(request.params), requestAbortSignal(request))
+    )
+  )
+}
+
+/** GET /api/users：按 offset/limit 分页列出用户。 */
+async function listUsers(
+  bindings: IdentityRouteBindings,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  const { offset, limit } = parseUserPagination(request.query)
+  await sendOk(
+    reply,
+    envelope(await bindings.controller.list(offset, limit, requestAbortSignal(request)))
+  )
 }
 
 /** 从认证头提取 Bearer token；logout/refresh 不经过 authenticate 前置处理器，需要独立解析。 */

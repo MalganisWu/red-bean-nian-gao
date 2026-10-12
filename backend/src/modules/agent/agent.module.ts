@@ -111,42 +111,48 @@ export function createAgentModuleCore(options: {
     lockRegistry,
     runtimeState
   )
+  /** 接回 Task 的结果投递能力后，补齐运行、Chat 与查询用例所需的装配。 */
+  function completeAgentModule(
+    deliveryQueue: TaskResultDeliveryPort,
+    moduleIdGenerator: IdGenerator
+  ): AgentModule {
+    const runService = new ProductAgentRunService({
+      loader,
+      executor,
+      sessions: new SessionLifecycle(sessionRepository, messageBuffer, lockRegistry),
+      messageBuffer,
+      deliveryQueue,
+      runFacts: runFactRepository,
+      logger: options.logger,
+    })
+    const sessionQueryService = new DefaultSessionQueryService(sessionRepository)
+    const chatService = new DefaultChatService({
+      runService,
+      cancelRegistry,
+      idGenerator: moduleIdGenerator,
+    })
+    return {
+      backgroundExecution,
+      externalTurnWriter,
+      cancelRegistry,
+      runService,
+      chat: chatService,
+      chatLifecycle: chatService,
+      sessionQueries: sessionQueryService,
+      trajectory: new DefaultTrajectoryService(
+        sessionRepository,
+        subExecutionRepository,
+        runFactRepository,
+        options.logger
+      ),
+    }
+  }
+
   return {
     sessionLocks: lockRegistry,
     backgroundExecution,
     externalTurnWriter,
-    complete: (deliveryQueue, moduleIdGenerator): AgentModule => {
-      const runService = new ProductAgentRunService({
-        loader,
-        executor,
-        sessions: new SessionLifecycle(sessionRepository, messageBuffer, lockRegistry),
-        messageBuffer,
-        deliveryQueue,
-        runFacts: runFactRepository,
-        logger: options.logger,
-      })
-      const sessionQueryService = new DefaultSessionQueryService(sessionRepository)
-      const chatService = new DefaultChatService({
-        runService,
-        cancelRegistry,
-        idGenerator: moduleIdGenerator,
-      })
-      return {
-        backgroundExecution,
-        externalTurnWriter,
-        cancelRegistry,
-        runService,
-        chat: chatService,
-        chatLifecycle: chatService,
-        sessionQueries: sessionQueryService,
-        trajectory: new DefaultTrajectoryService(
-          sessionRepository,
-          subExecutionRepository,
-          runFactRepository,
-          options.logger
-        ),
-      }
-    },
+    complete: completeAgentModule,
   }
 }
 

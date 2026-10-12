@@ -6,15 +6,19 @@ import { normalizeError } from '../errors/normalize-error.js'
  */
 export function abortableDelay(milliseconds: number, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return Promise.reject(normalizeError(signal.reason))
-  return new Promise<void>((resolve, reject) => {
-    const onAbort = (): void => {
+  /** 等待到期或被 abort 中止的 executor：定时器 unref，落定或中止后解绑监听。 */
+  return new Promise<void>(function waitForDelayOrAbort(resolve, reject): void {
+    /** 取消：清掉定时器并以上游原因拒绝，避免等待方被定时器提前唤醒。 */
+    function onAbort(): void {
       clearTimeout(timeout)
       reject(normalizeError(signal.reason))
     }
-    const timeout = setTimeout((): void => {
+    /** 到期：先解绑取消监听再兑现。 */
+    function resolveWhenDue(): void {
       signal.removeEventListener('abort', onAbort)
       resolve()
-    }, milliseconds)
+    }
+    const timeout = setTimeout(resolveWhenDue, milliseconds)
     timeout.unref()
     signal.addEventListener('abort', onAbort, { once: true })
   })

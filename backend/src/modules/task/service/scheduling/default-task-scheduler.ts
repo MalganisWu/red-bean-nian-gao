@@ -163,8 +163,11 @@ function isLockConflict(value: unknown): boolean {
 }
 
 function waitUninterruptibly(milliseconds: number): Promise<'timeout'> {
-  return new Promise<'timeout'>((resolve) => {
+  /** executor：挂一次性定时器，到点以 'timeout' 兑现；定时器 unref 以免阻止进程退出。 */
+  function scheduleTimeout(resolve: (value: 'timeout') => void): void {
     const timeout = setTimeout((): void => resolve('timeout'), milliseconds)
     timeout.unref()
-  })
+  }
+
+  return new Promise<'timeout'>(scheduleTimeout)
 }

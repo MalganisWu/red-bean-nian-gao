@@ -1,5 +1,5 @@
 import { API_ROUTES, type ApiRouteDefinition } from '@red-bean/api-contract'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, RouteOptions } from 'fastify'
 
 type RouteCatalog = Readonly<Record<string, ApiRouteDefinition>>
 
@@ -21,13 +21,7 @@ export function routeCatalogChecker(
   expected: RouteCatalog = API_ROUTES
 ): RouteCatalogChecker {
   const registered = new Map<string, string>()
-  server.addHook('onRoute', (options): void => {
-    const methods = Array.isArray(options.method) ? options.method : [options.method]
-    for (const method of methods) {
-      if (method === 'HEAD') continue // Fastify 为 GET 自动补 HEAD，非业务路由
-      registered.set(`${method} ${options.url}`, options.url)
-    }
-  })
+  server.addHook('onRoute', (options): void => collectRegisteredRoute(options, registered))
 
   return {
     verify(): void {
@@ -57,6 +51,15 @@ export function routeCatalogChecker(
 /** 校验已注册完成的服务器：便捷入口，等价于"先收集、后 verify"。 */
 export function verifyRouteCatalog(server: FastifyInstance): void {
   routeCatalogChecker(server).verify()
+}
+
+/** 把一条已注册路由收进对账表；HEAD 由 GET 自动派生，不按业务路由统计。 */
+function collectRegisteredRoute(options: RouteOptions, registered: Map<string, string>): void {
+  const methods = Array.isArray(options.method) ? options.method : [options.method]
+  for (const method of methods) {
+    if (method === 'HEAD') continue // Fastify 为 GET 自动补 HEAD，非业务路由
+    registered.set(`${method} ${options.url}`, options.url)
+  }
 }
 
 function splitKey(key: string): readonly [string, string] {

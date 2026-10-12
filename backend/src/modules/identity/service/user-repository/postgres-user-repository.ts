@@ -124,13 +124,7 @@ export class PostgresUserRepository implements UserRepository {
         [limit, offset],
         signal
       )
-      const parsed = result.rows.map((row: unknown): z.infer<typeof userListRowSchema> => {
-        const validation = userListRowSchema.safeParse(row)
-        if (!validation.success) {
-          throw new Error('invalid users row', { cause: validation.error })
-        }
-        return validation.data
-      })
+      const parsed = result.rows.map(parseUserListRow)
       return {
         users: parsed.map(toUser),
         total: parsed[0]?.total_count ?? 0,
@@ -161,6 +155,15 @@ export class PostgresUserRepository implements UserRepository {
       throw contextualError(errorContext, cause)
     }
   }
+}
+
+/** 校验单条用户列表行；任一行不符合 schema 即抛错，坏行不会被静默丢弃。 */
+function parseUserListRow(row: unknown): z.infer<typeof userListRowSchema> {
+  const validation = userListRowSchema.safeParse(row)
+  if (!validation.success) {
+    throw new Error('invalid users row', { cause: validation.error })
+  }
+  return validation.data
 }
 
 function isPostgresUniqueViolation(cause: unknown): boolean {

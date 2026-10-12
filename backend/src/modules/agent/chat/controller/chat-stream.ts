@@ -89,21 +89,28 @@ async function nextOrHeartbeat(
 ): Promise<NextOrHeartbeat> {
   let timer: ReturnType<typeof setTimeout> | undefined
   let onDisconnect: (() => void) | undefined
-  const heartbeat = new Promise<NextOrHeartbeat>((resolve): void => {
+
+  /** 心跳路径：部署定时器，到点即以心跳步进结果兑现；句柄交给外层 `finally` 清理。 */
+  function armHeartbeat(resolve: (result: NextOrHeartbeat) => void): void {
     timer = setTimeout(
       (): void => resolve({ kind: STREAM_STEP_KINDS.HEARTBEAT }),
       heartbeatMilliseconds
     )
-  })
+  }
+
+  /** 断连路径：已中止则立即兑现，否则挂一次性监听，同样由外层 `finally` 摘除。 */
+  function watchDisconnect(resolve: (result: NextOrHeartbeat) => void): void {
+    if (disconnectSignal.aborted) {
+      resolve({ kind: STREAM_STEP_KINDS.DISCONNECTED })
+      return
+    }
+    onDisconnect = (): void => resolve({ kind: STREAM_STEP_KINDS.DISCONNECTED })
+    disconnectSignal.addEventListener('abort', onDisconnect, { once: true })
+  }
+
+  const heartbeat = new Promise<NextOrHeartbeat>(armHeartbeat)
   try {
-    const disconnected = new Promise<NextOrHeartbeat>((resolve): void => {
-      if (disconnectSignal.aborted) {
-        resolve({ kind: STREAM_STEP_KINDS.DISCONNECTED })
-        return
-      }
-      onDisconnect = (): void => resolve({ kind: STREAM_STEP_KINDS.DISCONNECTED })
-      disconnectSignal.addEventListener('abort', onDisconnect, { once: true })
-    })
+    const disconnected = new Promise<NextOrHeartbeat>(watchDisconnect)
     return await Promise.race([
       next.then((iteration): NextOrHeartbeat => ({ kind: STREAM_STEP_KINDS.EVENT, iteration })),
       heartbeat,

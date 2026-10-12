@@ -14,6 +14,7 @@ import {
   emptyStringToNull,
   insertExecution,
   notAuthorizedError,
+  type SerializedExecution,
   serializeExecution,
   staleExecutionError,
 } from './../task-sql.js'
@@ -136,23 +137,9 @@ export class PostgresTaskCommandRepository
   ): Promise<void> {
     try {
       const serialized = serializeExecution(execution)
-      await this.#database.transaction(signal, async (transaction: SqlExecutor): Promise<void> => {
-        const update = await transaction.query(
-          `UPDATE scheduled_tasks
-           SET is_active = $1, retry_count = $2, next_run_at = $3
-           WHERE scheduled_task_id = $4${fencingToken === undefined ? '' : ' AND execution_fencing_token = $5'}`,
-          [
-            task.isActive,
-            task.retryCount,
-            task.nextRunAt ?? null,
-            task.taskId,
-            ...(fencingToken === undefined ? [] : [fencingToken.toString()]),
-          ],
-          signal
-        )
-        if (fencingToken !== undefined && update.rowCount === 0) throw staleExecutionError()
-        await insertExecution(transaction, serialized, signal)
-      })
+      await this.#database.transaction(signal, (transaction) =>
+        updateTaskRowAndInsertExecution(transaction, task, serialized, fencingToken, signal)
+      )
     } catch (cause: unknown) {
       if (cause instanceof TaskRepositoryError) throw cause
       throw contextualError('任务执行落库事务失败', cause)
@@ -173,4 +160,32 @@ export class PostgresTaskCommandRepository
       throw contextualError('软删除任务失败', cause)
     }
   }
+}
+
+/**
+ * 事务内先按 fencing 条件更新任务行，再写入执行记录；
+ * 任一步失败都让整个事务回滚，任务状态与执行记录不会只落一半。
+ */
+async function updateTaskRowAndInsertExecution(
+  transaction: SqlExecutor,
+  task: AgentTaskDefinition,
+  serialized: SerializedExecution,
+  fencingToken: bigint | undefined,
+  signal: AbortSignal
+): Promise<void> {
+  const update = await transaction.query(
+    `UPDATE scheduled_tasks
+           SET is_active = $1, retry_count = $2, next_run_at = $3
+           WHERE scheduled_task_id = $4${fencingToken === undefined ? '' : ' AND execution_fencing_token = $5'}`,
+    [
+      task.isActive,
+      task.retryCount,
+      task.nextRunAt ?? null,
+      task.taskId,
+      ...(fencingToken === undefined ? [] : [fencingToken.toString()]),
+    ],
+    signal
+  )
+  if (fencingToken !== undefined && update.rowCount === 0) throw staleExecutionError()
+  await insertExecution(transaction, serialized, signal)
 }

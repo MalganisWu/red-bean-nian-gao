@@ -195,10 +195,7 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
   }
 
   #closeActiveRuns(): Promise<void>[] {
-    return [...this.#activeRuns.values()].map(async (run): Promise<void> => {
-      await run.handle.close('server_shutdown')
-      await run.cleanup
-    })
+    return [...this.#activeRuns.values()].map((run): Promise<void> => closeActiveRun(run))
   }
 
   async #cleanupRun(runId: string, key: string, handle: ChatRunHandle): Promise<void> {
@@ -235,22 +232,39 @@ export function selectMessagesForTurn(
   return []
 }
 
+/** 关停单个活动运行：先关句柄再等它自己的清理落地。 */
+async function closeActiveRun(run: ActiveRun): Promise<void> {
+  await run.handle.close('server_shutdown')
+  await run.cleanup
+}
+
 function raceWithAbort(operation: Promise<void>, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return Promise.reject(abortReason(signal))
-  return new Promise<void>((resolve, reject): void => {
+
+  /**
+   * executor：operation 的落地与 signal 的中止谁先到谁兑现；
+   * 任一条路径先到都摘掉中止监听，不在调用方传进来的 signal 上留下监听器。
+   */
+  function settleAgainstAbort(resolve: () => void, reject: (reason?: unknown) => void): void {
     const onAbort = (): void => reject(abortReason(signal))
     signal.addEventListener('abort', onAbort, { once: true })
-    void operation.then(
-      (): void => {
-        signal.removeEventListener('abort', onAbort)
-        resolve()
-      },
-      (cause: unknown): void => {
-        signal.removeEventListener('abort', onAbort)
-        reject(normalizeError(cause))
-      }
-    )
-  })
+
+    /** operation 成功落地：摘掉中止监听并放行等待。 */
+    function onResolved(): void {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }
+
+    /** operation 失败落地：摘掉中止监听并透传归一化错误。 */
+    function onRejected(cause: unknown): void {
+      signal.removeEventListener('abort', onAbort)
+      reject(normalizeError(cause))
+    }
+
+    void operation.then(onResolved, onRejected)
+  }
+
+  return new Promise<void>(settleAgainstAbort)
 }
 
 function abortReason(signal: AbortSignal): Error {

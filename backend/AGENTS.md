@@ -116,6 +116,12 @@ Fastify 解耦的用例签名，并负责 wire DTO 投影和 HTTP 应用错误�
   Repository、Adapter、ObjectStorage 或 serializer helper。
 - Routes 100 行、Controller 200 行、主 Service 250 行、Adapter 300 行和单个测试 400 行为职责审查触发线，
   不是机械失败线；超限项必须自然拆分或在相邻模块文档记录保留理由。
+  - 现状（2026-10-13 记录）：`modules/**/controller/*.routes.ts` 在端点 handler 按「函数与流程可读性」
+    具名化后普遍超线（如 `task.routes.ts` 271、`identity.routes.ts` 219、`storage.routes.ts` 188，
+    改写前分别为 204/163/149）。**评估结论：保留，暂不拆分。** 理由是这些文件的固有规模来自端点数量，
+    handler 抽到同文件模块级后，注册处退化成一张端点清单、链路指纹注释与 handler 同处一文件，
+    拆到 `*-route-handlers.ts` 反而让「注册 → 链路 → 实现」多一次跨文件跳转。若端点继续增长，
+    按业务面拆分为独立 route 文件而不是把 handler 抽走。
 
 人工追踪构造注入时固定使用：`依赖字段 → Port 定义 → implements 搜索 → 对应 *.module.ts 中的 new →
 实现方法`；只有跨 Module 连接才继续查看 `composition-root.ts`。调用处没有 `new` 是构造注入的结果，

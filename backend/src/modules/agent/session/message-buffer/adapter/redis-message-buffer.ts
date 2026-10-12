@@ -191,31 +191,34 @@ function generationKey(sessionId: string, generation: MessageBufferGeneration): 
  * 缺失的可选字段用 `optionalField` 处理，保证「缺席」与「显式 undefined」在结果里是同一种表示。
  */
 function decodeMessages(values: readonly string[]): readonly AgentMessage[] {
-  return values.map((value): AgentMessage => {
-    let parsedJson: unknown
-    try {
-      parsedJson = JSON.parse(value)
-    } catch (cause: unknown) {
-      throw new Error('反序列化消息失败', { cause })
-    }
-    const parsed = rawMessageSchema.safeParse(parsedJson)
-    if (!parsed.success) throw new Error('反序列化消息失败', { cause: parsed.error })
-    const toolCalls: readonly AgentToolCall[] | undefined = parsed.data.tool_calls?.map(
-      (call): AgentToolCall => ({
-        ...optionalField('index', call.index),
-        id: call.id,
-        type: call.type,
-        function: call.function,
-      })
-    )
-    return {
-      role: parsed.data.role,
-      content: parsed.data.content,
-      ...optionalField('toolCalls', toolCalls),
-      ...optionalField('toolCallId', parsed.data.tool_call_id),
-      ...optionalField('name', parsed.data.name),
-    }
-  })
+  return values.map((value): AgentMessage => decodeMessage(value))
+}
+
+/** 反序列化单条消息并逐字段校验；任一步失败都以同一条中文错误抛出。 */
+function decodeMessage(value: string): AgentMessage {
+  let parsedJson: unknown
+  try {
+    parsedJson = JSON.parse(value)
+  } catch (cause: unknown) {
+    throw new Error('反序列化消息失败', { cause })
+  }
+  const parsed = rawMessageSchema.safeParse(parsedJson)
+  if (!parsed.success) throw new Error('反序列化消息失败', { cause: parsed.error })
+  const toolCalls: readonly AgentToolCall[] | undefined = parsed.data.tool_calls?.map(
+    (call): AgentToolCall => ({
+      ...optionalField('index', call.index),
+      id: call.id,
+      type: call.type,
+      function: call.function,
+    })
+  )
+  return {
+    role: parsed.data.role,
+    content: parsed.data.content,
+    ...optionalField('toolCalls', toolCalls),
+    ...optionalField('toolCallId', parsed.data.tool_call_id),
+    ...optionalField('name', parsed.data.name),
+  }
 }
 
 function contextualError(context: string, cause: unknown): Error {

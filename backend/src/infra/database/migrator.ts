@@ -486,18 +486,9 @@ export class PostgresMigrator implements MigrationRunnerPort {
     const appliedByName = new Map(
       applied.map((item): readonly [string, AppliedMigration] => [item.name, item])
     )
-    return this.#migrations.map((migration): MigrationStatus => {
-      const history = appliedByName.get(migration.name)
-      return history === undefined
-        ? { name: migration.name, comment: migration.comment, status: 'pending' }
-        : {
-            name: migration.name,
-            comment: migration.comment,
-            status: 'applied',
-            groupId: history.groupId,
-            migratedAt: history.migratedAt,
-          }
-    })
+    return this.#migrations.map((migration): MigrationStatus =>
+      toMigrationStatus(migration, appliedByName)
+    )
   }
 
   public async up(signal: AbortSignal): Promise<MigrationGroup> {
@@ -507,26 +498,34 @@ export class PostgresMigrator implements MigrationRunnerPort {
      * 先读后锁的话，两个实例可能读到同一份历史，各自算出同一批 pending，然后双双执行。
      * 锁在整个事务结束时自动释放（pg_advisory_xact_lock 的语义）。
      */
-    return this.#database.transaction(signal, async (transaction): Promise<MigrationGroup> => {
-      await acquireMigrationLock(transaction, signal)
-      const applied = await this.#loadApplied(transaction, signal)
-      // 已应用的是冻结目录的前缀（validateHistory 保证），所以「剩下没跑的」就是后缀切片。
-      const pending = this.#migrations.slice(applied.length)
-      if (pending.length === 0) return { groupId: 0, migrationNames: [] }
-      // 分组号取「历史里最大的 + 1」，因此一次 up 是一个可以整体回滚的单位。
-      const groupId =
-        applied.reduce((highest, item): number => Math.max(highest, item.groupId), 0) + 1
-      for (const migration of pending) {
-        await runMigrationStatements(transaction, migration, 'up', signal)
-        await transaction.query(
-          `INSERT INTO ${HISTORY_TABLE} (name, group_id, migrated_at)
+    return this.#database.transaction(signal, (transaction): Promise<MigrationGroup> =>
+      this.#applyPendingMigrations(transaction, signal)
+    )
+  }
+
+  /** 在事务内按目录顺序应用尚未执行的迁移，并记录本次分组号。 */
+  async #applyPendingMigrations(
+    transaction: SqlExecutor,
+    signal: AbortSignal
+  ): Promise<MigrationGroup> {
+    await acquireMigrationLock(transaction, signal)
+    const applied = await this.#loadApplied(transaction, signal)
+    // 已应用的是冻结目录的前缀（validateHistory 保证），所以「剩下没跑的」就是后缀切片。
+    const pending = this.#migrations.slice(applied.length)
+    if (pending.length === 0) return { groupId: 0, migrationNames: [] }
+    // 分组号取「历史里最大的 + 1」，因此一次 up 是一个可以整体回滚的单位。
+    const groupId =
+      applied.reduce((highest, item): number => Math.max(highest, item.groupId), 0) + 1
+    for (const migration of pending) {
+      await runMigrationStatements(transaction, migration, 'up', signal)
+      await transaction.query(
+        `INSERT INTO ${HISTORY_TABLE} (name, group_id, migrated_at)
            VALUES ($1, $2, CURRENT_TIMESTAMP)`,
-          [migration.name, groupId],
-          signal
-        )
-      }
-      return { groupId, migrationNames: pending.map((migration): string => migration.name) }
-    })
+        [migration.name, groupId],
+        signal
+      )
+    }
+    return { groupId, migrationNames: pending.map((migration): string => migration.name) }
   }
 
   /**
@@ -536,27 +535,35 @@ export class PostgresMigrator implements MigrationRunnerPort {
    */
   public async down(signal: AbortSignal): Promise<MigrationGroup> {
     await this.initialize(signal)
-    return this.#database.transaction(signal, async (transaction): Promise<MigrationGroup> => {
-      await acquireMigrationLock(transaction, signal)
-      const applied = await this.#loadApplied(transaction, signal)
-      if (applied.length === 0) return { groupId: 0, migrationNames: [] }
-      const groupId = applied.reduce((highest, item): number => Math.max(highest, item.groupId), 0)
-      // 用 Set 存名字再过滤冻结目录，是为了让回滚顺序由**目录定义顺序**决定，
-      // 而不是由历史表的行序决定；两者一致，但前者才是权威。
-      const names = new Set(
-        applied.filter((item): boolean => item.groupId === groupId).map((item): string => item.name)
+    return this.#database.transaction(signal, (transaction): Promise<MigrationGroup> =>
+      this.#rollbackLatestGroup(transaction, signal)
+    )
+  }
+
+  /** 在事务内按目录定义的逆序回滚最近一个分组。 */
+  async #rollbackLatestGroup(
+    transaction: SqlExecutor,
+    signal: AbortSignal
+  ): Promise<MigrationGroup> {
+    await acquireMigrationLock(transaction, signal)
+    const applied = await this.#loadApplied(transaction, signal)
+    if (applied.length === 0) return { groupId: 0, migrationNames: [] }
+    const groupId = applied.reduce((highest, item): number => Math.max(highest, item.groupId), 0)
+    // 用 Set 存名字再过滤冻结目录，是为了让回滚顺序由**目录定义顺序**决定，
+    // 而不是由历史表的行序决定；两者一致，但前者才是权威。
+    const names = new Set(
+      applied.filter((item): boolean => item.groupId === groupId).map((item): string => item.name)
+    )
+    const rollback = this.#migrations.filter((item): boolean => names.has(item.name)).toReversed()
+    for (const migration of rollback) {
+      await runMigrationStatements(transaction, migration, 'down', signal)
+      await transaction.query(
+        `DELETE FROM ${HISTORY_TABLE} WHERE name = $1`,
+        [migration.name],
+        signal
       )
-      const rollback = this.#migrations.filter((item): boolean => names.has(item.name)).toReversed()
-      for (const migration of rollback) {
-        await runMigrationStatements(transaction, migration, 'down', signal)
-        await transaction.query(
-          `DELETE FROM ${HISTORY_TABLE} WHERE name = $1`,
-          [migration.name],
-          signal
-        )
-      }
-      return { groupId, migrationNames: rollback.map((migration): string => migration.name) }
-    })
+    }
+    return { groupId, migrationNames: rollback.map((migration): string => migration.name) }
   }
 
   /** 按写入顺序（`id ASC`）读出历史；顺序本身就是信息，`validateHistory` 依赖它。 */
@@ -609,6 +616,23 @@ function validateCatalog(migrations: readonly Migration[]): readonly Migration[]
     previous = item.name
   }
   return migrations
+}
+
+/** 把一条目录迁移与已应用历史合并成对外状态；历史里没有就是 pending。 */
+function toMigrationStatus(
+  migration: Migration,
+  appliedByName: ReadonlyMap<string, AppliedMigration>
+): MigrationStatus {
+  const history = appliedByName.get(migration.name)
+  return history === undefined
+    ? { name: migration.name, comment: migration.comment, status: 'pending' }
+    : {
+        name: migration.name,
+        comment: migration.comment,
+        status: 'applied',
+        groupId: history.groupId,
+        migratedAt: history.migratedAt,
+      }
 }
 
 function parseHistoryRow(row: unknown): AppliedMigration {

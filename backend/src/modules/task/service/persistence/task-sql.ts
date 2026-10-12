@@ -89,7 +89,8 @@ export const TASK_LIST_SELECT = `
   ) AS latest ON TRUE
 `
 
-interface SerializedExecution {
+/** 执行记录的落库形态；由 `serializeExecution` 产出，`insertExecution` 消费。 */
+export interface SerializedExecution {
   readonly execution: AgentTaskExecution
   readonly displayMessages: string
 }

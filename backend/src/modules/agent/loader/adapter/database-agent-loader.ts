@@ -203,10 +203,7 @@ export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
       signal
     )
     const byId = new Map(
-      result.rows.map((row: unknown): readonly [string, CoreAgentRow] => {
-        const parsed = parseRow(coreAgentRowSchema, row, 'core_agents child')
-        return [parsed.agent_id, parsed]
-      })
+      result.rows.map((row: unknown): readonly [string, CoreAgentRow] => toCoreAgentEntry(row))
     )
     const definitions: SubAgentToolDefinition[] = []
     for (const agentId of agentIds) {
@@ -222,6 +219,12 @@ export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
     }
     return definitions
   }
+}
+
+/** 把一行 `core_agents` 原始数据校验后转成按 agent_id 索引的 Map 条目。 */
+function toCoreAgentEntry(row: unknown): readonly [string, CoreAgentRow] {
+  const parsed = parseRow(coreAgentRowSchema, row, 'core_agents child')
+  return [parsed.agent_id, parsed]
 }
 
 function parseModelParams(value: Readonly<Record<string, unknown>>): AgentModelParams {

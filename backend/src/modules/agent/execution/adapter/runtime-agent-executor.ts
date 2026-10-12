@@ -82,7 +82,7 @@ export class RuntimeAgentExecutor implements AgentExecutionPort {
               toRuntimeMessages(command.recoveryMessages ?? [])
             ),
           }
-    const run = async (): Promise<AgentExecutionOutcome> => {
+    async function run(): Promise<AgentExecutionOutcome> {
       try {
         // resume 分支才携带 interruptId/response 语义（回答询问卡片/中断恢复）；
         // run 分支传 messages，且仅在无显式 state 但有 recovery 时把增量消息作为 history。

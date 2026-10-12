@@ -1,5 +1,10 @@
 import { API_ROUTES } from '@red-bean/api-contract'
-import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify'
+import type {
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+  preHandlerAsyncHookHandler,
+} from 'fastify'
 
 import { bindRoute } from '../../../../shared/http/bind-route.js'
 import { authenticatedPrincipal } from '../../../../shared/http/authenticated-request.js'
@@ -21,36 +26,50 @@ export function registerSessionRoutes(
   // 链路：auth → controller.list → 信封
   bindRoute(server, API_ROUTES.SESSIONS, {
     auth: authenticate,
-    handler: async (request, reply): Promise<void> => {
-      const { cursor, limit } = parseSessionPagination(request.query)
-      await sendOk(
-        reply,
-        envelope(
-          await controller.list(
-            authenticatedPrincipal(request).userId,
-            cursor,
-            limit,
-            requestAbortSignal(request)
-          )
-        )
-      )
-    },
+    handler: (request, reply) => listSessions(controller, request, reply),
   })
   // GET /api/sessions/:id → SessionController.detail
   // 链路：auth → controller.detail → 信封
   bindRoute(server, API_ROUTES.SESSION, {
     auth: authenticate,
-    handler: async (request, reply): Promise<void> => {
-      await sendOk(
-        reply,
-        envelope(
-          await controller.detail(
-            authenticatedPrincipal(request).userId,
-            parseSessionId(request.params),
-            requestAbortSignal(request)
-          )
-        )
-      )
-    },
+    handler: (request, reply) => getSessionDetail(controller, request, reply),
   })
+}
+
+/** GET /api/sessions：按游标分页列出当前用户的会话。 */
+async function listSessions(
+  controller: SessionController,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  const { cursor, limit } = parseSessionPagination(request.query)
+  await sendOk(
+    reply,
+    envelope(
+      await controller.list(
+        authenticatedPrincipal(request).userId,
+        cursor,
+        limit,
+        requestAbortSignal(request)
+      )
+    )
+  )
+}
+
+/** GET /api/sessions/:id：返回单个会话详情。 */
+async function getSessionDetail(
+  controller: SessionController,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await sendOk(
+    reply,
+    envelope(
+      await controller.detail(
+        authenticatedPrincipal(request).userId,
+        parseSessionId(request.params),
+        requestAbortSignal(request)
+      )
+    )
+  )
 }
