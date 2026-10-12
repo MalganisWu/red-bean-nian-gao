@@ -208,7 +208,14 @@ export class TaskExecutionService {
     await this.#handleSuccess(state, result, signal)
   }
 
-  /** 失败分支：未耗尽重试则顺延下次运行；否则写失败执行记录并结束任务。 */
+  /**
+   * 失败分支，两条出路取决于重试预算是否耗尽：
+   * - **还有预算**：只更新重试计数与下次运行时间，**不写执行记录**——这一轮不算一次「执行」，
+   *   轨迹里不该出现一串只有失败没有结果的记录。同时清掉恢复缓冲，让下次从干净状态开始。
+   * - **预算耗尽**：写一条失败执行记录并投递。此时按任务类型分流：
+   *   周期任务**把 retryCount 归零**再排下一次 cron——否则它会永远卡在耗尽状态、
+   *   每次触发都直接失败；一次性任务则关停。
+   */
   async #handleFailure(
     state: ScheduledTaskRunState,
     result: BackgroundAgentExecutionResult | undefined,
@@ -359,6 +366,11 @@ function requireFencingToken(lease: ScheduledTaskLease): bigint {
   return lease.fencingToken
 }
 
+/**
+ * 失败时的展示消息：把失败文案放在最前，**保留**原有的推理与工具组 section 在文案之后。
+ * 保留过程是有意的——用户需要看到「它尝试做了什么才失败的」，
+ * 只留一句「任务失败」会让排障变成猜谜。只截取 reason/tool_group 两类，去掉会与失败文案冲突的内容 section。
+ */
 function failureDisplayMessage(
   messages: readonly DisplayMessage[],
   notice: string,
@@ -397,6 +409,14 @@ function translateFailureStatus(
   }
 }
 
+/**
+ * 算下一次触发时间。`mode: '5-part'` 固定为五位 cron（分 时 日 月 周），
+ * 避免库对六位写法的歧义解释。
+ *
+ * 表达式非法或算不出下次时间时，**兜底为 1 小时后**而不是抛错：
+ * 抛错会让这次执行失败、任务卡在「永远不会再触发」的状态；
+ * 顺延一小时至少能让它继续被调度，运维还有机会从执行记录里发现问题。
+ */
 function nextCronRun(expression: string, timezone: string, now: Date): Date {
   try {
     const next = new Cron(expression, { timezone, paused: true, mode: '5-part' }).nextRun(now)
@@ -407,6 +427,12 @@ function nextCronRun(expression: string, timezone: string, now: Date): Date {
   }
 }
 
+/**
+ * 落库前确认 lease 仍在手上。
+ * `Promise.race([lost, Promise.resolve(undefined)])` 只判断**是否已经丢失**，
+ * 不等它将来可能丢失——这个 race 立刻就有结果：丢失的 Promise 已 settle 则拿到 Error，
+ * 否则拿到 undefined。若直接 `await state.leaseLost`，一次成功的执行会被永久挂在这里。
+ */
 async function assertLeaseHeld(state: ScheduledTaskRunState): Promise<void> {
   if (state.leaseLost === undefined) return
   const lost = await Promise.race([state.leaseLost, Promise.resolve(undefined)])

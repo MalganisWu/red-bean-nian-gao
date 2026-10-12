@@ -70,6 +70,10 @@ const PARAMETERS: AgentJsonObject = Object.freeze({
  * sys_scheduled_task_manage 工具：Agent 通过该工具创建、查询、更新和删除定时任务。
  * 由 task.module.ts 组装并注册进 Tool Registry；时间语义（时区、cron 与 run_at）统一在本类校验，
  * 持久化委托注入的 Task 仓储边界。
+ *
+ * **所有分支都先取 `currentScope(context)`**：工具参数里的 `task_id` 完全由模型提供，
+ * 是不可信输入，因此每次操作都必须以「当前用户 + 当前会话」为作用域去查，
+ * 而不是拿 task_id 直接读写。否则模型只要报出一个别人的 ID 就能越权操作。
  */
 export class ScheduledTaskManageTool implements AgentTool {
   public readonly name = SCHEDULED_TASK_MANAGE_TOOL_NAME
