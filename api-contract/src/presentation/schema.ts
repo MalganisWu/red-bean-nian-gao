@@ -124,6 +124,7 @@ function isDisplayMessageMeta(value: unknown): value is DisplayMessageMetaDto {
   )
 }
 
+/** 持久化展示消息的守卫；`sections` 与 `meta` 可选，但给了就必须逐层合法。 */
 export function isPersistedDisplayMessage(value: unknown): value is PersistedDisplayMessageDto {
   if (
     !isRecord(value) ||

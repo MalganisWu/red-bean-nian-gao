@@ -14,4 +14,5 @@ export const SSE_EVENT_TYPES = {
   AGENT_EVENT: 'agent_event',
 } as const
 
+/** SSE 事件名的字面量联合；与 `SSE_EVENT_TYPES` 的取值一一对应。 */
 export type SSEEventType = (typeof SSE_EVENT_TYPES)[keyof typeof SSE_EVENT_TYPES]

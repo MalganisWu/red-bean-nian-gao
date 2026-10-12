@@ -13,6 +13,7 @@ export const objectPathSchema = z.object({
     ),
 })
 
+/** 预签名请求体校验；`expires` 可选，给了必须是整数秒。 */
 export const presignRequestSchema: z.ZodType<PresignRequestDto> = z.object({
   key: z.string().min(1),
   expires: z.number().int().optional(),

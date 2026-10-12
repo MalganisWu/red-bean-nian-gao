@@ -1,5 +1,6 @@
 import type { QuestionAnswerDto, QuestionDto } from '../chat/dto.js'
 
+/** 卡片 section 的持久化载荷；`answers` 可为 null（尚未作答）或缺省。 */
 export interface CardSectionDataDto {
   readonly interaction_id: string
   readonly status: 'pending' | 'answered' | 'refused'
@@ -7,6 +8,7 @@ export interface CardSectionDataDto {
   readonly answers?: Readonly<Record<string, QuestionAnswerDto>> | null | undefined
 }
 
+/** 工具调用的持久化投影；`status` 五态覆盖运行中、成功、失败、取消与未闭合。 */
 export interface PersistedToolCardDto {
   readonly callId: string
   readonly name: string
@@ -20,6 +22,7 @@ export interface PersistedToolCardDto {
   readonly startedAtMs?: number | undefined
 }
 
+/** reason section 里的一项：要么是一段思考文本，要么是一次工具调用。 */
 export interface ReasonItemDto {
   readonly itemType: 'step' | 'tool'
   readonly index?: number | undefined
@@ -27,6 +30,7 @@ export interface ReasonItemDto {
   readonly tool?: PersistedToolCardDto | undefined
 }
 
+/** 子 Agent section 的载荷；`status` 可缺省（早期写入的记录没有这个字段）。 */
 export interface PersistedSubAgentSectionDataDto {
   readonly agent_id: string
   readonly agent_name: string
@@ -38,6 +42,7 @@ export interface PersistedSubAgentSectionDataDto {
   readonly parent_call_id?: string | undefined
 }
 
+/** 展示消息中 section 的可辨识联合；`type` 决定其余字段，消费方必须先分支再取值。 */
 export type PersistedMessageSectionDto =
   | {
       readonly type: 'reason'
@@ -64,6 +69,7 @@ export type PersistedMessageSectionDto =
       readonly timestamp: number
     }
 
+/** 消息由定时任务产生时的来源信息；`completed_at` 可缺省（执行尚未结束）。 */
 export interface ScheduledTaskMetaDto {
   readonly task_id: string
   readonly task_name: string
@@ -73,6 +79,7 @@ export interface ScheduledTaskMetaDto {
   readonly completed_at?: number | undefined
 }
 
+/** 展示元信息；`process_status` 目前只有 `cancelled` 一个取值，用于标记被中断的过程块。 */
 export interface DisplayMessageMetaDto {
   readonly scheduled_task?: ScheduledTaskMetaDto | undefined
   readonly run_started_at?: number | undefined

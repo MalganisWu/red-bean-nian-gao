@@ -1,3 +1,7 @@
+/*
+ * Task 模块的请求 schema 与响应类型守卫；字段名与 `dto.ts` 严格对应。
+ * 守卫只在客户端解析服务端响应时使用，因此失败一律判假，不做抛错与兼容填充。
+ */
 import type {
   ExecutionViewStateDto,
   ExecutionViewStatePatchDto,
@@ -22,9 +26,13 @@ import {
 } from '../common/schema.js'
 import { isPersistedDisplayMessage } from '../presentation/schema.js'
 
+/** 任务 ID 的路径参数；空串被拒。 */
 export const taskParamsSchema = z.object({ id: z.string().min(1) })
+/** 任务 ID + 执行 ID 的组合路径参数，两者都必须非空。 */
 export const executionParamsSchema = z.object({ id: z.string().min(1), eid: z.string().min(1) })
+/** 更新任务请求体；只有 `is_active` 一个字段。 */
 export const updateTaskSchema: z.ZodType<UpdateTaskDto> = z.object({ is_active: z.boolean() })
+/** 偏好补丁校验；`mark_seen` 只接受字面量 `true`——它表达「执行标记为已读」这个动作，不是开关。 */
 export const executionViewStatePatchSchema: z.ZodType<ExecutionViewStatePatchDto> = z
   .object({
     mark_seen: z.literal(true).optional(),
@@ -39,6 +47,7 @@ function isTaskStatus(value: unknown): value is TaskExecutionStatus {
   return ['pending', 'running', 'completed', 'failed'].includes(String(value))
 }
 
+/** 任务实体的守卫；两个时间字段可选，其余全部必填。 */
 export function isTask(value: unknown): value is TaskDto {
   if (
     !isRecord(value) ||
@@ -69,6 +78,7 @@ function isTaskExecutionSummary(value: unknown): value is TaskExecutionSummaryDt
   )
 }
 
+/** 列表项的守卫：在任务实体之上要求 `latest_execution` 键存在（值可为 null）。 */
 export function isTaskListItem(value: unknown): value is TaskListItemDto {
   return (
     isRecord(value) &&
@@ -78,12 +88,14 @@ export function isTaskListItem(value: unknown): value is TaskListItemDto {
   )
 }
 
+/** 任务列表页的守卫；逐项过 `isTaskListItem`。 */
 export function isTaskList(value: unknown): value is TaskListDto {
   return (
     isRecord(value) && isArrayOf(value['tasks'], isTaskListItem) && isString(value['next_cursor'])
   )
 }
 
+/** 执行记录的守卫；展示消息逐条过 `isPersistedDisplayMessage`。 */
 export function isTaskExecution(value: unknown): value is TaskExecutionDto {
   return (
     isRecord(value) &&
@@ -101,6 +113,7 @@ export function isTaskExecution(value: unknown): value is TaskExecutionDto {
   )
 }
 
+/** 执行记录列表页的守卫；逐条过 `isTaskExecution`。 */
 export function isTaskExecutionList(value: unknown): value is TaskExecutionListDto {
   return (
     isRecord(value) &&
@@ -109,6 +122,7 @@ export function isTaskExecutionList(value: unknown): value is TaskExecutionListD
   )
 }
 
+/** 偏好行的守卫；`collapsed_override` 只接受 null 或布尔。 */
 export function isExecutionViewState(value: unknown): value is ExecutionViewStateDto {
   return (
     isRecord(value) &&
