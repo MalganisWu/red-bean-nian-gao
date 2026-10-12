@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify'
 
 type RouteCatalog = Readonly<Record<string, ApiRouteDefinition>>
 
+/** 路由目录对账句柄；只对账 method+path，认证钩子的一致性由 `bindRoute` 自己断言。 */
 export interface RouteCatalogChecker {
   /** 在全部路由注册完成后调用；目录与实际注册表不一致时抛错（fail-fast）。 */
   verify(): void

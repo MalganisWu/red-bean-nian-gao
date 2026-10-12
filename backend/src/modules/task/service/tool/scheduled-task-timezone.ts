@@ -2,6 +2,7 @@ import { Cron } from 'croner'
 
 import { contextualError } from './../error/contextual-error.js'
 
+/** 解析 run_at：接受 RFC3339，也接受无偏移的 `YYYY-MM-DD HH:mm:ss`（后者按给定时区解释，不是 UTC）。 */
 export function parseRunAt(value: string, timezone: string): Date {
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(value)) {
     const parsed = new Date(value)
@@ -28,6 +29,7 @@ export function parseRunAt(value: string, timezone: string): Date {
   )
 }
 
+/** 算下一个 cron 触发时刻；只接受 5 字段表达式，带秒/年字段的会被 `croner` 拒掉并转成中文提示。 */
 export function nextRecurring(expression: string, timezone: string, now: Date): Date {
   try {
     const cron = new Cron(expression, { timezone, paused: true, mode: '5-part' })
@@ -42,6 +44,7 @@ export function nextRecurring(expression: string, timezone: string, now: Date): 
   }
 }
 
+/** 用 `Intl` 试构造一次来校验时区名；不维护清单，因此永远与运行时的 tzdata 一致。 */
 export function validateTimezone(timezone: string): void {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date(0))

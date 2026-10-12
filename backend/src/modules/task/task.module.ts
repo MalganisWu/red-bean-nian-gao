@@ -59,6 +59,7 @@ export interface TaskPersistence {
   createModule(options: TaskModuleAssemblyOptions): TaskModule
 }
 
+/** Task Module 的输出面：投递队列、调度器、两个用例服务与需随进程收束的后台任务。 */
 export interface TaskModule {
   readonly deliveryQueue: TaskResultDeliveryPort
   readonly scheduler: TaskSchedulerPort

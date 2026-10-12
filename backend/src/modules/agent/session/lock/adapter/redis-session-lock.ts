@@ -19,6 +19,7 @@ const DEFAULT_RENEW_INTERVAL_MILLISECONDS = DEFAULT_TTL_MILLISECONDS / 3
  */
 let fallbackFencingToken = BigInt(Date.now()) * 1_000_000n
 
+/** 锁参数；`nextFencingToken` 与 `nonce` 可注入，测试因此能产出确定的围栏值与随机串。 */
 export interface RedisSessionLockRegistryOptions {
   readonly ttlMilliseconds?: number
   readonly renewIntervalMilliseconds?: number

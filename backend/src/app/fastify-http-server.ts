@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 
 import type { HttpServer } from './server-application.js'
 
+/** 监听参数；`port` 允许字符串是因为它直接来自配置层的字符串取值。 */
 export interface FastifyHttpServerOptions {
   readonly host: string
   readonly port: string | number

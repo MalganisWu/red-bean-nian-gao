@@ -1,7 +1,9 @@
 import type { MigrationRunnerPort } from '../infra/database/migrator.js'
 
+/** migrate CLI 的三个子命令。 */
 export type MigrationCommand = 'up' | 'down' | 'status'
 
+/** 解析子命令；缺省是 `up`，未知值直接抛错并给出用法——拼错一个字母就默默跑 up 太危险。 */
 export function parseMigrationCommand(value: string | undefined): MigrationCommand {
   const command = value ?? 'up'
   if (command === 'up' || command === 'down' || command === 'status') return command

@@ -4,6 +4,7 @@ import { serializeDisplayMessage } from '../../presentation/presenter/display-me
 import type { Session, SessionSummary } from '../model/session.js'
 import type { SessionDetailDto, SessionSummaryDto } from './session.dto.js'
 
+/** 会话摘要 → wire DTO；时间转 ISO，字段名转 snake_case。 */
 export function toSessionSummaryDto(summary: SessionSummary): SessionSummaryDto {
   return {
     id: summary.id,
@@ -13,6 +14,7 @@ export function toSessionSummaryDto(summary: SessionSummary): SessionSummaryDto 
   }
 }
 
+/** 会话详情 → wire DTO；每条消息都过契约校验，不符合就抛错，而不是尽力输出一个残缺结构。 */
 export function toSessionDetailDto(session: Session): SessionDetailDto {
   return {
     id: session.id,

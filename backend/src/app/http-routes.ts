@@ -17,6 +17,7 @@ import {
 import { registerTaskRoutes, type TaskRouteDependencies } from '../modules/task/http-api.js'
 import { registerUserRoutes, type UserRouteDependencies } from '../modules/identity/http-api.js'
 
+/** 各 Module 输出的路由依赖绑定表；这里只出现 Port 与路由依赖类型，不出现任何实现类。 */
 export interface ApplicationRouteDependencies {
   readonly health: HealthServicePort
   readonly chat: ChatRouteDependencies

@@ -23,6 +23,7 @@ export const RUN_COMPACTION_TRIGGERS = Object.freeze({
   MANUAL: 'manual',
 } as const)
 
+/** 压缩触发来源的字面量联合；取值与 SSE compaction 事件的 `trigger` 一致。 */
 export type RunCompactionTrigger =
   (typeof RUN_COMPACTION_TRIGGERS)[keyof typeof RUN_COMPACTION_TRIGGERS]
 
@@ -36,6 +37,7 @@ export const RUN_COMPACTION_STATUSES = Object.freeze({
   INTERRUPTED: 'interrupted',
 } as const)
 
+/** 压缩终态的字面量联合；失败态必须可辨——压缩失败意味着上下文并没有收缩。 */
 export type RunCompactionStatus =
   (typeof RUN_COMPACTION_STATUSES)[keyof typeof RUN_COMPACTION_STATUSES]
 
@@ -101,6 +103,7 @@ export const RUN_TOOL_STATUSES = Object.freeze({
   INCOMPLETE: 'incomplete',
 } as const)
 
+/** 只能显式记录的两种工具状态；正常完成与失败由 `result`/`error` 推断，不写这个字段。 */
 export type RunToolStatus = (typeof RUN_TOOL_STATUSES)[keyof typeof RUN_TOOL_STATUSES]
 
 /** 一次工具调用事实：result 与 error 互斥（成功记 result，失败记 error）；status 表达挂起与打断。 */

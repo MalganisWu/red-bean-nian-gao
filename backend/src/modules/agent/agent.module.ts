@@ -50,6 +50,7 @@ export interface AgentModuleCore extends AgentTaskCapabilities {
   complete(deliveryQueue: TaskResultDeliveryPort, idGenerator: IdGenerator): AgentModule
 }
 
+/** 接回 Task 结果投递能力之后的完整 Agent Module 输出面，供 Composition Root 装配。 */
 export interface AgentModule extends AgentTaskCapabilities {
   readonly cancelRegistry: CancelRegistryPort
   readonly runService: AgentRunServicePort

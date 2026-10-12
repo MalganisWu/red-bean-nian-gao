@@ -6,6 +6,7 @@ import type {
 } from '../../execution/port/agent-executor.js'
 import type { ChildSectionCollector } from '../run/port/child-execution-lifecycle.port.js'
 
+/** 增量消息落库的回调；带上 `persistenceRevision` 是为了让这次写入也参与 CAS。 */
 export type ChildMessageSink = (
   executionId: string,
   persistenceRevision: bigint,
@@ -13,6 +14,7 @@ export type ChildMessageSink = (
   signal: AbortSignal
 ) => Promise<void>
 
+/** 造子运行事件出口的工厂；返回的 sink 会同时喂给子执行的展示收集器与父流。 */
 export type ChildStreamFactory = (
   executionId: string,
   parentCallId: string,

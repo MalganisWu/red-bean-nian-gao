@@ -1,8 +1,10 @@
+/** Identity 用例的错误码；只收「冲突」与「不存在」两类，其余失败原样上抛。 */
 export const IDENTITY_APPLICATION_ERROR_CODES = Object.freeze({
   CONFLICT: 'identity_conflict',
   NOT_FOUND: 'identity_not_found',
 } as const)
 
+/** 错误码的字面量联合。 */
 export type IdentityApplicationErrorCode =
   (typeof IDENTITY_APPLICATION_ERROR_CODES)[keyof typeof IDENTITY_APPLICATION_ERROR_CODES]
 

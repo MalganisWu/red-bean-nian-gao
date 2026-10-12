@@ -8,6 +8,7 @@ import {
   StorageApplicationError,
 } from './error/storage-application-error.js'
 
+/** 上传命令；对象 key 由本服务按 `uploads/{userId}/{时间戳}{扩展名}` 生成，调用方不参与命名。 */
 export interface UploadObjectCommand {
   readonly userId: string
   readonly filename: string
@@ -15,12 +16,14 @@ export interface UploadObjectCommand {
   readonly contents: Buffer
 }
 
+/** 预签名命令；`expiresSeconds` 缺省取 15 分钟，超过 1 小时会被拒。 */
 export interface PresignObjectCommand {
   readonly userId: string
   readonly key: string
   readonly expiresSeconds?: number | undefined
 }
 
+/** 预签名结果；`expiresSeconds` 回传实际采用的有效期，可能与请求值不同。 */
 export interface PresignObjectResult {
   readonly url: string
   readonly expiresSeconds: number

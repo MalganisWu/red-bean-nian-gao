@@ -17,6 +17,7 @@ export const SESSION_RUN_STATUSES = Object.freeze({
   EXHAUSTED: 'exhausted',
 } as const)
 
+/** run 状态的字面量联合；状态只从 `running` 单向推进到某个终态，不会回退。 */
 export type SessionRunStatus = (typeof SESSION_RUN_STATUSES)[keyof typeof SESSION_RUN_STATUSES]
 
 /** 取消归属；chat cancel 属于用户取消。 */
@@ -25,12 +26,14 @@ export const SESSION_RUN_CANCELLED_BY = Object.freeze({
   SYSTEM: 'system',
 } as const)
 
+/** 取消归属的字面量联合；用户主动取消记 `user`，系统侧（停机排空等）记 `system`。 */
 export type SessionRunCancelledBy =
   (typeof SESSION_RUN_CANCELLED_BY)[keyof typeof SESSION_RUN_CANCELLED_BY]
 
 /** run 容器 schema 版本；与 facts 内记录的版本纪律一致。 */
 export const SESSION_RUN_SCHEMA_VERSION = 1
 
+/** 除 `running` 之外的终态集合；`FinalizeSessionRunCommand` 只接受它，从类型上杜绝「终止到 running」。 */
 export type SessionRunTerminalStatus = Exclude<
   SessionRunStatus,
   (typeof SESSION_RUN_STATUSES)['RUNNING']

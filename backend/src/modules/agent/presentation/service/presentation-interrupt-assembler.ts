@@ -7,8 +7,10 @@ import type {
   PresentationContext,
 } from './display-message-collector.js'
 
+/** 展示历史在 pipeline metadata 里的键；存的是深拷贝快照，节点不应就地修改。 */
 export const DISPLAY_MESSAGES_METADATA_KEY = 'display_messages'
 
+/** 构造选项；两个可注入点分别控制时间戳来源与 section 的构造方式。 */
 export interface PresentationInterruptAssemblerOptions {
   readonly now?: PresentationClock | undefined
   readonly buildSections?: (() => AgentJsonValue) | undefined

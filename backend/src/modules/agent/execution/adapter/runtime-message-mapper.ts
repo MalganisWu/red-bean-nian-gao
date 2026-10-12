@@ -29,10 +29,12 @@ export function fromRuntimeMessage(message: RawMessage): AgentMessage {
   }
 }
 
+/** 批量入站映射；Adapter 之外不允许直接构造 `RawMessage`，SDK 形状只在这一层出现。 */
 export function toRuntimeMessages(messages: readonly AgentMessage[]): RawMessage[] {
   return messages.map(toRuntimeMessage)
 }
 
+/** 批量出站映射；SDK 消息进入产品域的唯一入口，同样是逐条新建对象。 */
 export function fromRuntimeMessages(messages: readonly RawMessage[]): AgentMessage[] {
   return messages.map(fromRuntimeMessage)
 }

@@ -13,6 +13,7 @@ import {
   infrastructureFailure,
 } from './../error/task-application-error.js'
 
+/** 命令用例依赖；`queryRepository` 只收窄到所有权校验真正用到的两个方法。 */
 export interface TaskCommandServiceDependencies {
   readonly commandRepository: TaskCommandRepository
   readonly queryRepository: Pick<TaskQueryRepository, 'getTask' | 'getExecutionById'>

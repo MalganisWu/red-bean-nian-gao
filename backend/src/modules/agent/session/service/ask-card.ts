@@ -8,6 +8,7 @@ import type { AnswerMarker } from '../model/session.js'
 
 const INTERRUPTED_TOOL_RESULT = '{"error":"tool call interrupted, result unavailable"}'
 
+/** 从展示 section 里读出的卡片状态；`answers` 只在已作答的卡片上出现。 */
 export interface AskCardData {
   readonly interactionId: string
   readonly status: string
@@ -74,6 +75,7 @@ export function validateAndFix(
   return repaired
 }
 
+/** 历史里是否还存在 pending 卡片；跨全部消息扫描，只要有一张未处理就为真。 */
 export function hasPendingCard(messages: readonly DisplayMessage[]): boolean {
   return messages.some((message): boolean =>
     sectionsFrom(message).some((section): boolean => cardFromSection(section)?.status === 'pending')
@@ -100,6 +102,11 @@ export function findPendingCard(
   return undefined
 }
 
+/**
+ * 把用户作答转成 ask 工具的返回值。
+ * 两条分支给出的是**语义不同的载荷**：正常作答回传原问题与答案；拒答则给一段明确要求
+ * 模型不要重复追问的文案——只回一个空的 answers 会被模型理解成「用户还没答」，从而再问一遍。
+ */
 export function buildAnswerToolResult(card: AskCardData, marker: AnswerMarker): string {
   if (marker.refused) {
     return JSON.stringify({
@@ -138,6 +145,7 @@ export function assertAskIsLast(messages: readonly AgentMessage[], interactionId
   throw new Error(`断言失败：未找到 interaction_id ${interactionId} 对应的 ask tool_call`)
 }
 
+/** 把作答写回卡片所在 section（状态置 answered 或 refused）；未命中卡片的消息原样返回。 */
 export function resolveCard(
   messages: readonly DisplayMessage[],
   marker: AnswerMarker

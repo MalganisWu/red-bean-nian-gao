@@ -45,6 +45,7 @@ import { optionalField } from '../../../../shared/object/optional-field.js'
 
 const FINALIZATION_TIMEOUT_MILLISECONDS = 30_000
 
+/** 服务依赖；`deliveryQueue` / `runFacts` / `logger` 均可缺省，缺省即关闭对应能力。 */
 export interface ProductAgentRunServiceOptions {
   readonly loader: AgentLoader
   readonly executor: AgentExecutionPort
@@ -61,6 +62,7 @@ export interface ProductAgentRunServiceOptions {
   readonly finalizationTimeoutMilliseconds?: number | undefined
 }
 
+/** 服务端诊断日志的窄接口；只有 error 一档，因为这里的用途就是记录异常。 */
 export interface AgentRunLogger {
   error(message: string, fields?: Readonly<Record<string, unknown>>): void
 }

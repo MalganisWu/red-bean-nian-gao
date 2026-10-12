@@ -8,6 +8,7 @@ import type {
 } from '../execution/model/agent-execution-contract.js'
 import { normalizeError } from '../../../shared/errors/normalize-error.js'
 
+/** 提问工具名；pipeline 与卡片投影层据此识别「这次的挂起是一次提问」。 */
 export const ASK_USER_TOOL_NAME = 'sys_ask_user'
 
 const PARAMETERS: AgentJsonObject = Object.freeze({
@@ -54,6 +55,12 @@ interface AskQuestion {
   readonly select: 'single' | 'multi'
 }
 
+/**
+ * 系统内置的提问工具；只做参数校验与挂起，不产生任何正文结果。
+ *
+ * `interrupting: true` 是它成立的前提——Runtime 靠这个**静态声明**在调用处形成中断屏障。
+ * 少了它，这个工具会退化成一个「立刻返回空内容」的普通工具跑完，用户永远看不到卡片。
+ */
 export class AskUserTool implements AgentTool {
   public readonly name = ASK_USER_TOOL_NAME
   public readonly schema: AgentToolSchema = {

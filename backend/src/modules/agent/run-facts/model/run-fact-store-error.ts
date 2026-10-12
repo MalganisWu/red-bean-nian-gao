@@ -7,9 +7,11 @@ export const RUN_FACT_STORE_ERROR_CODES = Object.freeze({
   FACTS_UNREADABLE: 'run_fact_facts_unreadable',
 } as const)
 
+/** 持久化校验错误码的字面量联合。 */
 export type RunFactStoreErrorCode =
   (typeof RUN_FACT_STORE_ERROR_CODES)[keyof typeof RUN_FACT_STORE_ERROR_CODES]
 
+/** facts / run 行的校验失败；只用于信任边界上的「读不懂」，基础设施故障不要套用这个类型。 */
 export class RunFactStoreError extends Error {
   public readonly code: RunFactStoreErrorCode
 

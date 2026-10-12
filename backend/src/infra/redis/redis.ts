@@ -89,6 +89,7 @@ redis.call("del", KEYS[1])
 return data
 `
 
+/** KV 与比较交换接口；比较的是**值**而不是键是否存在，这正是「不会误删别人的锁」的关键。 */
 export interface RedisStore {
   set(key: string, value: string, ttlMilliseconds: number, signal: AbortSignal): Promise<void>
   setIfAbsent(
@@ -109,6 +110,7 @@ export interface RedisStore {
   ttlMilliseconds(key: string, signal: AbortSignal): Promise<number>
 }
 
+/** 底层客户端的窄接口；上层因此不绑定具体 redis 客户端，测试可注入假驱动。 */
 export interface RedisDriver {
   connect(): Promise<void>
   ping(): Promise<string>
@@ -128,6 +130,7 @@ export interface RedisDriver {
   ): Promise<unknown>
 }
 
+/** 造驱动的工厂；默认实现基于 node-redis 的 `createClient`。 */
 export interface RedisDriverFactory {
   create(url: string): RedisDriver
 }

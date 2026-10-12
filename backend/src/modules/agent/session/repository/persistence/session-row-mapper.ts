@@ -53,6 +53,7 @@ const sessionOwnerSchema = z.object({
 const revisionSchema = z.object({ revision: z.union([z.string(), z.number().int(), z.bigint()]) })
 const tokenSchema = z.object({ token: z.union([z.string(), z.number().int(), z.bigint()]) })
 
+/** 会话所有权行的最小投影；`revision`/`fencing_token` 可缺省，只看归属的调用方不必读版本号。 */
 export interface SessionOwnerRow {
   readonly user_id: string
   readonly revision?: string | number | bigint | undefined
@@ -87,18 +88,21 @@ export function parseSessionSummary(value: unknown): SessionSummary {
   }
 }
 
+/** 解析会话所有权行；两个版本字段缺省是合法的，只做归属判断时用不到它们。 */
 export function parseSessionOwner(value: unknown): SessionOwnerRow {
   const parsed = sessionOwnerSchema.safeParse(value)
   if (!parsed.success) throw new Error('invalid session owner row', { cause: parsed.error })
   return parsed.data
 }
 
+/** 解析单列 `revision`；用于写入前拿到当前版本，作为 CAS 的比较基准。 */
 export function parseRevision(value: unknown): bigint {
   const parsed = revisionSchema.safeParse(value)
   if (!parsed.success) throw new Error('invalid session revision row', { cause: parsed.error })
   return toBigInt(parsed.data.revision, 'revision')
 }
 
+/** 解析单列 `fencing_token`；续租或写入前用它确认自己仍持有围栏。 */
 export function parseFencingToken(value: unknown): bigint {
   const parsed = tokenSchema.safeParse(value)
   if (!parsed.success) throw new Error('invalid session fencing token row', { cause: parsed.error })

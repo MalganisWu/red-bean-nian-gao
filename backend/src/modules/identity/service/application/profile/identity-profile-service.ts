@@ -5,6 +5,7 @@ import {
   IdentityApplicationError,
 } from '../error/identity-application-error.js'
 
+/** 更新自己资料的命令；只有显式出现的字段会被写入，缺省即保持原值。 */
 export interface UpdateSelfCommand {
   readonly userId: string
   readonly displayName?: string | undefined
@@ -12,6 +13,7 @@ export interface UpdateSelfCommand {
   readonly email?: string | undefined
 }
 
+/** 服务依赖；`now` 可注入，测试因此不依赖真实时钟。 */
 export interface IdentityProfileServiceOptions {
   readonly users: UserRepository
   readonly now?: (() => Date) | undefined

@@ -23,6 +23,7 @@ import {
 import { toPublicUserDto, toSelfUserDto } from './identity-presenter.js'
 import { optionalField } from '../../../shared/object/optional-field.js'
 
+/** Controller 的三个用例服务依赖；Controller 不感知仓储与散列的具体实现。 */
 export interface IdentityControllerDependencies {
   readonly registration: IdentityRegistrationService
   readonly authentication: AuthServicePort

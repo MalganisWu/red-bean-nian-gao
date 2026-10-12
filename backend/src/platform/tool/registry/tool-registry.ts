@@ -13,10 +13,12 @@ import {
   ToolDispatchError,
 } from 'red-bean-qing-tuan/tools'
 
+/** 启动期工具登记入口；登记处封闭后再调用会抛错，杜绝运行期注册。 */
 export interface ToolRegistrar {
   provide(tool: Tool | null | undefined): void
 }
 
+/** 一个工具提供方插件；`name` 归一化后必须唯一，`register` 里登记它拥有的全部工具。 */
 export interface ToolProviderPlugin {
   readonly name: string
   register(registrar: ToolRegistrar): void

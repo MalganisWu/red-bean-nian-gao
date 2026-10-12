@@ -11,6 +11,7 @@ import type { AgentJsonValue } from '../../model/json-value.js'
 import type { AgentBuildConfig } from '../../loader/port/agent-loader.port.js'
 import type { CardEvent } from '../model/agent-run.js'
 
+/** 执行阶段必需的完整配置：把 `AgentBuildConfig` 的可选字段收窄为必填。 */
 export interface ExecutableAgentConfig extends AgentBuildConfig {
   readonly llmAdapter: AgentModelAdapter
   readonly toolDispatcher: AgentToolDispatcher

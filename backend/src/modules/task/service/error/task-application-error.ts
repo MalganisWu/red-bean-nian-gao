@@ -6,6 +6,7 @@ export const TASK_APPLICATION_ERROR_CODES = Object.freeze({
   INFRASTRUCTURE: 'task_infrastructure_failure',
 } as const)
 
+/** 用例错误码的字面量联合。 */
 export type TaskApplicationErrorCode =
   (typeof TASK_APPLICATION_ERROR_CODES)[keyof typeof TASK_APPLICATION_ERROR_CODES]
 

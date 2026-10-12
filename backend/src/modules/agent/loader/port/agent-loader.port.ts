@@ -29,6 +29,7 @@ export interface SubAgentRuntimeEvent {
   readonly event: AgentRuntimeEvent
 }
 
+/** 加载期事件出口承载的事件：Runtime 事件，或带父调用标识的子 Agent 事件。 */
 export type AgentStreamEvent = AgentRuntimeEvent | SubAgentRuntimeEvent
 
 /** Agent 加载期间使用的事件出口。 */

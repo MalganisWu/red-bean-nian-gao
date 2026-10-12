@@ -20,6 +20,7 @@ const rawMessageSchema = z.object({
   name: z.string().optional(),
 })
 
+/** 消息缓冲实际用到的 Redis 能力子集；只声明这两个方法，避免把整个连接暴露给缓冲实现。 */
 export interface RedisMessageBufferStore {
   appendListWithExpiry(
     key: string,

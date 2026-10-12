@@ -10,6 +10,7 @@ import { IdentityProfileService } from './service/application/profile/identity-p
 import { IdentityRegistrationService } from './service/application/registration/identity-registration-service.js'
 import { PostgresUserRepository } from './service/user-repository/postgres-user-repository.js'
 
+/** Identity Module 的输出面：认证服务、密码散列器与两个用例服务。 */
 export interface IdentityModule {
   readonly authService: AuthServicePort
   readonly passwordHasher: PasswordHasher

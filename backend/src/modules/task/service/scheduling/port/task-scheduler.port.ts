@@ -1,5 +1,6 @@
 import type { AgentTaskDefinition } from './../../../model/task.js'
 
+/** 扫描配置；来自 `config.scheduledTask`，在组装期一次性传入，运行期不再读配置。 */
 export interface SchedulerConfig {
   readonly batchSize: number
   readonly maxConcurrent: number
@@ -18,6 +19,7 @@ export interface PendingTaskRepository {
   ): Promise<readonly AgentTaskDefinition[]>
 }
 
+/** 一次任务执行的分布式租约；`lost` 是失租信号，`release` 由持有者负责调用。 */
 export interface ScheduledTaskLease {
   readonly fencingToken?: bigint | undefined
   readonly lost?: Promise<Error> | undefined
@@ -37,6 +39,7 @@ export interface ScheduledTaskLockRegistry {
   ): ScheduledTaskLease | Promise<ScheduledTaskLease>
 }
 
+/** 拿到租约后真正执行一次任务的函数；形状固定，便于组装期替换不同实现。 */
 export type ScheduledTaskPipeline = (
   taskId: string,
   lease: ScheduledTaskLease,

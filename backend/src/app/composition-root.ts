@@ -28,6 +28,7 @@ import { registerApplicationRoutes } from './http-routes.js'
 import { routeCatalogChecker } from '../shared/http/route-catalog-check.js'
 import { ServerApplication, buildManaged } from './server-application.js'
 
+/** 组装选项；目前只有构建版本信息一项可注入。 */
 export interface BuildApplicationOptions {
   readonly version?: VersionInfo | undefined
 }

@@ -36,6 +36,7 @@ export interface SubAgentToolDefinition {
   readonly systemToolIds: readonly string[]
 }
 
+/** 一次构建请求：本次加载到的子 Agent 定义，外加父运行共享的模型、运行参数与展示注册表。 */
 export interface BuildSubAgentToolsRequest {
   readonly definitions: readonly SubAgentToolDefinition[]
   readonly parentAdapter: AgentModelAdapter
@@ -46,11 +47,13 @@ export interface BuildSubAgentToolsRequest {
   readonly loadContext: AgentLoadContext
 }
 
+/** 构建结果：给模型看的 schema 列表与实际分发用的 dispatcher，两者必须出自同一批工具。 */
 export interface SubAgentToolSet {
   readonly schemas: readonly AgentToolSchema[]
   readonly dispatcher: AgentToolDispatcher
 }
 
+/** 工厂依赖；`decorators` 可缺省，追加请走 `withRuntimeDecorator`（返回新实例，不就地改）。 */
 export interface RuntimeSubAgentToolFactoryOptions {
   readonly executor: AgentExecutionPort
   readonly idGenerator: IdGenerator

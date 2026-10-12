@@ -19,6 +19,7 @@ const claimsSchema = z.object({
   iat: z.number().finite(),
 })
 
+/** 认证服务依赖；`now` 可注入，token 的有效期因此在测试里可以被推进。 */
 export interface JwtAuthServiceOptions {
   readonly userRepository: UserRepository
   readonly passwordHasher: PasswordHasher

@@ -12,14 +12,17 @@ export const SUB_EXECUTION_STATUSES = Object.freeze({
   AWAITING_USER: 'awaiting_user',
 } as const)
 
+/** 子执行状态的字面量联合；`awaiting_user` 是唯一的中间态，表示在等父 Agent 转达用户作答。 */
 export type SubExecutionStatus =
   (typeof SUB_EXECUTION_STATUSES)[keyof typeof SUB_EXECUTION_STATUSES]
 
+/** 子执行仓储的稳定冲突码；两个都是 CAS 类冲突，调用方不得把它降级成普通覆盖写。 */
 export const SUB_EXECUTION_STORE_ERROR_CODES = Object.freeze({
   REVISION_CONFLICT: 'sub_execution_revision_conflict',
   RESUME_CONFLICT: 'sub_execution_resume_conflict',
 } as const)
 
+/** 冲突码的字面量联合。 */
 export type SubExecutionStoreErrorCode =
   (typeof SUB_EXECUTION_STORE_ERROR_CODES)[keyof typeof SUB_EXECUTION_STORE_ERROR_CODES]
 

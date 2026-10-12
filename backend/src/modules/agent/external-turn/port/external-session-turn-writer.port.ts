@@ -1,5 +1,6 @@
 import type { DisplayMessage } from '../../presentation/model/display-message.js'
 
+/** 一次外部回合；`fencingToken` 由已持锁的调用方传入，不传则由 Writer 自行取锁并在提交后释放。 */
 export interface ExternalSessionTurn {
   readonly sessionId: string
   readonly userId: string
@@ -11,6 +12,7 @@ export interface ExternalSessionTurn {
   readonly fencingToken?: bigint | undefined
 }
 
+/** 写入结果：`duplicate` 表示这次投递此前已落库（幂等命中），`deferred` 表示当前不可写、需稍后重试。 */
 export type ExternalSessionTurnWriteResult = 'written' | 'duplicate' | 'deferred'
 
 /**

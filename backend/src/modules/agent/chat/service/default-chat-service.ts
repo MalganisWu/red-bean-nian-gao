@@ -216,6 +216,7 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
   }
 }
 
+/** 取消键 = 用户 + 请求；带上 userId 是为了让不同用户的同 requestId 不会互相取消。 */
 export function cancelRegistryKey(userId: string, requestId: string): string {
   return `${userId}:${requestId}`
 }

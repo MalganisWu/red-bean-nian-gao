@@ -11,6 +11,7 @@ import {
 } from '../error/identity-application-error.js'
 import { optionalField } from '../../../../../shared/object/optional-field.js'
 
+/** 注册命令；密码在这里仍是明文，散列由本用例完成，调用方拿不到也不该管这个过程。 */
 export interface RegisterIdentityCommand {
   readonly username: string
   readonly email: string
@@ -19,6 +20,7 @@ export interface RegisterIdentityCommand {
   readonly avatar?: string | undefined
 }
 
+/** 服务依赖；除用户仓储外还需要散列器与 ID 生成器，三者都可替换以适配测试。 */
 export interface IdentityRegistrationServiceOptions {
   readonly users: UserRepository
   readonly passwordHasher: PasswordHasher

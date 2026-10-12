@@ -11,6 +11,7 @@ import type {
   AgentToolSchema,
 } from '../model/agent-execution-contract.js'
 
+/** 一次执行所需的全部中性依赖；由 Agent Loader 从数据库装配，Runtime 自身不认识数据库。 */
 export interface AgentExecutionDefinition {
   readonly model: AgentModelAdapter
   readonly dispatcher: AgentToolDispatcher
@@ -45,6 +46,10 @@ export const EXECUTION_OUTCOME_STATUSES = Object.freeze({
   EXHAUSTED: 'exhausted',
 } as const)
 
+/**
+ * 执行命令；`kind` 决定这次是「新开一轮」还是「从挂起处续跑」，
+ * 两者对 `state` / `interruptId` / `response` 的要求不同，构造时须与 `kind` 对齐。
+ */
 export interface AgentExecutionCommand extends AgentRunIdentity {
   readonly kind: (typeof EXECUTION_COMMAND_KINDS)[keyof typeof EXECUTION_COMMAND_KINDS]
   readonly definition: AgentExecutionDefinition
@@ -66,6 +71,7 @@ interface AgentExecutionOutcomeBase {
   readonly finishReason: string
 }
 
+/** 挂起信息：哪个工具、什么参数，以及供宿主标定这次交互的 id。 */
 export interface AgentExecutionInterrupt {
   readonly id: string
   readonly toolName: string

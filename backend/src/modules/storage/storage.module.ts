@@ -4,6 +4,7 @@ import { StorageService } from './service/application/storage-service.js'
 import { StorageHealthService } from './service/application/storage-health-service.js'
 import { MinioObjectStorage } from './service/object-storage/minio-object-storage.js'
 
+/** Storage Module 的输出面：对象用例服务与健康探针。 */
 export interface StorageModule {
   readonly storageService: StorageService
   readonly health: StorageHealthPort

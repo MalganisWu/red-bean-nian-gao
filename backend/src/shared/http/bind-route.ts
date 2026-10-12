@@ -9,6 +9,7 @@ import type {
 /** 契约目录中的任一条路由定义（`API_ROUTES` 命名表的联合值类型）。 */
 type ApiRoute = (typeof API_ROUTES)[keyof typeof API_ROUTES]
 
+/** 注册参数；`auth` 必须与端点目录的 `authenticated` 标志一致，不一致会在启动期直接失败。 */
 export interface BindRouteOptions {
   /** 认证钩子：与清单 `authenticated` 标志机械绑定，缺失/多余时启动即失败（fail-fast）。 */
   readonly auth?: preHandlerAsyncHookHandler

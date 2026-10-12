@@ -8,6 +8,7 @@ import { StructuredLogTracer, type StructuredLogSink } from './structured-log-tr
 
 const INSTRUMENTATION_NAME = 'red-bean-nian-gao'
 
+/** 观测后端配置；来自 `config.observability`，`exporter` 只认 structured 与 otlp。 */
 export interface ObservabilityProviderOptions {
   readonly exporter: string
   readonly serviceName: string
@@ -15,6 +16,7 @@ export interface ObservabilityProviderOptions {
   readonly sampleRatio: number
 }
 
+/** 构造依赖；两处均可注入，测试因此不建真实 exporter、也不去抓 stdout。 */
 export interface ObservabilityProviderDependencies {
   readonly exporterFactory?: (() => tracing.SpanExporter) | undefined
   readonly logSink?: StructuredLogSink | undefined

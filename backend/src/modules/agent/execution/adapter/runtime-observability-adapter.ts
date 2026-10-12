@@ -15,6 +15,7 @@ export function wrapRuntimeModel(
   return wrapLlm(tracer, adapter)
 }
 
+/** 给工具分发套上 SDK 的观测 wrapper；业务侧只见到产品自己的 `TracerPort`。 */
 export function wrapRuntimeToolDispatcher(
   tracer: TracerPort,
   dispatcher: AgentToolDispatcher
@@ -22,6 +23,7 @@ export function wrapRuntimeToolDispatcher(
   return wrapToolDispatcher(tracer, dispatcher)
 }
 
+/** 给子运行执行器套上观测 wrapper；与上面两个同属 Runtime SDK 的防腐层。 */
 export function wrapRuntimeChildRunner(
   tracer: TracerPort,
   runner: AgentChildRunner

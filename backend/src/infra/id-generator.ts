@@ -5,7 +5,9 @@ import type { IdGenerator } from '../shared/id/id-generator.js'
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789'
 const SUFFIX_LENGTH = 8
 
+/** 毫秒时钟；可注入，生成的 ID 因此能在测试里确定。 */
 export type MillisecondClock = () => number
+/** 随机字节源；可注入，测试可构造确定的随机后缀。 */
 export type RandomByteSource = (size: number) => Uint8Array
 
 /** 生成与既有产品 wire 格式一致的不透明 ID。 */

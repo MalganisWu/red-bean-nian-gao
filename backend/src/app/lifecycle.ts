@@ -1,3 +1,4 @@
+/** 关闭处理器；按注册的逆序执行，整个 Lifecycle 也只关闭一次。 */
 export type CloseHandler = (signal: AbortSignal) => Promise<void>
 
 /** 统一持有进程资源，并保证按注册逆序且仅关闭一次。 */

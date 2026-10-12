@@ -17,6 +17,7 @@ import type {
   ChildRuntimeDecoratableAgentLoader,
 } from '../loader/port/agent-loader.port.js'
 
+/** 给 Loader 套上观测装饰；支持子运行装饰的 Loader 会同时拿到 LLM / 工具 / 子运行三层 wrapper。 */
 export function wrapAgentLoader(tracer: TracerPort, source: AgentLoader): AgentLoader {
   const next = isChildDecoratableLoader(source)
     ? source.withChildRuntimeDecorator({

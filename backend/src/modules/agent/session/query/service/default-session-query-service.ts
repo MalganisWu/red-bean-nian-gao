@@ -7,17 +7,20 @@ import {
 import type { SessionRepository } from '../../repository/port/session-repository.port.js'
 import type { SessionSummary } from '../../model/session.js'
 
+/** 会话列表查询入参；`cursor` 为空串表示取首页。 */
 export interface ListSessionsQuery {
   readonly userId: string
   readonly cursor: string
   readonly limit: number
 }
 
+/** 会话列表结果；`nextCursor` 为空串表示没有下一页。 */
 export interface SessionQueryPage {
   readonly sessions: readonly SessionSummary[]
   readonly nextCursor: string
 }
 
+/** 详情查询入参；必须同时带 userId，越权访问与不存在因此收敛到同一条 404 分支。 */
 export interface GetSessionQuery {
   readonly sessionId: string
   readonly userId: string

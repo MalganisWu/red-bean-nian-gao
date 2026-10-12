@@ -22,6 +22,7 @@ import {
 } from './../tool/task-tool-constants.js'
 import { optionalField } from '../../../../shared/object/optional-field.js'
 
+/** 重试策略：最大重试次数、重试间隔（毫秒）与 cron 解释所用的时区。 */
 export interface ScheduledTaskPolicy {
   readonly maxRetries: number
   readonly retryIntervalMilliseconds: number
@@ -38,6 +39,7 @@ export interface ScheduledTaskRunState {
   readonly leaseLost?: Promise<Error> | undefined
 }
 
+/** 服务依赖；仓储按实际用到的方法收窄，`queue` 缺省表示这次装配不投递结果。 */
 export interface TaskExecutionServiceOptions {
   readonly queries: Pick<TaskQueryRepository, 'getTask'>
   readonly commands: Pick<
@@ -53,6 +55,7 @@ export interface TaskExecutionServiceOptions {
   readonly now?: (() => Date) | undefined
 }
 
+/** 定时任务的系统提示词；核心是「无人可交互」——不提问、不请求澄清、不碰任务管理工具。 */
 export const SCHEDULED_TASK_SYSTEM_PROMPT = `你是定时任务执行器。定时任务已在后台触发，你当前正在执行该任务。
 
 职责：

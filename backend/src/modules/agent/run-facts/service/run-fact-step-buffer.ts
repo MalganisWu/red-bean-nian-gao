@@ -164,6 +164,7 @@ export class RunFactStepBuffer {
   }
 }
 
+/** 把步骤快照固化成 assistant 事实；缺 `startedAt` 时时长记 0，不留空。 */
 export function assistantFactFromSnapshot(snapshot: StepSnapshot, now: number): RunAssistantFact {
   return {
     type: 'assistant',
@@ -177,6 +178,7 @@ export function assistantFactFromSnapshot(snapshot: StepSnapshot, now: number): 
   }
 }
 
+/** 由一次工具调用构造 tool 事实；`result`/`error`/`status` 缺省时不写该键，与存量记录保持一致。 */
 export function toolFact(input: {
   readonly callId: string
   readonly name: string

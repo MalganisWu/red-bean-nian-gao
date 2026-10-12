@@ -1,16 +1,19 @@
 import type { LlmAdapter, LlmAdapterFactory } from 'red-bean-qing-tuan/llm'
 import { normalizeError } from '../../../shared/errors/normalize-error.js'
 
+/** 按凭据造 adapter；返回 `null`/`undefined` 是插件表达「这个配置我造不出来」的方式，不是静默跳过。 */
 export type LlmProviderFactory = (
   apiKey: string,
   baseUrl: string,
   modelName: string
 ) => LlmAdapter | null | undefined
 
+/** 启动期注册入口；注册表封闭后再调用会抛错，杜绝运行时注册带来的不确定行为。 */
 export interface LlmProviderRegistrar {
   provide(name: string, factory: LlmProviderFactory | null | undefined): void
 }
 
+/** 一个 provider 插件；`name` 归一化（trim + 小写）后必须唯一。 */
 export interface LlmProviderPlugin {
   readonly name: string
   register(registrar: LlmProviderRegistrar): void

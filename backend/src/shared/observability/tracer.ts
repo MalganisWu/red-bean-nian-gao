@@ -9,12 +9,14 @@ export interface TraceAttribute {
   readonly value: string
 }
 
+/** span 的窄接口；`within` 把本 span 设为异步上下文里的活跃 span，子 span 才会挂在它下面。 */
 export interface TraceSpan {
   setAttributes(...attributes: readonly TraceAttribute[]): void
   within<TValue>(operation: () => Promise<TValue>): Promise<TValue>
   end(error?: Error): void
 }
 
+/** 造 span 的入口；业务只依赖它，不感知底层是结构化日志还是 OTLP。 */
 export interface TracerPort {
   start(start: { readonly name: string; readonly attributes: readonly TraceAttribute[] }): TraceSpan
 }
@@ -33,6 +35,7 @@ export class NoopTraceSpan implements TraceSpan {
   public end(): void {}
 }
 
+/** 空实现；`start` 恒返回 `NoopTraceSpan`，让「没配观测」与「配了观测」在业务代码里长得一样。 */
 export class NoopTracer implements TracerPort {
   public start(): TraceSpan {
     return new NoopTraceSpan()

@@ -19,6 +19,7 @@ import { RunFactModelObserver } from './run-fact-model-observer.js'
 import { assistantFactFromSnapshot, RunFactStepBuffer, toolFact } from './run-fact-step-buffer.js'
 import { normalizeError } from '../../../../shared/errors/normalize-error.js'
 
+/** 记录器依赖；`onError` 缺省即静默降级——事实写入失败不影响会话主流程。 */
 export interface RunFactRecorderOptions {
   readonly run: StartSessionRunCommand
   /** 事件与消息 append 阶段使用的中止信号；终态化允许传入独立的收尾信号。 */

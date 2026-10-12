@@ -16,6 +16,7 @@ import {
   infrastructureFailure,
 } from './../error/task-application-error.js'
 
+/** 查询用例依赖：任务详情、任务列表与已读/折叠偏好三个仓储。 */
 export interface TaskQueryServiceDependencies {
   readonly taskRepository: TaskQueryRepository
   readonly taskListRepository: TaskListRepository

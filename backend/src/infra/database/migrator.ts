@@ -6,6 +6,7 @@ import type { SqlExecutor, TransactionalSqlExecutor } from './postgres.js'
 const HISTORY_TABLE = 'schema_migrations'
 const ADVISORY_LOCK_NAME = 'red-bean-nian-gao:schema_migrations'
 
+/** 一条迁移；`name` 是 14 位时间戳，`up`/`down` 必须成对给出且都非空。 */
 export interface Migration {
   readonly name: string
   readonly comment: string
@@ -13,11 +14,13 @@ export interface Migration {
   readonly down: readonly string[]
 }
 
+/** 一次 up/down 的批次；同批语句视为一个可整体回滚的单位。 */
 export interface MigrationGroup {
   readonly groupId: number
   readonly migrationNames: readonly string[]
 }
 
+/** 单条迁移的当前状态；`pending` 时 `groupId`/`migratedAt` 不会出现。 */
 export interface MigrationStatus {
   readonly name: string
   readonly comment: string
@@ -55,6 +58,13 @@ const historyRowSchema = z.object({
   migrated_at: z.date(),
 })
 
+/**
+ * 冻结的迁移目录：**只能追加，不得回头修改已发布的条目**。
+ *
+ * 启动时 `validateCatalog` 校验命名、唯一性与严格升序，`validateHistory` 还要求实际历史
+ * 是这份目录的**严格前缀**。因此改动历史中某条迁移的顺序或名字不会静默生效，
+ * 而是让进程在启动期直接失败——这正是「各环境 schema 不许悄悄分叉」这条纪律的执行者。
+ */
 export const MIGRATIONS: readonly Migration[] = Object.freeze([
   migration(
     '20260604000001',

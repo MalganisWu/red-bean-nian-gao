@@ -5,14 +5,17 @@ import { normalizeError } from '../shared/errors/normalize-error.js'
 
 export type { BackgroundTask } from '../shared/lifecycle/background-task.js'
 
+/** HTTP 服务的生命周期端口；`shutdown` 是停止接收新连接并排空，`close` 是强制收尾。 */
 export interface HttpServer {
   listen(): Promise<void>
   shutdown(signal: AbortSignal): Promise<void>
   close(): Promise<void>
 }
 
+/** 排空期要跑的一项任务（关队列消费者、等租约释放等）；与 HTTP 排空并行执行。 */
 export type ShutdownTask = (signal: AbortSignal) => Promise<void>
 
+/** 组装选项；后台任务与排空任务分开配置，因为二者的收束时机不同（见 `run` 的注释）。 */
 export interface ServerApplicationOptions {
   readonly server: HttpServer
   readonly lifecycle: Lifecycle

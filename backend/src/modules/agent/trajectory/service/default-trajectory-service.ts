@@ -15,6 +15,7 @@ import type { SessionTrajectory } from '../model/trajectory.js'
 import { projectFactsTrajectory } from './trajectory-fact-projector.js'
 import { projectTrajectory } from './trajectory-projector.js'
 
+/** 轨迹查询入参；必须带 userId，越权访问与不存在收敛到同一条 404。 */
 export interface GetTrajectoryQuery {
   readonly sessionId: string
   readonly userId: string

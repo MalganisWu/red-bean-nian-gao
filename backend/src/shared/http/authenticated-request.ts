@@ -11,6 +11,7 @@ export interface RequestPrincipal {
 
 const requestPrincipals = new WeakMap<FastifyRequest, RequestPrincipal>()
 
+/** 认证钩子选项；目前只有 Bearer 格式错误时的提示文案可定制。 */
 export interface AuthenticationOptions {
   /** Bearer 格式错误时返回给调用方的稳定中文提示。 */
   readonly malformedMessage?: string | undefined
@@ -64,6 +65,7 @@ export function authenticatedPrincipal(request: FastifyRequest): RequestPrincipa
   return principal
 }
 
+/** 取 header 的首个值；同名 header 出现多次时 Fastify 给的是数组，这里统一取第一个。 */
 export function firstHeader(value: string | readonly string[] | undefined): string | undefined {
   return typeof value === 'string' ? value : value?.[0]
 }

@@ -51,6 +51,7 @@ const credentialRowSchema = z.object({
 type CoreAgentRow = z.infer<typeof coreAgentRowSchema>
 type LlmConfigRow = z.infer<typeof llmConfigRowSchema>
 
+/** Loader 依赖；全部在构造期传入，`load` 期间不回查数据库。 */
 export interface DbMainAgentLoaderOptions {
   readonly database: SqlExecutor
   readonly registry: ToolRegistry

@@ -8,6 +8,7 @@ import { optionalField } from '../../../../shared/object/optional-field.js'
 
 const metadataSchema = z.record(z.string(), z.unknown())
 
+/** MinIO 连接配置；由 `config.minio` 段映射而来，字段与配置层一一对应。 */
 export interface MinioStorageConfig {
   readonly endpoint: string
   readonly accessKey: string

@@ -14,10 +14,12 @@ import {
   type SubAgentSectionData,
 } from '../../service/subagent-display.js'
 
+/** 造展示载荷的入参；在 section 数据之上补一个领域状态（`SubAgentSectionData.status` 是裸字符串）。 */
 export interface BuildSubExecutionDisplayRequest extends SubAgentSectionData {
   readonly status: SubExecutionStatus
 }
 
+/** 终态写入时的展示字段；空串与 `undefined` 一律按「未提供」处理，不会写进记录。 */
 export interface SubExecutionCompletionOptions {
   readonly agentName: string
   readonly modelName?: string | undefined
@@ -110,6 +112,7 @@ export function executionStatus(
   }
 }
 
+/** 取第一条 user 消息，作为「这次委派让子 Agent 做了什么」的指令；没有则返回空串。 */
 export function firstUserMessage(messages: readonly AgentMessage[]): string {
   for (const message of messages) {
     if (message.role === 'user' && message.content !== null) return message.content
@@ -117,6 +120,7 @@ export function firstUserMessage(messages: readonly AgentMessage[]): string {
   return ''
 }
 
+/** 取最后一条非空 assistant 正文；倒序扫描，纯工具调用轮次的空正文会被跳过。 */
 export function lastAssistantContent(messages: readonly AgentMessage[]): string {
   for (const message of messages.toReversed()) {
     if (message.role === 'assistant' && message.content !== null && message.content !== '')

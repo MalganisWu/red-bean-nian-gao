@@ -12,6 +12,7 @@ import { core } from '@opentelemetry/sdk-node'
 
 import type { TraceContextExtractorPort } from '../../shared/http/fastify-http-boundary.js'
 
+/** 从 `traceparent` / `tracestate` 解析出的上下文；`traceFlags` 已转成数字。 */
 export interface ExtractedW3CTraceContext {
   readonly traceId: string
   readonly parentSpanId: string

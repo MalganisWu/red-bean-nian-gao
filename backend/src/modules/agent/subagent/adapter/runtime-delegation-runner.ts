@@ -39,6 +39,7 @@ const CHILD_RUN_STATUSES = Object.freeze({
 } as const)
 type ChildRunStatus = AgentChildRunResult['status']
 
+/** 子运行执行器的依赖；除 `executor`/`adapter`/`dispatcher` 外均可缺省，缺省即关闭对应能力。 */
 export interface RuntimeChildRunnerOptions {
   readonly executor: AgentExecutionPort
   readonly executionPrefix?: string | undefined

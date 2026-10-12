@@ -5,6 +5,7 @@ export const REGISTRY_ERROR_CODES = Object.freeze({
   REQUEST_ALREADY_REGISTERED: 'request_already_registered',
 } as const)
 
+/** 基础设施错误码的字面量联合；只覆盖锁与请求注册，Runtime SDK 不感知这些语义。 */
 export type RegistryErrorCode = (typeof REGISTRY_ERROR_CODES)[keyof typeof REGISTRY_ERROR_CODES]
 
 const REGISTRY_ERROR_MESSAGES: Readonly<Record<RegistryErrorCode, string>> = Object.freeze({
@@ -13,6 +14,7 @@ const REGISTRY_ERROR_MESSAGES: Readonly<Record<RegistryErrorCode, string>> = Obj
   request_already_registered: 'request already registered',
 })
 
+/** 基础设施异常；message 由内部码表统一给出，调用方只应依据 `code` 分支。 */
 export class RegistryError extends Error {
   public readonly code: RegistryErrorCode
 

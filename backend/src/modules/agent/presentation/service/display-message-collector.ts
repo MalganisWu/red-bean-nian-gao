@@ -2,15 +2,18 @@ import type { AgentMessage } from '../../model/agent-message.js'
 import type { AgentJsonValue } from '../../model/json-value.js'
 import type { DisplayMessage } from '../model/display-message.js'
 
+/** 取当前时间戳（epoch 毫秒）；可注入，测试因此能产出确定的时间。 */
 export interface PresentationClock {
   (): number
 }
 
+/** 构造选项；`buildSections` 用于把当次运行累积的 section 挂到 assistant 消息上。 */
 export interface DisplayMessageCollectorOptions {
   readonly now?: PresentationClock | undefined
   readonly buildSections?: (() => AgentJsonValue) | undefined
 }
 
+/** Runtime 回调携带的上下文；`metadata` 是节点之间共享的可变袋。 */
 export interface PresentationContext {
   readonly sessionId: string
   readonly metadata: Map<string, unknown>

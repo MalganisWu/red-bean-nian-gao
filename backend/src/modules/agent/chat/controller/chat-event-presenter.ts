@@ -37,9 +37,16 @@ export function toStreamErrorEvent(error: unknown): StreamErrorEvent {
   return { type: 'error', code: 5000, message: '服务器内部错误' }
 }
 
-/** 在 HTTP 展示边界为 Runtime 状态补充产品文案。 */
+/**
+ * 在 HTTP 展示边界为 Runtime 状态补充产品文案。
+ *
+ * `status` 事件会被换成带 `content` 的本地化版本；其余事件原样返回，
+ * 但 `agent_event` 信封会**递归下钻**——子 Agent 的 status 同样需要本地化。
+ */
 export function localizeRuntimeEvent(event: AgentStatusEvent): LocalizedStatusEvent
+/** 非 status 事件：原样返回；`agent_event` 信封则递归处理其内层事件。 */
 export function localizeRuntimeEvent(event: ProductStreamEvent): ProductStreamEvent
+/** 实现体：`status` 交给 `localizedStatus`，`agent_event` 解构信封后递归。 */
 export function localizeRuntimeEvent(event: ProductStreamEvent): ProductStreamEvent {
   if (event.type === AGENT_EVENT_TYPES.STATUS) return localizedStatus(event)
   if (event.type !== STREAM_EVENT_TYPES.AGENT_EVENT) return event

@@ -31,10 +31,12 @@ import {
 const RESUME_LEASE_MILLISECONDS = 30 * 60 * 1_000
 const RESUME_HEARTBEAT_MILLISECONDS = 10 * 60 * 1_000
 
+/** 把子执行的展示数据交给父运行的回调；父运行据此把子结果折进自己的展示流。 */
 export interface SubExecutionDisplayPublisher {
   publish(data: AgentJsonObject): void
 }
 
+/** 生命周期选项；`now` 与租期/心跳均可注入，测试因此不必真等满 30 分钟。 */
 export interface SubExecutionLifecycleOptions {
   readonly agentId: string
   readonly agentName: string

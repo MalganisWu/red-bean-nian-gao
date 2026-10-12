@@ -1,6 +1,7 @@
 import type { Readable } from 'node:stream'
 import type { ObjectDownload, ObjectInfo } from '../../application/model/object-result.js'
 
+/** 上传入参；`size` 必须由调用方给出——对象存储要先知道读多少字节，流本身不携带长度。 */
 export interface UploadInput {
   readonly key: string
   readonly body: Readable
@@ -8,6 +9,7 @@ export interface UploadInput {
   readonly contentType: string
 }
 
+/** 预签名入参：对象键与链接有效期（秒）。 */
 export interface PresignInput {
   readonly key: string
   readonly expiresSeconds: number

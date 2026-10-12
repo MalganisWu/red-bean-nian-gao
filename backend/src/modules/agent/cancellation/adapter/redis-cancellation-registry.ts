@@ -15,6 +15,7 @@ interface CancelEntry {
   pollTimer: NodeJS.Timeout | undefined
 }
 
+/** 取消注册表选项；前者是取消键的存活时间，后者是跨实例的轮询间隔。 */
 export interface RedisCancelRegistryOptions {
   readonly timeoutMilliseconds?: number
   readonly pollIntervalMilliseconds?: number

@@ -27,6 +27,7 @@ const DEFAULT_AGENT_TOOL_IDS = Object.freeze([
   'sys_shell',
 ])
 
+/** 播种所需的依赖；`migrator` 可缺省，缺省时按传入的数据库连接自建一个。 */
 export interface DatabaseBootstrapOptions {
   readonly config: AppConfig
   readonly database: TransactionalSqlExecutor

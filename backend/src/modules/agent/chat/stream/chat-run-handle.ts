@@ -1,8 +1,10 @@
 import type { ProductStreamEvent } from '../../run/model/agent-run.js'
 import { RunEventQueue } from './run-event-queue.js'
 
+/** 关闭原因：消费者主动收摊、客户端断连、服务停机排空。 */
 export type ChatRunCloseReason = 'consumer_closed' | 'client_disconnected' | 'server_shutdown'
 
+/** 一次运行的结局；`completed` 之外的两种都带原因或错误，供上层决定日志级别与重试。 */
 export type ChatRunResult =
   | { readonly status: 'completed' }
   | { readonly status: 'cancelled'; readonly reason: ChatRunCloseReason }

@@ -5,12 +5,14 @@ import type { AnswerMarker } from '../../model/session.js'
 import type { SessionLease } from '../../lock/port/session-lock.js'
 import type { AgentRunIdentity } from '../../../run/model/agent-run.js'
 
+/** 加载请求；带 `answer` 表示这次加载是为一次续跑（用户已对卡片作答）。 */
 export interface SessionLoadRequest extends AgentRunIdentity {
   readonly checkpointId: string
   readonly messages: readonly AgentMessage[]
   readonly answer?: AnswerMarker
 }
 
+/** 加载后的完整运行态；`lock` 是本次持有的租约（由 `save` 负责释放），`leaseLost` 是失租信号。 */
 export interface SessionRunState extends AgentRunIdentity {
   readonly checkpointId: string
   readonly messages: readonly AgentMessage[]
@@ -26,6 +28,7 @@ export interface SessionRunState extends AgentRunIdentity {
   readonly lock?: SessionLease | undefined
 }
 
+/** 一次运行的结果；`interruptCallId` 有值表示本轮流停在某个挂起的工具调用上。 */
 export interface SessionRunOutcome {
   readonly runtimeState?: StoredRuntimeState | undefined
   readonly displayMessages: readonly DisplayMessage[]
