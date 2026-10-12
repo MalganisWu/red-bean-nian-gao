@@ -46,6 +46,14 @@ import { ScheduledTaskWorker } from './service/scheduling/scheduled-task-worker.
 
 const DELIVERY_RECONCILE_INTERVAL_MILLISECONDS = 30_000
 
+/**
+ * Task Module 的组装入口。生产实现的 Port → 实现映射全部集中在本文件，
+ * composition root 只负责把基础设施与跨 Module 能力传进来。
+ *
+ * 分成 `createTaskPersistence`（只依赖数据库，先建）与 `createModule`（还需要 Redis、
+ * Agent 能力与配置）两步，是为了解开一个循环：Agent Module 要用 Task 的投递队列，
+ * 而 Task 又要用 Agent 的执行能力。先建不依赖 Agent 的持久化层，才能在后面各取所需。
+ */
 export interface TaskPersistence {
   createManagementTool(idGenerator: IdGenerator, timezone: string): AgentTool
   createModule(options: TaskModuleAssemblyOptions): TaskModule

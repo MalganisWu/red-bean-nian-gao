@@ -33,6 +33,11 @@ export class ScheduledTaskWorker {
     this.#logger.info('scheduled task worker started', {
       scan_interval_ms: this.#scanIntervalMilliseconds,
     })
+    /*
+     * 先等一个扫描间隔再扫，而不是立刻扫一次：进程刚起来时数据库迁移、连接池预热都还没稳，
+     * 抢着扫只会拿到一堆瞬时失败。代价是启动后最多有一个间隔的调度延迟——
+     * 对分钟级的定时任务可以接受，也避免了启动期的抖动。
+     */
     try {
       while (!signal.aborted) {
         await abortableDelay(this.#scanIntervalMilliseconds, signal)

@@ -12,6 +12,7 @@ import type {
   TaskSchedulerPort,
 } from './port/task-scheduler.port.js'
 
+/** 认领者标识：调度器整体是一个「owner」，而非每个任务一个，便于在锁记录上区分来源。 */
 const LOCK_OWNER = 'scheduler'
 const WORKER_DRAIN_TIMEOUT_MILLISECONDS = 30_000
 
