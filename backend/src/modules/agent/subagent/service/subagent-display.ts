@@ -71,6 +71,14 @@ export class SectionBuildNode {
     this.#createCollector = createCollector
   }
 
+  /**
+   * 接管事件出口：内部交接事件被捕获后**不再转发**（`return`），其余事件
+   * 先喂给本节点的收集器、再交给原来的出口。
+   *
+   * 拦截必须发生在 transport sink 之前——`sub_agent_display_ready` 是产品内部的
+   * 展示交接，一旦漏到 SSE 上，前端会收到一个它不认识的、也不该看到的内部事件。
+   * 收集器在 `execute` 里新建，因此每个节点只拥有本次执行产生的事件。
+   */
   public execute(context: ProductPipelineContext, signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
     const collector = this.#createCollector()
@@ -107,6 +115,9 @@ export function serializeSubAgentSectionData(data: SubAgentSectionData): AgentJs
 
 /**
  * 只捕获面向父运行的展示交接数据。返回的布尔值供 stream decorator 在 transport sink 前过滤内部事件。
+ *
+ * 注册表缺失时**同样返回 true**（消费掉但不存）：这类事件无论如何都不该流出去，
+ * 「存不下」和「不该转发」是两件事，不能因为前者失败就放行后者。
  */
 export function captureSubAgentDisplayEvent(
   event: ProductPipelineEvent,
@@ -122,6 +133,10 @@ export function captureSubAgentDisplayEvent(
 /**
  * 将子执行展示数据紧接着匹配的父 tool group 插入。
  * 非法历史会被保留，避免一条损坏记录导致整个视图被擦除。
+ *
+ * 匹配键是**父工具调用的 callId**：子执行是由父运行里某次委派工具调用发起的，
+ * 把结果插在那一组工具之后，用户的阅读顺序才是「父调用了子 → 子返回了什么」。
+ * 找不到匹配（`inserted` 为假）时返回原消息的浅拷贝，不做任何改动。
  */
 export function embedSubAgentSections(
   messages: readonly DisplayMessage[],

@@ -71,6 +71,11 @@ export class RuntimeSubAgentToolFactory {
     this.#options = { ...options, decorators: [...(options.decorators ?? [])] }
   }
 
+  /**
+   * 追加一个装饰器并返回**新的**工厂实例。
+   * 不可变：同一个工厂会并发服务多个父运行的加载，就地追加会让先启动的那些也受影响。
+   * 新装饰器追加在末尾，因此已有的在外层（与插件注册的顺序约定一致）。
+   */
   public withRuntimeDecorator(decorator: ChildRuntimeDecorator): RuntimeSubAgentToolFactory {
     return new RuntimeSubAgentToolFactory({
       ...this.#options,
@@ -91,6 +96,17 @@ export class RuntimeSubAgentToolFactory {
     }
   }
 
+  /**
+   * 为一个子 Agent 定义造出委派工具。
+   *
+   * 装饰器在**两个不同层次**被套上，别以为是一处：
+   * - `wrapLlm` / `wrapToolDispatcher` 包的是子运行内部的模型与工具（下面的循环）；
+   * - `wrapChildRunner` 包的是「发起子运行」这件事本身（函数末尾）。
+   * 前者影响子 Agent 怎么干活，后者影响父 Agent 怎么调用它——观测与授权各自需要的是不同的一层。
+   *
+   * 子执行的工具集取 `definition.systemToolIds`：子 Agent 的工具授权是它自己的，
+   * 与父的清单无关，这也是「子 Agent 是独立配置」的体现。
+   */
   #createTool(definition: SubAgentToolDefinition, request: BuildSubAgentToolsRequest): AgentTool {
     let adapter = request.parentAdapter
     let dispatcher: AgentToolDispatcher = this.#options.registry.dispatcher(
