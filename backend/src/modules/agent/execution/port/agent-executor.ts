@@ -72,7 +72,14 @@ export interface AgentExecutionInterrupt {
   readonly arguments: AgentJsonValue
 }
 
-/** Runtime 执行结果使用可辨识联合，避免状态与错误、Interrupt 形成非法组合。 */
+/**
+ * Runtime 执行结果使用可辨识联合，避免状态与错误、Interrupt 形成非法组合。
+ *
+ * `interrupt?: never` / `error?: never` 这些看起来多余的字段是**穷尽性守卫**：
+ * 有了它们，`status: 'completed'` 的分支里访问 `outcome.interrupt` 会是编译错误。
+ * 这正是这个联合比「一个宽结构 + 可选字段」强的地方——后者允许
+ * `{status:'completed', error: ...}` 这种没有意义的组合存在，而消费方无从判断该信哪个。
+ */
 export type AgentExecutionOutcome =
   | (AgentExecutionOutcomeBase & {
       readonly status: 'completed'
