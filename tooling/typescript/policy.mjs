@@ -52,6 +52,15 @@ export const typescriptSafetyRules = Object.freeze({
   '@typescript-eslint/no-floating-promises': 'error',
   '@typescript-eslint/no-misused-promises': 'error',
   '@typescript-eslint/no-non-null-assertion': 'error',
+  '@typescript-eslint/no-unused-vars': [
+    'error',
+    {
+      argsIgnorePattern: '^_',
+      caughtErrorsIgnorePattern: '^_',
+      destructuredArrayIgnorePattern: '^_',
+      varsIgnorePattern: '^_',
+    },
+  ],
   '@typescript-eslint/no-confusing-void-expression': 'off',
   '@typescript-eslint/no-deprecated': 'off',
   '@typescript-eslint/no-dynamic-delete': 'off',

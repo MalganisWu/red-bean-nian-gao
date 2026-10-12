@@ -22,7 +22,7 @@ PNPM_CONTRACT := pnpm --filter @red-bean/api-contract
 # 所有目标都是任务名而非真实文件，声明为 .PHONY 避免与同名文件冲突
 .PHONY: help setup init bootstrap require-install doctor check-tools hooks-install hooks-uninstall hooks-status fmt fmt-check diff-check secrets-check compose-check lint test \
 		test-integration build run dev clean infra-up infra-down infra-logs db-migrate db-status db-rollback \
-		ci verify verify-quick verify-full backend-verify frontend-verify sdk-revision-check sdk-verify docs-check common-conventions-check audit audit-js \
+		ci verify verify-quick verify-full backend-verify frontend-verify sdk-revision-check sdk-verify docs-check shared-files-check audit audit-js \
 		typecheck ts-lint ts-policy-check be-architecture-check be-build be-format be-format-check be-lint be-typecheck be-test be-test-integration be-install backend-ts-verify \
 		fe-dev fe-build fe-format fe-format-check fe-lint fe-typecheck fe-test fe-test-watch fe-install \
 		ds-dev ds-build ds-check ds-format ds-format-check ds-lint ds-typecheck ds-install ds-test contract fe-contract full-dev \
@@ -125,8 +125,8 @@ fe-contract: contract-build ## 前端契约校验（服务调用、路径常量�
 docs-check: ## 检查活文档索引、Markdown 链接/锚点与跨客户端 Skill 单一来源
 	./scripts/check-docs.sh
 
-common-conventions-check: ## 检查跨仓共享的 TypeScript 通用规范件与 Runtime SDK 仓逐字一致
-	./scripts/check-common-conventions.sh
+shared-files-check: ## 检查跨仓共享件（通用规范、TS 工具链配置）与 Runtime SDK 仓一致
+	node ./scripts/check-shared-files.mjs
 
 typecheck: be-typecheck fe-typecheck ds-typecheck ## 检查全部 TypeScript package
 
@@ -226,9 +226,9 @@ sdk-verify: sdk-revision-check ## 验证锁定版本的同级 Runtime SDK（SDK_
 		exit 1; }
 	$(MAKE) -C $(SDK_DIR) verify
 
-verify: require-install doctor diff-check docs-check common-conventions-check secrets-check compose-check ts-policy-check backend-verify frontend-verify ds-check sdk-verify ## 本地统一门禁（不改 Git 跟踪文件、不要求外部服务）
+verify: require-install doctor diff-check docs-check shared-files-check secrets-check compose-check ts-policy-check backend-verify frontend-verify ds-check sdk-verify ## 本地统一门禁（不改 Git 跟踪文件、不要求外部服务）
 
-verify-quick: require-install doctor diff-check docs-check common-conventions-check secrets-check compose-check ts-policy-check be-architecture-check fmt-check ## commit 前快速门禁（不改 Git 跟踪文件）
+verify-quick: require-install doctor diff-check docs-check shared-files-check secrets-check compose-check ts-policy-check be-architecture-check fmt-check ## commit 前快速门禁（不改 Git 跟踪文件）
 
 verify-full: verify test-integration audit ## 发布级门禁（额外要求基础设施、网络和安全审计工具）
 
