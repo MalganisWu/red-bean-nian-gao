@@ -43,6 +43,11 @@ export class ChildExecutionObserver
     this.#messageSink = messageSink
   }
 
+  /**
+   * 事件同时进两处：子执行自己的展示收集器（落进它的执行记录），
+   * 以及父流的事件出口（让父运行的 SSE 能把子执行的进展折叠展示出来）。
+   * 三者都可选，因此观察器的存在不会强制宿主提供任何一项能力。
+   */
   public publish(event: AgentRuntimeEvent): void {
     this.#sections?.collect(event)
     this.#eventSink?.(event)

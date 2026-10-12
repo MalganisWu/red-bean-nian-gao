@@ -31,7 +31,15 @@ export function buildSubExecutionDisplay(
   return serializeSubAgentSectionData(request)
 }
 
-/** 把一次执行结果完整写回可持久化记录，避免生命周期编排掺杂字段映射。 */
+/**
+ * 把一次执行结果完整写回可持久化记录，避免生命周期编排掺杂字段映射。
+ *
+ * 两处值得注意的取值：
+ * - `record.display = display ?? messages.map(serializeAgentMessage)`：没有独立展示 section 时
+ *   退回用原始消息，保证记录里**总有**可供展示的内容，前端不必处理「display 为空」的情况。
+ * - `record.recoveryMessages = []`：终态写入即意味着增量缓冲已被合并进 `runtimeState`，
+ *   清空它，否则下次加载会把同一批消息再恢复一遍。
+ */
 export function updateCompletedRecord(
   record: SubExecutionRecord,
   identity: ChildExecutionIdentity,
@@ -64,6 +72,14 @@ export function updateCompletedRecord(
   if (identity.parentCallId !== '') record.parentCallId = identity.parentCallId
 }
 
+/**
+ * 把 Runtime 的执行结果映射成产品侧的子执行状态。
+ *
+ * `completed` 与 `suspended` 一一对应，其余三态**都归到 FAILED**：
+ * 从「父 Agent 委派了一个任务」的视角看，被取消、迭代耗尽、报错都是「没拿到结果」，
+ * 区别只在 errorMessage 里保留。真正的中间态只有 `AWAITING_USER`——那是在等父 Agent 转达用户确认。
+ * `outcome === undefined`（连结果都没拿到）同样计为失败。
+ */
 export function executionStatus(
   outcome: AgentExecutionOutcome | undefined,
   executionError: Error | undefined
@@ -109,6 +125,11 @@ export function lastAssistantContent(messages: readonly AgentMessage[]): string 
   return ''
 }
 
+/**
+ * 递归判定是否是可安全落库的 JSON 值。
+ * `Number.isFinite` 同时排掉 `NaN`、`±Infinity`——它们能被 `typeof` 判为 number，
+ * 却无法在 JSON 里表示（序列化后变成 `null`，读回来就不再是原来的值了）。
+ */
 export function isJsonValue(value: unknown): value is AgentJsonValue {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true
   if (typeof value === 'number') return Number.isFinite(value)

@@ -27,6 +27,7 @@ import {
   updateCompletedRecord,
 } from './sub-execution-result.js'
 
+/** resume 租期与心跳；心跳取租期的 1/3，连续两次续租失败后仍有 1/3 租期可用。 */
 const RESUME_LEASE_MILLISECONDS = 30 * 60 * 1_000
 const RESUME_HEARTBEAT_MILLISECONDS = 10 * 60 * 1_000
 
@@ -60,7 +61,16 @@ export class SubExecutionLifecycle implements ChildExecutionLifecycle {
     this.#now = options.now ?? (() => new Date())
   }
 
-  /** 创建或校验子执行，并返回 Runtime 恢复所需的状态与崩溃增量。 */
+  /**
+   * 创建或校验子执行，并返回 Runtime 恢复所需的状态与崩溃增量。
+   *
+   * 恢复路径是一串有序校验，顺序不能换：**归属**（是不是我的）→ **有状态可恢复** →
+   * **interrupt ID 对得上**（且未过期）→ **当前状态允许恢复** → 认领 + 建租约。
+   * 把归属放最前是因为它是唯一会「掩盖存在性」的判定，见下。
+   *
+   * 注意「不存在」与「不属于当前会话」用的是**同一句错误文案**：
+   * 区分开会让人用 executionId 探测别人的子执行是否存在。
+   */
   public async load(
     identity: ChildExecutionIdentity,
     resume: boolean,
@@ -76,6 +86,7 @@ export class SubExecutionLifecycle implements ChildExecutionLifecycle {
     if (executionId === '') throw new Error('子执行 execution_id 不能为空')
     const existing = await this.#repository.getById(executionId, signal)
     if (existing === undefined) {
+      // 要恢复一个不存在的子执行：多半是父 Agent 拿了一个过期或别人给的 executionId。
       if (resume) throw new Error(`子执行 ${JSON.stringify(executionId)} 不存在或不属于当前会话`)
       const created = this.#newRecord(identity, this.#now())
       await this.#repository.create(created, signal)
@@ -131,7 +142,13 @@ export class SubExecutionLifecycle implements ChildExecutionLifecycle {
     }
   }
 
-  /** 将中性执行结果提交为产品记录，提交成功后才清理增量缓冲。 */
+  /**
+   * 将中性执行结果提交为产品记录，提交成功后才清理增量缓冲。
+   *
+   * 两道门槛在写入之前：**租约仍然有效**（失效说明别的实例已接管，写进去就是覆盖别人的结果）
+   * 与 **revision 未变**（CAS）。
+   * 租约的 `release()` 放在 `finally`，且失败路径也走它——否则一次写失败会让心跳定时器一直活着。
+   */
   public async save(
     identity: ChildExecutionIdentity,
     outcome: AgentExecutionOutcome | undefined,
