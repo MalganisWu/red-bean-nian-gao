@@ -457,6 +457,6 @@
 | 2026-08-28 | 定时任务列表聚合 | 列表与会话任务接口返回 `TaskListItem`，批量携带会话标题与最近执行摘要，支持“需要关注”和未读状态展示 |
 | 2026-08-31 | 安全与事件契约收口 | storage 全路由鉴权并校验 key 归属；修正 wildcard、health/readyz、status/heartbeat/compaction；新增前后端共享 SSE payload golden |
 | 2026-09-03 | 能力图瘦身 | 删除动态插件与 Generation 管理 API；`/version` 保留为部署探针 |
-| 2026-09-04 | TypeScript 后端切换 | 30 条路由与 SSE 契约由 Fastify 生产入口承担，Go 检查降为观察期 oracle |
-| 2026-09-07 | Go 后端退役 | 删除 Go oracle，契约由 TypeScript 后端与前端双向测试持续校验 |
+| 2026-09-04 | 生产入口切换 | 30 条路由与 SSE 契约改由 Fastify 生产入口承担 |
+| 2026-09-07 | 契约校验收口 | 交叉校验实现退役，契约由后端与前端双向测试持续校验 |
 | 2026-10-08 | 存量兼容清理 | 删除不再有生产者的遗留结构：`DisplayMessage.think`/`ThinkEntry`/`serializeThinkEntry`、`PersistedDisplayMessageDto.steps`/`LegacyStepDto`/`isLegacyStep`、`PersistedMessageSectionDto` 的 `process` 变体/`ProcessStepItemDto`/`isProcessStep`、前端遗留 SSE `think` 事件；持久化形态以此文与 `api-contract` 为准 |

@@ -28,8 +28,6 @@ Agent Loader 只接收 Runtime SDK 的中性 `LLMAdapterFactory`，不得直接�
 `backend/src/entrypoint/server.main.ts` 只负责信号、配置和启动调用。`src/app/composition-root.ts` 是显式组装层，不是运行期
 Service Locator，业务模块仍只通过构造函数接收依赖。
 
-业务后端已完成 TypeScript 迁移，生产源码、测试、数据库迁移与本地门禁均不再依赖 Go。
-
 运行中的实例不安装 Provider、重建能力图或切换 Generation。需要新增协议实现、工具代码或 Runtime
 版本时，修改代码、验证并部署新的产品实例；部署平台负责健康检查与旧实例优雅退出。模型、凭据和
 Agent 授权等数据库配置可在下一次运行加载时生效，但不在单次流式运行中途更换 Adapter。

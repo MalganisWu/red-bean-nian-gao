@@ -35,7 +35,7 @@
 
 - [ ] 日志使用 JSON，生产日志级别合理；可按 trace ID、run ID、session ID 定位一次运行，并确认
   `http.request → agent.load/agent.execute → llm.stream/tool.execute` 层级可检索。
-- [ ] 明确选择 `slog` 或 `otlp`。使用 OTLP 时，Collector endpoint、TLS、认证和网络策略通过标准
+- [ ] 明确选择 `structured` 或 `otlp`。使用 OTLP 时，Collector endpoint、TLS、认证和网络策略通过标准
   `OTEL_EXPORTER_OTLP_*` 环境变量配置，`service.name`、环境和采样率符合当前部署，并验证优雅停机
   能在超时内刷新 exporter。
 - [ ] 用合法 `traceparent` 冒烟确认 `X-Trace-ID` 继承上游 Trace ID；用非法 header 确认服务生成新的

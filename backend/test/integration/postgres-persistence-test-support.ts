@@ -22,8 +22,7 @@ import { stringField } from './integration-environment-test-support.js'
 export const EXPECTED_TABLES = [
   'agent_task_executions',
   'api_credentials',
-  'bun_migration_locks',
-  'bun_migrations',
+  'schema_migrations',
   'core_agents',
   'llm_configs',
   'mcp_servers',

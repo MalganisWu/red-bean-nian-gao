@@ -3,9 +3,8 @@ import { normalizeError } from '../../shared/errors/normalize-error.js'
 
 import type { SqlExecutor, TransactionalSqlExecutor } from './postgres.js'
 
-const HISTORY_TABLE = 'bun_migrations'
-const LOCKS_TABLE = 'bun_migration_locks'
-const ADVISORY_LOCK_NAME = 'red-bean-nian-gao:bun_migrations'
+const HISTORY_TABLE = 'schema_migrations'
+const ADVISORY_LOCK_NAME = 'red-bean-nian-gao:schema_migrations'
 
 export interface Migration {
   readonly name: string
@@ -441,7 +440,7 @@ export const MIGRATIONS: readonly Migration[] = Object.freeze([
   ),
 ])
 
-/** 在执行规范化 SQL migration 时精确保留既有 Bun migration 历史。 */
+/** 在执行规范化 SQL migration 时精确保留既有迁移历史。 */
 export class PostgresMigrator implements MigrationRunnerPort {
   readonly #database: TransactionalSqlExecutor
   readonly #migrations: readonly Migration[]
@@ -462,14 +461,6 @@ export class PostgresMigrator implements MigrationRunnerPort {
           name VARCHAR,
           group_id BIGINT,
           migrated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )`,
-        [],
-        signal
-      )
-      await this.#database.query(
-        `CREATE TABLE IF NOT EXISTS ${LOCKS_TABLE} (
-          id BIGSERIAL PRIMARY KEY,
-          table_name VARCHAR UNIQUE
         )`,
         [],
         signal

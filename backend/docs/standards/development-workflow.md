@@ -92,7 +92,7 @@ README，不回写历史 spec / plan 来描述新现状。完整分类见仓库 
 **数据库迁移**：
 - 一次任务相关的表、字段、索引和回滚 SQL 作为一个 migration 追加到
   `src/infra/database/migrator.ts`，不修改已执行历史。
-- migration 名称继续使用 14 位时间戳，TypeScript migrator 必须兼容既有 Bun history。
+- migration 名称继续使用 14 位时间戳，TypeScript migrator 必须兼容既有 history。
 - 迁移通过 `make db-migrate` 执行，并用真实 PostgreSQL 验证 up、status、down 与存量 history。
 
 ---

@@ -4,7 +4,7 @@ import { tracing } from '@opentelemetry/sdk-node'
 import type { TracerPort } from '../../shared/observability/tracer.js'
 
 import { OTelTracer, PreferredTraceIdGenerator } from './otel-tracer.js'
-import { SlogTracer, type StructuredLogSink } from './slog-tracer.js'
+import { StructuredLogTracer, type StructuredLogSink } from './structured-log-tracer.js'
 
 const INSTRUMENTATION_NAME = 'red-bean-nian-gao'
 
@@ -45,15 +45,15 @@ export function createObservabilityProvider(
   options: ObservabilityProviderOptions,
   dependencies: ObservabilityProviderDependencies = {}
 ): ObservabilityProvider {
-  const exporterName = options.exporter.trim().toLowerCase() || 'slog'
+  const exporterName = options.exporter.trim().toLowerCase() || 'structured'
   const serviceName = options.serviceName.trim()
   if (serviceName === '') throw new Error('create trace provider: service name must not be empty')
   if (options.sampleRatio <= 0 || options.sampleRatio > 1) {
     throw new Error('create trace provider: sample ratio must be in (0, 1]')
   }
 
-  if (exporterName === 'slog') {
-    return new ObservabilityProvider(new SlogTracer({ sink: dependencies.logSink }))
+  if (exporterName === 'structured') {
+    return new ObservabilityProvider(new StructuredLogTracer({ sink: dependencies.logSink }))
   }
   if (exporterName !== 'otlp') {
     throw new Error(

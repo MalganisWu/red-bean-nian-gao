@@ -70,7 +70,7 @@ backend/
 1. 连接 PostgreSQL、Redis、MinIO，运行健康检查、schema 校验和默认数据初始化。
 2. 创建 Identity、Storage、Agent、Task、System Module；Module 内的 `*.module.ts` 明确完成 Port 到默认实现
    的第一层绑定，LLM、Tool Registry 位于 `platform/` 并在启动期封闭。
-3. 按配置创建 slog 或 OTLP/HTTP 观测 Provider，将 Runtime decorator、Provider shutdown 等依赖显式
+3. 按配置创建结构化日志或 OTLP/HTTP 观测 Provider，将 Runtime decorator、Provider shutdown 等依赖显式
    注入消费者；启动完成后不再改变 Registry 或能力图。
 4. 收集各 Module 的路由依赖表并注册 Fastify 路由；Trace hook 在 HTTP 边缘处理 W3C Trace Context。
 5. 启动 HTTP、Scheduler 和周期 delivery reconcile；收到信号或 serve 错误后取消并等待后台任务。
@@ -217,7 +217,7 @@ AgentLoader.load
 | 工具                               | 中性 Tool/Dispatcher 与可选 builtin               | 封闭 Tool Registry、Provider 插件、权限、默认启用、产品仓储工具                       |
 | 子 Agent                           | `ChildRunner` / DelegationTool                    | DB 执行记录、恢复、事件包装与展示                                                     |
 | LLM Provider                       | `LLMAdapter` / `LLMAdapterFactory` 与默认 Adapter | 启动期封闭 Registry、静态 Provider、凭据和每次运行的模型选择                          |
-| 插件与观测                         | 静态 Plugin、Tracer、LLM/Tool/ChildRunner wrapper | 启动期依赖组装、HTTP/Pipeline/Scheduler span、slog/OTLP Provider、W3C 传播            |
+| 插件与观测                         | 静态 Plugin、Tracer、LLM/Tool/ChildRunner wrapper | 启动期依赖组装、HTTP/Pipeline/Scheduler span、结构化日志/OTLP Provider、W3C 传播            |
 | 核心进程更新                       | 无                                                | 构建并部署新的产品实例；应用提供版本与探针并优雅退出                                  |
 
 禁止把产品 presentation、Session、Redis key 或 PostgreSQL row model 移入 Runtime。产品不复制 Runtime

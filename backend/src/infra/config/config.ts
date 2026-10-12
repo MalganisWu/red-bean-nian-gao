@@ -218,7 +218,7 @@ export function parseConfig(raw: unknown, environment: Environment): AppConfig {
         'exporter',
         environment,
         'OBSERVABILITY_EXPORTER',
-        'slog'
+        'structured'
       ),
       serviceName: stringValue(
         observability,
@@ -294,8 +294,8 @@ function validateConfig(config: AppConfig): void {
   validateTimezone(config.scheduledTask.timezone)
 
   const exporter = config.observability.exporter.trim().toLowerCase()
-  if (exporter !== 'slog' && exporter !== 'otlp') {
-    throw new Error('observability.exporter 必须是 slog 或 otlp')
+  if (exporter !== 'structured' && exporter !== 'otlp') {
+    throw new Error('observability.exporter 必须是 structured 或 otlp')
   }
   if (config.observability.serviceName.trim().length === 0) {
     throw new Error('observability.service_name 未设置')

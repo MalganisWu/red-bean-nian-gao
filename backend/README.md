@@ -199,7 +199,7 @@ backend/
 | `scheduled_task.batch_size` | 每轮扫描任务上限 | `100` |
 | `scheduled_task.max_concurrent` | scheduler 最大并发数 | `4` |
 | `scheduled_task.execution_timeout` | 单次执行超时 | `15m` |
-| `observability.exporter` | Trace 后端 | `slog`（默认）或 `otlp` |
+| `observability.exporter` | Trace 后端 | `structured`（默认）或 `otlp` |
 | `observability.service_name` | OTel `service.name` | `red-bean-nian-gao`；可由 `OTEL_SERVICE_NAME` 覆盖 |
 | `observability.sample_ratio` | 本地新 Trace 采样率 | `(0, 1]`；可由 `OTEL_TRACES_SAMPLER_ARG` 覆盖 |
 | `dev_user.username` | 本地默认用户 | 留空则不创建 |
@@ -332,7 +332,7 @@ make db-migrate
    {"time":"...","level":"INFO","msg":"span.end","request_id":"REQ_...","trace_id":"...","span_id":"...","span.name":"pipeline.run"}
    ```
 
-默认 `slog` 模式不建立外部连接。启用 OTLP/HTTP 时设置 `observability.exporter: otlp` 或
+默认 `structured` 模式不建立外部连接。启用 OTLP/HTTP 时设置 `observability.exporter: otlp` 或
 `OBSERVABILITY_EXPORTER=otlp`，再用标准 `OTEL_EXPORTER_OTLP_ENDPOINT`、
 `OTEL_EXPORTER_OTLP_HEADERS`、`OTEL_EXPORTER_OTLP_INSECURE` 等环境变量配置 Collector。业务 handler、
 Pipeline 和工具无需改动；进程关闭时应用 lifecycle 会刷新并关闭 exporter。详见

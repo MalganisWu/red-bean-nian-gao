@@ -12,7 +12,7 @@
 | HTTP | Fastify 5 | 路由、中间件、SSE 与优雅关闭 |
 | Schema | Zod 4 + 显式解析器 | HTTP、数据库 JSON、配置等不可信边界运行时校验 |
 | PostgreSQL | `pg` 8 + 显式 SQL | 不使用 ORM，不用复杂查询构建器隐藏 SQL |
-| 数据库迁移 | TypeScript migrator | 读取并延续既有 `bun_migrations` 历史 |
+| 数据库迁移 | TypeScript migrator | 冻结数组式迁移目录 + `schema_migrations` 历史表 |
 | Redis | `redis` 6 | 取消、MessageBuffer、lease/fencing 与投递队列 |
 | 对象存储 | MinIO JavaScript SDK 8 | 上传、下载、删除与预签名 URL |
 | 配置 | `yaml` 2 + 环境变量 + 显式校验 | `config.yaml` → 环境变量（`backend/.env.local` 在入口注入） |
@@ -51,8 +51,7 @@
 
 - `pg` 连接池和事务边界集中在 `src/infra/database`，仓储使用参数化 SQL。
 - PostgreSQL 行、JSONB、nullable 字段在进入领域层前解析；不会用 TypeScript 断言代替运行时校验。
-- TypeScript migrator 内置既有迁移的同序 SQL，并继续读写 `bun_migrations` / `bun_migration_locks`，
-  不会重放存量迁移。
+- TypeScript migrator 内置全部迁移的同序 SQL，按编号顺序读写 `schema_migrations`，不会重放已应用的迁移。
 - `src/entrypoint/migrate.main.ts` 提供 `up`、`down`、`status`。生产通过独立 job 执行，应用实例只校验 schema。
 
 ### 配置

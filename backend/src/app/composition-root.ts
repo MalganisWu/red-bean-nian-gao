@@ -11,7 +11,7 @@ import { connectPostgres } from '../infra/database/postgres.js'
 import { TimestampIdGenerator } from '../infra/id-generator.js'
 import { createLogger, type Logger } from '../infra/logger/logger.js'
 import { createObservabilityProvider } from '../infra/observability/provider.js'
-import { newTraceId } from '../infra/observability/slog-tracer.js'
+import { newTraceId } from '../infra/observability/structured-log-tracer.js'
 import { W3CTraceContextExtractor } from '../infra/observability/w3c-propagator.js'
 import { connectRedis } from '../infra/redis/redis.js'
 import {

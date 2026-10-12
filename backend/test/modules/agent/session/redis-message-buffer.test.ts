@@ -74,7 +74,7 @@ class MemoryRedisMessages implements RedisMessageBufferStore {
 }
 
 void describe('Redis message buffer', () => {
-  void it('uses the Go-compatible key and a 24-hour atomic append TTL', async () => {
+  void it('uses the session key and a 24-hour atomic append TTL', async () => {
     const store = new MemoryRedisMessages()
     const buffer = new RedisMessageBuffer(store)
     const signal = AbortSignal.timeout(1_000)

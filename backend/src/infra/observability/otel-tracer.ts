@@ -18,7 +18,7 @@ import {
 import type { tracing } from '@opentelemetry/sdk-node'
 import type { TraceAttribute, TraceSpan, TracerPort } from '../../shared/observability/tracer.js'
 
-import { newSpanId, newTraceId } from './slog-tracer.js'
+import { newSpanId, newTraceId } from './structured-log-tracer.js'
 
 const RESERVED_ATTRIBUTES = new Set([
   'trace.id',

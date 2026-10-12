@@ -29,7 +29,7 @@ class MigrationDatabase implements TransactionalSqlExecutor {
     if (this.failWhenSqlIncludes !== '' && sql.includes(this.failWhenSqlIncludes)) {
       return Promise.reject(new Error('migration statement failed'))
     }
-    if (sql.includes('FROM bun_migrations')) {
+    if (sql.includes('FROM schema_migrations')) {
       return Promise.resolve({ rows: this.historyRows, rowCount: this.historyRows.length })
     }
     return Promise.resolve({ rows: [], rowCount: 0 })
@@ -65,7 +65,7 @@ const migrationNames = [
   '20260911000001',
 ]
 
-void describe('Bun-compatible TypeScript migrator', () => {
+void describe('TypeScript migrator', () => {
   void it('registers the frozen migrations in the original order', () => {
     assert.deepEqual(
       MIGRATIONS.map((migration): string => migration.name),
@@ -75,7 +75,7 @@ void describe('Bun-compatible TypeScript migrator', () => {
     assert.ok(MIGRATIONS.every((migration): boolean => migration.down.length > 0))
   })
 
-  void it('initializes Bun history tables and applies every pending migration as one group', async () => {
+  void it('initializes the migration history table and applies every pending migration as one group', async () => {
     const database = new MigrationDatabase()
     const migrator = new PostgresMigrator(database)
 
@@ -83,10 +83,9 @@ void describe('Bun-compatible TypeScript migrator', () => {
 
     assert.deepEqual(group, { groupId: 1, migrationNames })
     assert.equal(database.transactions, 1)
-    assert.ok(database.queries.some((query): boolean => query.sql.includes('bun_migrations')))
-    assert.ok(database.queries.some((query): boolean => query.sql.includes('bun_migration_locks')))
+    assert.ok(database.queries.some((query): boolean => query.sql.includes('schema_migrations')))
     const historyWrites = database.queries.filter((query): boolean =>
-      query.sql.includes('INSERT INTO bun_migrations')
+      query.sql.includes('INSERT INTO schema_migrations')
     )
     assert.equal(historyWrites.length, migrationNames.length)
     assert.deepEqual(
@@ -95,7 +94,7 @@ void describe('Bun-compatible TypeScript migrator', () => {
     )
   })
 
-  void it('recognizes an existing Bun history without replaying migrations', async () => {
+  void it('recognizes an existing history without replaying migrations', async () => {
     const database = new MigrationDatabase()
     database.historyRows = migrationNames.map((name, index): unknown => ({
       id: String(index + 1),
@@ -112,13 +111,14 @@ void describe('Bun-compatible TypeScript migrator', () => {
     assert.equal(database.transactions, 1)
     assert.ok(status.every((migration): boolean => migration.status === 'applied'))
     assert.equal(
-      database.queries.filter((query): boolean => query.sql.includes('INSERT INTO bun_migrations'))
-        .length,
+      database.queries.filter((query): boolean =>
+        query.sql.includes('INSERT INTO schema_migrations')
+      ).length,
       0
     )
   })
 
-  void it('rejects unknown, duplicate and non-prefix Bun histories', async () => {
+  void it('rejects unknown, duplicate and non-prefix histories', async () => {
     for (const historyRows of [
       [historyRow('20990101000000', 1, 1)],
       [historyRow(migrationNames[0] ?? '', 1, 1), historyRow(migrationNames[0] ?? '', 2, 1)],
@@ -131,7 +131,7 @@ void describe('Bun-compatible TypeScript migrator', () => {
     }
   })
 
-  void it('rolls back only the latest Bun migration group in reverse order', async () => {
+  void it('rolls back only the latest migration group in reverse order', async () => {
     const database = new MigrationDatabase()
     database.historyRows = migrationNames.map((name, index): unknown =>
       historyRow(name, index + 1, index < 10 ? 1 : 2)
@@ -153,7 +153,7 @@ void describe('Bun-compatible TypeScript migrator', () => {
       ],
     })
     const deletes = database.queries.filter((query): boolean =>
-      query.sql.includes('DELETE FROM bun_migrations')
+      query.sql.includes('DELETE FROM schema_migrations')
     )
     assert.deepEqual(
       deletes.map((query): unknown => query.parameters),

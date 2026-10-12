@@ -9,11 +9,11 @@ import { OTelTracer, PreferredTraceIdGenerator } from '../../src/infra/observabi
 import { createObservabilityProvider } from '../../src/infra/observability/provider.js'
 import type { ObservabilityProvider } from '../../src/infra/observability/provider.js'
 import {
-  SlogTracer,
+  StructuredLogTracer,
   newTraceId,
   type StructuredLogRecord,
   type StructuredLogSink,
-} from '../../src/infra/observability/slog-tracer.js'
+} from '../../src/infra/observability/structured-log-tracer.js'
 import { W3CTraceContextExtractor } from '../../src/infra/observability/w3c-propagator.js'
 
 class RecordingLogSink implements StructuredLogSink {
@@ -52,7 +52,7 @@ afterEach(async (): Promise<void> => {
   await Promise.all(providers.splice(0).map((provider): Promise<void> => provider.shutdown()))
 })
 
-void describe('Slog tracing adapter', () => {
+void describe('Structured log tracing adapter', () => {
   void it('generates unique W3C-compatible trace IDs', () => {
     const first = newTraceId()
     const second = newTraceId()
@@ -66,7 +66,7 @@ void describe('Slog tracing adapter', () => {
     const sink = new RecordingLogSink()
     const spanIds = ['1111111111111111', '2222222222222222']
     const clockValues = [0, 0, 5, 8]
-    const tracer = new SlogTracer({
+    const tracer = new StructuredLogTracer({
       sink,
       traceIdGenerator: (): string => 'a'.repeat(32),
       spanIdGenerator: (): string => spanIds.shift() ?? 'f'.repeat(16),
@@ -98,7 +98,7 @@ void describe('Slog tracing adapter', () => {
 
   void it('emits trace_id once in every nested JSON log record', async () => {
     const sink = new RecordingLogSink()
-    const tracer = new SlogTracer({
+    const tracer = new StructuredLogTracer({
       sink,
       traceIdGenerator: (): string => 'a'.repeat(32),
       spanIdGenerator: (): string => '1'.repeat(16),
@@ -230,10 +230,10 @@ void describe('OpenTelemetry tracing adapter', () => {
 })
 
 void describe('observability provider', () => {
-  void it('uses slog by default without creating an exporter', () => {
+  void it('uses structured logging by default without creating an exporter', () => {
     let exporterCreated = false
     const provider = createObservabilityProvider(
-      { exporter: 'slog', serviceName: 'service', environment: '', sampleRatio: 1 },
+      { exporter: 'structured', serviceName: 'service', environment: '', sampleRatio: 1 },
       {
         exporterFactory: (): tracing.SpanExporter => {
           exporterCreated = true
@@ -243,7 +243,7 @@ void describe('observability provider', () => {
     )
     providers.push(provider)
 
-    assert.ok(provider.tracer() instanceof SlogTracer)
+    assert.ok(provider.tracer() instanceof StructuredLogTracer)
     assert.equal(exporterCreated, false)
   })
 

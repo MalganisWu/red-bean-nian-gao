@@ -95,7 +95,7 @@ const QUIET_LOGGER: Logger = {
 }
 
 void describe('TypeScript database bootstrap', () => {
-  void it('runs migrations and seeds the Go-compatible defaults idempotently', async () => {
+  void it('runs migrations and seeds the baseline records idempotently', async () => {
     const database = new RecordingDatabase()
     const migrator = new RecordingMigrator()
     const hasher = new RecordingHasher()
@@ -175,6 +175,6 @@ function config(autoMigrate: boolean): AppConfig {
       maxConcurrent: 4,
       executionTimeout: '15m',
     },
-    observability: { exporter: 'slog', serviceName: 'red-bean-nian-gao', sampleRatio: 1 },
+    observability: { exporter: 'structured', serviceName: 'red-bean-nian-gao', sampleRatio: 1 },
   }
 }

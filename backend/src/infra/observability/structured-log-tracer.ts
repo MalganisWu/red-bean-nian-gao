@@ -16,14 +16,14 @@ export interface StructuredLogSink {
   write(record: StructuredLogRecord): void
 }
 
-export interface SlogTracerOptions {
+export interface StructuredLogTracerOptions {
   readonly sink?: StructuredLogSink | undefined
   readonly traceIdGenerator?: (() => string) | undefined
   readonly spanIdGenerator?: (() => string) | undefined
   readonly now?: (() => number) | undefined
 }
 
-interface ActiveSlogSpan {
+interface ActiveStructuredLogSpan {
   readonly traceId: string
   readonly spanId: string
 }
@@ -35,14 +35,14 @@ class JsonConsoleLogSink implements StructuredLogSink {
 }
 
 /** Runtime tracing 契约的零依赖结构化日志实现。 */
-export class SlogTracer implements TracerPort {
-  readonly #active = new AsyncLocalStorage<ActiveSlogSpan>()
+export class StructuredLogTracer implements TracerPort {
+  readonly #active = new AsyncLocalStorage<ActiveStructuredLogSpan>()
   readonly #sink: StructuredLogSink
   readonly #traceIdGenerator: () => string
   readonly #spanIdGenerator: () => string
   readonly #now: () => number
 
-  public constructor(options: SlogTracerOptions = {}) {
+  public constructor(options: StructuredLogTracerOptions = {}) {
     this.#sink = options.sink ?? new JsonConsoleLogSink()
     this.#traceIdGenerator = options.traceIdGenerator ?? newTraceId
     this.#spanIdGenerator = options.spanIdGenerator ?? newSpanId
@@ -61,8 +61,8 @@ export class SlogTracer implements TracerPort {
       this.#traceIdGenerator()
     const parentSpanId =
       parent?.spanId ?? attributeValue(start.attributes, 'trace.parent_span_id') ?? ''
-    const state: ActiveSlogSpan = { traceId, spanId: this.#spanIdGenerator() }
-    const span = new SlogSpan({
+    const state: ActiveStructuredLogSpan = { traceId, spanId: this.#spanIdGenerator() }
+    const span = new StructuredLogSpan({
       start,
       state,
       parentSpanId,
@@ -76,28 +76,28 @@ export class SlogTracer implements TracerPort {
   }
 }
 
-interface SlogSpanOptions {
+interface StructuredLogSpanOptions {
   readonly start: { readonly name: string; readonly attributes: readonly TraceAttribute[] }
-  readonly state: ActiveSlogSpan
+  readonly state: ActiveStructuredLogSpan
   readonly parentSpanId: string
   readonly sink: StructuredLogSink
-  readonly active: AsyncLocalStorage<ActiveSlogSpan>
+  readonly active: AsyncLocalStorage<ActiveStructuredLogSpan>
   readonly startedAt: number
   readonly now: () => number
 }
 
-class SlogSpan implements TraceSpan {
+class StructuredLogSpan implements TraceSpan {
   readonly #name: string
-  readonly #state: ActiveSlogSpan
+  readonly #state: ActiveStructuredLogSpan
   readonly #parentSpanId: string
   readonly #sink: StructuredLogSink
-  readonly #active: AsyncLocalStorage<ActiveSlogSpan>
+  readonly #active: AsyncLocalStorage<ActiveStructuredLogSpan>
   readonly #startedAt: number
   readonly #now: () => number
   readonly #attributes: Map<string, string>
   #ended = false
 
-  public constructor(options: SlogSpanOptions) {
+  public constructor(options: StructuredLogSpanOptions) {
     this.#name = options.start.name
     this.#state = options.state
     this.#parentSpanId = options.parentSpanId

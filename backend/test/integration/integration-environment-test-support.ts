@@ -234,7 +234,7 @@ export function applicationConfig(
       executionTimeout: '15m',
     },
     observability: {
-      exporter: 'slog',
+      exporter: 'structured',
       serviceName: 'red-bean-nian-gao-http-integration',
       sampleRatio: 1,
     },

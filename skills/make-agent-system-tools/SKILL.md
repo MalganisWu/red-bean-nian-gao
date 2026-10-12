@@ -74,7 +74,7 @@ description: 在 red-bean-nian-gao 中新增、修改或评审后端 sys_* 系�
 完成实现后查看完整 diff，并按 `AGENTS.md` 执行文档影响审查：
 
 - 工具清单、行为、注册或默认启用状态变化时，更新 `docs/design/tool/tool-system.md`。
-- Runtime 公共行为变化时，更新 Runtime 的 README、Go doc、示例或兼容性说明中实际受影响的部分。
+- Runtime 公共行为变化时，更新 Runtime 的 README、API 文档、示例或兼容性说明中实际受影响的部分。
 - 只有真实 HTTP、SSE 或其他公开契约发生变化时才更新相应契约；不能预设“系统工具永远与契约无关”。
 - 架构、命令或开发流程发生变化时，检查相应 `AGENTS.md`、标准文档和 README。
 

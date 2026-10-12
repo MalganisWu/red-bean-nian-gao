@@ -64,7 +64,7 @@ void it('builds, starts, and gracefully drains the complete TypeScript applicati
       executionTimeout: '15m',
     },
     observability: {
-      exporter: 'slog',
+      exporter: 'structured',
       serviceName: 'red-bean-nian-gao-integration',
       sampleRatio: 1,
     },

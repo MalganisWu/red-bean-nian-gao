@@ -60,8 +60,8 @@ scheduler.run
   Chat 与定时任务复用同一套 Agent Module 执行能力。
 - `agent.delegate` 记录 agent/execution/parent-call、run/resume、status 及父链路身份；子运行继续使用
   同一个 Trace ID，并在该 span 下建立自己的模型与工具 span。
-- `src/infra/observability/provider.ts` 根据配置提供 `SlogTracer` 或 `OTelTracer`。默认
-  `SlogTracer` 不初始化网络连接，把 `trace_id`、`span_id`、`parent_span_id`、耗时、状态和低基数
+- `src/infra/observability/provider.ts` 根据配置提供 `StructuredLogTracer` 或 `OTelTracer`。默认
+  `StructuredLogTracer` 不初始化网络连接，把 `trace_id`、`span_id`、`parent_span_id`、耗时、状态和低基数
   字段写入结构化日志；`OTelTracer` 把同一中性契约映射到 OpenTelemetry SDK。
 - OTel 模式使用 OTLP/HTTP Batch Exporter、`ParentBased(TraceIDRatioBased)` 采样、自定义 IDGenerator
   和包含 `service.name`、`deployment.environment.name` 及 SDK 默认字段的 Resource。产品 Trace ID、
@@ -69,7 +69,7 @@ scheduler.run
 - Provider shutdown 由应用组装层直接登记到 lifecycle，随进程反向关闭并尽力刷新在途 span；初始化和
   关闭错误保留完整上下文。
 - HTTP middleware 和 Scheduler 只负责建立根 span 与生成身份；业务 handler、Node 和工具不直接依赖
-  slog 或具体追踪厂商。
+  具体日志实现或追踪厂商。
 
 Runtime SDK 仍不依赖 OpenTelemetry。Exporter、采样器、资源属性、脱敏和 W3C 传播都位于产品适配器
 或部署配置；未来替换 Trace 后端时只改 Provider/包装器，不改 Runtime 和业务逻辑。
@@ -78,7 +78,7 @@ Runtime SDK 仍不依赖 OpenTelemetry。Exporter、采样器、资源属性、�
 
 ```yaml
 observability:
-  exporter: slog # slog | otlp
+  exporter: structured # structured | otlp
   service_name: red-bean-nian-gao
   sample_ratio: 1.0 # (0, 1]
 ```

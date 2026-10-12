@@ -4,8 +4,8 @@ Backend AI 开发助手手册。写代码前先读仓库根 `AGENTS.md` 和本�
 
 ## 项目定位
 
-业务后端是严格 TypeScript 实现，Node.js 运行编译后的 ESM JavaScript。HTTP/SSE、PostgreSQL schema、
-Bun migration history、Redis key/TTL、MinIO、认证和 Agent 行为均由 TypeScript 实现与测试维护。
+业务后端是严格 TypeScript 实现，Node.js 运行编译后的 ESM JavaScript。HTTP/SSE、PostgreSQL schema
+与迁移历史、Redis key/TTL、MinIO、认证和 Agent 行为均由 TypeScript 实现与测试维护。
 
 ## API 契约同步（硬性红线）
 

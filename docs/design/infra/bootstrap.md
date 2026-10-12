@@ -49,8 +49,8 @@ bucket、连接自检、migration 或默认数据任一步失败都会阻止 HTT
   独立 job 通过 `backend/src/entrypoint/migrate.main.ts`（`make db-migrate`）执行，避免多个应用副本并发 DDL。
 
 迁移目录是 `backend/src/infra/database/migrator.ts` 的 `MIGRATIONS` 冻结数组（随二进制编译发布，
-不存在独立的 `backend/migrations/` 目录）。TypeScript migrator 继续读写 Bun 创建的
-`bun_migrations` / `bun_migration_locks`，并验证记录是冻结数组的合法前缀。已有历史不会重放；
+不存在独立的 `backend/migrations/` 目录）。TypeScript migrator 读写 `schema_migrations` 历史表，
+并验证记录是冻结数组的合法前缀。已应用的 migration 不会重放；
 新 migration 必须追加定义，不修改已经执行的历史 migration。
 
 ## 默认数据

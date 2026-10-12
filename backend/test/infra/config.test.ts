@@ -115,7 +115,7 @@ void describe('TypeScript backend configuration', () => {
     }
   })
 
-  void it('applies the Go-compatible defaults', () => {
+  void it('applies the documented defaults', () => {
     const config = parseConfig(validRawConfig(), {})
     assert.deepEqual(config.server, {
       host: '0.0.0.0',
@@ -136,7 +136,7 @@ void describe('TypeScript backend configuration', () => {
       executionTimeout: '15m',
     })
     assert.deepEqual(config.observability, {
-      exporter: 'slog',
+      exporter: 'structured',
       serviceName: 'red-bean-nian-gao',
       sampleRatio: 1,
     })
@@ -243,7 +243,7 @@ void describe('TypeScript backend configuration', () => {
     assert.throws(() => parseConfig(excessiveSampleRatio, {}), /sample_ratio/)
   })
 
-  void it('parses compound Go-style positive durations', () => {
+  void it('parses compound positive durations', () => {
     assert.equal(parseDurationMilliseconds('1h30m5.5s'), 5_405_500)
     assert.throws(() => parseDurationMilliseconds('0s'), /greater than zero/)
     assert.throws(() => parseDurationMilliseconds('1 day'), /duration/)
