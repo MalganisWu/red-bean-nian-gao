@@ -27,7 +27,13 @@ export interface ApplicationRouteDependencies {
   readonly users: UserRouteDependencies
 }
 
-/** 生产启动和路由契约测试共用的唯一注册入口。 */
+/**
+ * 生产启动和路由契约测试共用的唯一注册入口。
+ *
+ * 「共用」是重点：契约测试走的就是这条函数，因此**不存在「生产注册了但测试没覆盖」的路由**。
+ * 如果各模块自己在别处补注册，两边就会漂移，而路由表偏偏是最不该靠人工核对的东西。
+ * 注册完成后 `composition-root` 还会跑一次路由目录对账，漏注册与裸注册都会让启动失败。
+ */
 export function registerApplicationRoutes(
   server: FastifyInstance,
   dependencies: ApplicationRouteDependencies

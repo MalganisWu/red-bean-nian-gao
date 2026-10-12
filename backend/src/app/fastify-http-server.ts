@@ -33,6 +33,13 @@ export class FastifyHttpServer implements HttpServer {
     })
   }
 
+  /**
+   * 启动并**驻留到关闭为止**：先 `listen`，再等 `#closed` 兑现。
+   *
+   * 第二个 `await` 是让 `ServerApplication.run` 的 `Promise.race` 成立的关键——
+   * Fastify 的 `listen()` 一旦开始服务就 resolve 了，若这里直接返回，
+   * 「服务自己挂掉」就永远不会被观察到。等 `onClose` 钩子兑现，才等价于「一直服务到关闭」。
+   */
   public async listen(): Promise<void> {
     if (this.#started) throw new Error('HTTP server is already started')
     this.#started = true
@@ -40,11 +47,18 @@ export class FastifyHttpServer implements HttpServer {
     await this.#closed.promise
   }
 
+  /** 优雅关闭，且可被中止打断——超时后由 `ServerApplication` 改用 `close()` 强制收尾。 */
   public async shutdown(signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
     await raceWithAbort(this.#gracefulClose(), signal)
   }
 
+  /**
+   * 强制关闭：先掐掉所有连接再走优雅关闭。
+   * 顺序是有意的——`server.close()` 只停止接受新连接并等待存量请求结束，
+   * 不主动断开长连接（SSE 就是长连接）。不先 `closeAllConnections()` 的话，
+   * 一个挂着的 SSE 会让关闭一直等下去。
+   */
   public async close(): Promise<void> {
     this.#server.server.closeAllConnections()
     await this.#gracefulClose()
@@ -88,6 +102,11 @@ function abortReason(signal: AbortSignal): Error {
   return signal.reason instanceof Error ? signal.reason : new Error('HTTP shutdown aborted')
 }
 
+/**
+ * 构造一个可从外部兑现的 Promise。
+ * 初始 `resolve` 故意实现为抛错而不是空函数：真出现「兑现早于初始化」的时序问题时，
+ * 会在调用点直接炸掉，而不是变成一个静默失效的等待。
+ */
 function deferred(): Deferred {
   let resolve = (): void => {
     throw new Error('deferred promise resolved before initialization')
