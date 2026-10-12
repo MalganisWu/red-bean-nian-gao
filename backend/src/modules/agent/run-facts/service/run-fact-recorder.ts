@@ -79,7 +79,12 @@ export class RunFactRecorder implements AgentExecutionEventSink {
     this.#onError = options.onError
   }
 
-  /** 创建 run 容器；等待串行队列以确认首笔写入结果。 */
+  /**
+   * 创建 run 容器；等待串行队列以确认首笔写入结果。
+   * 这里**刻意 `await`**（与后面所有写入的 fire-and-forget 不同）：
+   * 容器是后续所有 fact 的外键，先确认它写成功，仓储不可用时就能立刻进入 `#broken` 状态停写，
+   * 而不是把一串注定失败的事实追加排进队列。
+   */
   public async start(signal: AbortSignal): Promise<void> {
     this.#enqueue(async (): Promise<void> => {
       await this.#repository.create(this.#run, signal)

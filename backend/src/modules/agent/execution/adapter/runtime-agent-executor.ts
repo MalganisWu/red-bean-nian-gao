@@ -25,9 +25,16 @@ import { fromRuntimeEvent } from './runtime-event-mapper.js'
 import { parseStoredRuntimeState } from './runtime-state-codec.js'
 import { optionalField } from '../../../../shared/object/optional-field.js'
 
-/** 将业务执行命令适配到 SDK；所有 SDK DTO 转换都收口在此处。
+/**
+ * 将业务执行命令适配到 SDK；**所有 SDK DTO 转换都收口在此处**。
+ *
+ * 这条约束是结构性的：产品代码只能经由本文件碰 `red-bean-qing-tuan` 的白名单入口，
+ * 别处必须依赖业务自有类型。好处是 SDK 升级时的改动面被限制在这几个 mapper 文件里
+ * （见同目录的 runtime-message/event/state mapper）。
+ *
  * 失败语义：SDK 抛出的 `RuntimeExecutionError` 携带已产生的 result 快照，本适配器
- * 不丢弃它——映射为带 error 的宿主结果，让上层仍能持久化部分进展。 */
+ * 不丢弃它——映射为带 error 的宿主结果，让上层仍能持久化部分进展。
+ */
 export class RuntimeAgentExecutor implements AgentExecutionPort {
   readonly #tracer: TracerPort | undefined
 
@@ -35,6 +42,11 @@ export class RuntimeAgentExecutor implements AgentExecutionPort {
     this.#tracer = tracer
   }
 
+  /**
+   * 跑一次执行。**每次调用都新建一个 `AgentRuntime`**，且必在 finally 中关闭：
+   * Runtime 的插件、能力图与生命周期计数器都是按实例持有的，跨命令复用会让上一次运行的
+   * 取消计数、消息 hook 与资源登记串到下一次；不复用也就意味着「一次运行一个实例」是这里的隐含约定。
+   */
   public async execute(
     command: AgentExecutionCommand,
     signal: AbortSignal
@@ -129,6 +141,12 @@ export class RuntimeAgentExecutor implements AgentExecutionPort {
   }
 }
 
+/**
+ * 把 SDK 的三类消息回调统一转成宿主观察者的一次 `observe`。
+ * 刻意忽略 `RuntimeContext`：宿主观察者由构造期注入，已经绑定了它需要的运行身份，
+ * 再传一次 context 只会让两个来源有机会不一致。
+ * 三类回调都走同一条路径，是因为宿主要做的是「把消息落库」，与角色无关。
+ */
 class ObserverMessageHook implements MessageHook {
   readonly #observer: AgentExecutionMessageObserver
 

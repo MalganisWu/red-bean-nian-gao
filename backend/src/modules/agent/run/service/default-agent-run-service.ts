@@ -65,7 +65,18 @@ export interface AgentRunLogger {
   error(message: string, fields?: Readonly<Record<string, unknown>>): void
 }
 
-/** 组合产品会话生命周期，并把实际 Agent 执行委托给统一执行 Port。 */
+/**
+ * 组合产品会话生命周期，并把实际 Agent 执行委托给统一执行 Port。
+ *
+ * 一次 run 分三段，边界就是两个 `await` 密集点：
+ * 1. **准备**（`start` 内）：建句柄、加载 Agent 配置、加载会话状态。这一段必须同步做完并返回句柄，
+ *    调用方才能拿到 SSE 流开始消费。
+ * 2. **执行**（`start` 里 fire-and-forget 的 `#execute`）：转入后台跑 Runtime。
+ * 3. **收尾**（`#execute` 尾部）：提交会话、投递积压的后台任务结果、终态化事实日志。
+ *
+ * 收尾段有一条硬规则：**它跑在独立的超时信号上，不复用客户端信号**。
+ * 客户端断开不该让「这次运行已经产生的状态」丢失——那会留下一个永远停在 running 的会话。
+ */
 export class ProductAgentRunService implements AgentRunServicePort {
   readonly #loader: AgentLoader
   readonly #executor: AgentExecutionPort
@@ -143,6 +154,8 @@ export class ProductAgentRunService implements AgentRunServicePort {
     }
     const state = await this.#sessions.load(loadRequest, signal)
     // 执行阶段转入后台，使 Controller 可以立即开始消费 SSE；最终完成由队列关闭表示。
+    // 刻意不 await、也不 catch：失败一律经由 `handle.fail` 从流内部传播给消费者，
+    // 因为此时 HTTP 响应头早已发出，抛异常已经没有接收者了。
     void this.#execute(config, state, request.traceId, sections, handle, facts)
     return handle
   }
@@ -238,9 +251,11 @@ export class ProductAgentRunService implements AgentRunServicePort {
       config.subAgentDisplayRegistry === undefined
         ? display.messages
         : embedSubAgentSections(display.messages, config.subAgentDisplayRegistry.data())
+    // 收尾用独立超时信号而非 signal：客户端断线不代表这次运行白跑，已产生的状态必须落盘。
     const finalizationSignal = AbortSignal.timeout(this.#finalizationTimeoutMilliseconds)
     try {
       // 收尾阶段独立于客户端信号：先提交 Session，再投递已经完成的后台任务结果。
+      // 顺序有依赖：投递队列里那些任务的结果要靠刚提交的会话状态才能被前端读到。
       await this.#sessions.save(
         state,
         {
@@ -259,6 +274,7 @@ export class ProductAgentRunService implements AgentRunServicePort {
           : new AggregateError([runError, saveError], 'Agent 执行与 session 保存均失败')
     }
 
+    // 挂起结果不投递：这一轮还没结束，等用户确认后恢复时再送。
     if (runError === undefined && outcome?.status !== 'suspended') {
       try {
         await this.#deliveryQueue?.drain(state.sessionId, finalizationSignal)
@@ -272,6 +288,8 @@ export class ProductAgentRunService implements AgentRunServicePort {
       await facts.finalize(finalizeCommand(outcome, runError), finalizationSignal)
     }
 
+    // 走到这里说明三段都跑完了，接下来只有两种收束方式，都必须显式关闭句柄——
+    // 句柄不关闭，等待它的 SSE 消费者会一直挂着。
     if (runError !== undefined) {
       this.#logger?.error('agent run failed', {
         error: runError,

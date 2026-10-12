@@ -100,6 +100,14 @@ export class RedisMessageBuffer implements MessageBuffer {
     }
   }
 
+  /**
+   * 写入「分代」缓冲：键里带 revision，因此每次运行各写各的，不会与上一代混在一起。
+   *
+   * 带 `writeProof` 时走守卫写入——先核对 `session_lock:<id>` 的值仍是本持有者，
+   * 不符就抛「session lease owner 已失效」。这道守卫的必要性在于：
+   * 写缓冲的是**正持有会话锁的那次运行**，锁被接管说明这次运行已经过期，
+   * 它刚刚产生的消息属于一个不会再被采纳的分支，写进去只会污染下一代的恢复内容。
+   */
   public async appendGeneration(
     sessionId: string,
     generation: MessageBufferGeneration,
@@ -176,6 +184,11 @@ function generationKey(sessionId: string, generation: MessageBufferGeneration): 
   return `${bufferKey(sessionId)}:${generation.revision.toString()}`
 }
 
+/**
+ * 反序列化并逐条校验。Redis 里存放的内容不可信（可能是旧版本写入的、或被人手工改过），
+ * 因此每条都过一遍 Zod，形状不对就抛错而不是把脏数据带进上下文。
+ * 缺失的可选字段用 `optionalField` 处理，保证「缺席」与「显式 undefined」在结果里是同一种表示。
+ */
 function decodeMessages(values: readonly string[]): readonly AgentMessage[] {
   return values.map((value): AgentMessage => {
     let parsedJson: unknown
