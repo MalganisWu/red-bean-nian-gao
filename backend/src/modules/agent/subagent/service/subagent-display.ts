@@ -88,11 +88,13 @@ export class SectionBuildNode {
     signal.throwIfAborted()
     const collector = this.#createCollector()
     const originalSink = context.eventSink
-    context.eventSink = (event: ProductPipelineEvent): void => {
+    /** 接管事件出口：内部交接事件被消费掉后不再转发，其余先喂收集器、再交给原出口。 */
+    const publishEvent = (event: ProductPipelineEvent): void => {
       if (captureSubAgentDisplayEvent(event, context.metadata)) return
       collector.collect(event)
       originalSink?.(event)
     }
+    context.eventSink = publishEvent
     return Promise.resolve()
   }
 }
