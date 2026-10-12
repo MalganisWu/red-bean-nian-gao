@@ -29,7 +29,8 @@
 ### 模块开发标准
 
 - [`../backend/src/README.md`](../backend/src/README.md)：从 HTTP Controller 到 DTO、用例、Port 与 Adapter 的人工审查导航。
-- [`standards/typescript-coding-conventions.md`](standards/typescript-coding-conventions.md)：全仓 TypeScript 安全、可读性与机械门禁基线。
+- [`standards/typescript-common-conventions.md`](standards/typescript-common-conventions.md)：跨仓共享的 TypeScript 通用规范，与 Runtime SDK 仓逐字相同，由 `scripts/check-common-conventions.sh` 校验。
+- [`standards/typescript-coding-conventions.md`](standards/typescript-coding-conventions.md)：产品仓特有的 TypeScript 约束（前端、契约来源、HTTP 边界、组装与门禁）。
 - [`../backend/docs/standards/development-workflow.md`](../backend/docs/standards/development-workflow.md)：后端开发流程。
 - [`../frontend/docs/standards/coding-conventions.md`](../frontend/docs/standards/coding-conventions.md)：前端编码规范。
 - [`../frontend/docs/standards/development-workflow.md`](../frontend/docs/standards/development-workflow.md)：前端开发流程。

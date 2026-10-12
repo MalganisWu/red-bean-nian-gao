@@ -87,7 +87,8 @@ cd ../design-system && pnpm ai:check
 ## 编码规范速查
 
 通用 TypeScript 规则见
-[`../docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md)，
+[`../docs/standards/typescript-common-conventions.md`](../docs/standards/typescript-common-conventions.md)，
+产品仓特有约束见 [`../docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md)，
 React/UI 附加规则见 [`docs/standards/coding-conventions.md`](docs/standards/coding-conventions.md)。
 
 | 规则 | 说明 |

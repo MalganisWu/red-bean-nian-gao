@@ -80,8 +80,9 @@ Fastify 解耦的用例签名，并负责 wire DTO 投影和 HTTP 应用错误�
 
 ## TypeScript 编码规则
 
-所有 `.ts` 遵循全仓唯一规范
-[`../docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md)。特别注意：
+所有 `.ts` 遵循跨仓共享的通用规范
+[`../docs/standards/typescript-common-conventions.md`](../docs/standards/typescript-common-conventions.md)，
+产品仓特有约束见 [`../docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md)。特别注意：
 
 - 导出函数、公开方法和 API/SSE/数据库/配置边界显式标注类型；简单局部值允许可靠推导。
 - 禁止 `any`、非空断言、无校验类型断言、Decorator DI、Service Locator、`enum` 和复杂类型体操。

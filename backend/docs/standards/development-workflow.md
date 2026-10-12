@@ -80,7 +80,8 @@ README，不回写历史 spec / plan 来描述新现状。完整分类见仓库 
 - 依赖经构造函数或显式 factory 注入，composition root 不得演化为 Service Locator
 - 外部输入在 API、数据库、Redis、配置、LLM 或 Tool 边界进行运行时校验
 - 异步操作传播 `AbortSignal` 和带上下文的错误，不吞掉 Promise
-- 遵守全仓 [TypeScript 规范](../../../docs/standards/typescript-coding-conventions.md)
+- 遵守跨仓共享的 [TypeScript 通用规范](../../../docs/standards/typescript-common-conventions.md)
+  与产品仓特有的 [本仓规范](../../../docs/standards/typescript-coding-conventions.md)
 
 **测试要求**：
 - 覆盖核心 happy path

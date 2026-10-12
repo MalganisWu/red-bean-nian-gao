@@ -1,8 +1,9 @@
 # 前端编码规范
 
-> 本文只补充 React/UI 规则。通用 TypeScript 类型、安全、泛型和门禁规则以
-> [`../../../docs/standards/typescript-coding-conventions.md`](../../../docs/standards/typescript-coding-conventions.md)
-> 为唯一事实来源。
+> 本文只补充 React/UI 规则。通用 TypeScript 类型、安全、可读性、泛型和门禁规则以跨仓共享的
+> [`../../../docs/standards/typescript-common-conventions.md`](../../../docs/standards/typescript-common-conventions.md)
+> 为唯一事实来源；产品仓特有约束见
+> [`../../../docs/standards/typescript-coding-conventions.md`](../../../docs/standards/typescript-coding-conventions.md)。
 
 ---
 
@@ -72,8 +73,8 @@ export function ChatInput({ onSubmit, disabled = false, placeholder = '输入消
   // 4. hooks
   const [value, setValue] = useState('')
 
-  // 5. 事件处理
-  const handleSubmit = () => {
+  // 5. 事件处理（多行闭包一律具名；用 function 声明，不用组件体内 const 箭头）
+  function handleSubmit(): void {
     if (value.trim()) {
       onSubmit(value)
       setValue('')
@@ -109,6 +110,8 @@ export function ChatInput({ onSubmit, disabled = false, placeholder = '输入消
 | 不用 `React.FC` | 直接用函数类型 |
 | 禁止 `<div onClick>` | 可交互元素用 `<button>`（支持键盘聚焦） |
 | 事件处理器命名 `handle*` | `handleSubmit`、`handleChange` |
+| 事件处理器用 `function` 声明 | 多行闭包一律具名，不用组件体内 `const` 箭头（见通用规范「函数与流程可读性」） |
+| 单行内联回调可以用箭头函数 | 如 `onChange={(e) => setValue(e.target.value)}`；超过一行即提到组件体内 |
 
 ---
 
@@ -224,7 +227,7 @@ AI 生成的代码默认不做性能优化（memo、lazy），避免过度优化
 
 ## 9. 注释规范（前端补充）
 
-规则正文见根 [`typescript-coding-conventions.md`「中文注释」](../../../docs/standards/typescript-coding-conventions.md)
+规则正文见根 [`typescript-common-conventions.md`「中文注释」](../../../docs/standards/typescript-common-conventions.md)
 （简体中文、讲 why 与边界、注释与代码同 diff 更新、测试注释优先中文）。本节只列 React/UI 场景的应用要点：
 
 - **Props**：关键 Props 用 JSDoc 说明用途与边界——回调触发时机、`undefined` 与缺省语义、联动的前置条件

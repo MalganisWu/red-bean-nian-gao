@@ -24,9 +24,10 @@ design-system/
 └── public/
 ```
 
-通用 TypeScript 规范遵循
-[`docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md)，React/UI 规则遵循
-[`frontend/docs/standards/coding-conventions.md`](../frontend/docs/standards/coding-conventions.md)。
+通用 TypeScript 规范遵循跨仓共享的
+[`docs/standards/typescript-common-conventions.md`](../docs/standards/typescript-common-conventions.md)，
+产品仓特有约束见 [`docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md)，
+React/UI 规则遵循 [`frontend/docs/standards/coding-conventions.md`](../frontend/docs/standards/coding-conventions.md)。
 
 ---
 
@@ -105,7 +106,7 @@ design-system/
 ## 组件注释规范
 
 注释语言与共性规则见根
-[`docs/standards/typescript-coding-conventions.md`「中文注释」](../docs/standards/typescript-coding-conventions.md)
+[`docs/standards/typescript-common-conventions.md`「中文注释」](../docs/standards/typescript-common-conventions.md)
 与 [`frontend/docs/standards/coding-conventions.md` §9](../frontend/docs/standards/coding-conventions.md)，
 本节只列 design-system 特有要求：
 

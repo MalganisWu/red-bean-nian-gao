@@ -174,12 +174,14 @@ TDD 约束的是行为增量，不要求为每一行实现代码单独写测试�
 
 ### TypeScript 安全基线
 
-所有现有与新增 TypeScript 代码共同遵循
+所有现有与新增 TypeScript 代码共同遵循跨仓共享的
+[`docs/standards/typescript-common-conventions.md`](docs/standards/typescript-common-conventions.md)
+（与 Runtime SDK 仓逐字相同，由 `scripts/check-common-conventions.sh` 校验）；产品仓特有约束见
 [`docs/standards/typescript-coding-conventions.md`](docs/standards/typescript-coding-conventions.md)。硬性红线包括：
 
 - 禁止显式 `any`、非空断言、无校验的类型断言、浮空 Promise 与隐式强制转换。
 - 错误码/状态码/事件类型/命令 kind 等字面量联合的比较与 case 标签必须引用 const 成员
-  （`CODE.X`），禁止字符串字面量（详见 typescript-coding-conventions 硬性禁止）。
+  （`CODE.X`），禁止字符串字面量（详见 typescript-common-conventions 硬性禁止）。
 - 导出函数及 API、SSE、Tool、Checkpoint、持久化和配置边界必须显式标注类型。
 - 简单局部值允许可靠推导；不要用 `const count: number = 1` 一类重复标注制造噪声。
 - 业务代码禁止 Decorator/Reflect 自动注入、Service Locator、`enum` 与复杂递归类型体操。
