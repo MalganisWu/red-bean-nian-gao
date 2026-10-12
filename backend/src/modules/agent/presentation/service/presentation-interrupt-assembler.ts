@@ -70,6 +70,16 @@ function questionsFrom(argumentsValue: AgentJsonValue): AgentJsonValue {
   return questions === undefined ? [] : toAgentJsonValue(questions)
 }
 
+/**
+ * 从工具组里摘掉发起中断的那个工具，换成卡片来呈现。
+ *
+ * 摘掉的理由：中断工具永远不会有 tool_result，留着就是界面上一个永远转圈的工具。
+ * 组里还有其他工具时保留该组，全被摘光就整组丢弃——空组渲染出来是一片空白。
+ *
+ * 两个键名都判（`call_id` 与 `callId`）是因为数据来源有两处：
+ * 持久化 section 用 snake_case，SDK 侧的事件用 camelCase，投影层不做归一化，
+ * 这里两种都得认。
+ */
 function filterInterruptTool(value: AgentJsonValue | undefined, callId: string): AgentJsonValue[] {
   if (!Array.isArray(value)) return []
   const sections: AgentJsonValue[] = []

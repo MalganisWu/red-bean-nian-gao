@@ -20,7 +20,15 @@ interface ReasonItem {
   content: string
 }
 
-/** 使用发送到 SSE 的同一批中性事件重建持久化 section 时间线。 */
+/**
+ * 使用发送到 SSE 的同一批中性事件重建持久化 section 时间线。
+ *
+ * 「同一批」是关键：持久化的时间线与用户当时看到的帧来自同一串事件，
+ * 因此刷新页面后重放出来的过程与实时看到的一致，不会出现「存下来的和看过的不一样」。
+ *
+ * 内部按三类内容分别攒缓冲（推理 / 正文 / 工具组），收到另一类事件时先把当前类 flush 出去——
+ * 时间线的顺序就是 flush 的顺序，这样「边想边调工具边说」的真实交错才不会被抹平成三段。
+ */
 export class SectionCollector implements ChildSectionCollector, SectionEventCollector {
   readonly #now: PresentationClock
   readonly #sections: Record<string, AgentJsonValue>[] = []
@@ -54,6 +62,8 @@ export class SectionCollector implements ChildSectionCollector, SectionEventColl
       case 'tool_start':
         this.#flushReason()
         this.#flushContent()
+        // 已有工具在跑 → 并入同一组（模型并发下发多个调用）。
+        // 全都跑完又来新的 → 先收束上一组，让界面上呈现为两批而不是一个越来越长的列表。
         if (this.#toolItems.some((tool): boolean => tool.status === 'running')) {
           this.#appendTool(event.toolName, event.callId, event.params)
           return
@@ -82,6 +92,7 @@ export class SectionCollector implements ChildSectionCollector, SectionEventColl
     }
   }
 
+  /** 取快照前必须把三个缓冲全部 flush，否则最后一段内容会留在缓冲里丢失。 */
   public build(): AgentJsonValue {
     this.#flushReason()
     this.#flushContent()

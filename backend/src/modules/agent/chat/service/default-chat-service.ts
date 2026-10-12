@@ -78,6 +78,13 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
   /**
    * 停机排空：置 draining（拒绝新启动）→ 中止所有活动运行 → 等启动中与清理全部落地；
    * 每个阶段受外部 signal 约束，超时由调用方处理，不无限等待。
+   *
+   * `#closeActiveRuns()` **调用两次**是必要的，不是重复：第一次处理此刻已在运行的；
+   * 而在等待 `startingRuns` 期间，某个「正在启动」的运行可能恰好完成启动并注册进 `#activeRuns`。
+   * 第二次调用把这一批也收进来。少了它，停机时正在启动的那次会漏掉。
+   *
+   * 中止信号是内部 `#shutdownController`，不是调用方传进来的：后者只用来限制**等待时长**，
+   * 不该决定「哪些运行要停」。
    */
   public async shutdown(signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
@@ -171,6 +178,12 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
     }
   }
 
+  /**
+   * 把「启动中」的运行登记下来，只为让停机时能等它落地。
+   * 从集合里摘除的时机写在 `finally` 里而不是 `then`：启动失败的运行同样要摘掉，
+   * 否则它会永远留在集合里，停机时白等一个已 reject 的 Promise。
+   * 末尾那个空 `catch` 是为了消费掉这条派生链上的拒绝——原始 Promise 仍会正常抛给调用方。
+   */
   #trackStart(starting: Promise<StartedChatRun>): Promise<StartedChatRun> {
     this.#startingRuns.add(starting)
     void starting

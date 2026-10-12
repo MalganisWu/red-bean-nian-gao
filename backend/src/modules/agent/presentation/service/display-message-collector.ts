@@ -19,6 +19,12 @@ export interface PresentationContext {
 /**
  * 中性 Runtime 消息的产品展示投影。Tool 信封只保留在 LLM context 中；
  * UI 仅接收用户输入和已完成的 assistant 内容。
+ *
+ * 「已完成的 assistant」有两条硬条件：正文非空，且**不带 toolCalls**。
+ * 工具调用轮次的 assistant 消息正文为空，是给模型看的协议结构，
+ * 展示层混进去会出现一条空白的助手消息。
+ *
+ * `messages` 取值时深拷贝：调用方拿到的是快照，改它不会影响收集器内部状态。
  */
 export class DisplayMessageCollector {
   readonly #now: PresentationClock

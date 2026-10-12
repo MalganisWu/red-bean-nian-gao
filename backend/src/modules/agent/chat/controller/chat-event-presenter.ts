@@ -15,7 +15,13 @@ import { SESSION_STORE_ERROR_CODES, SessionStoreError } from '../../session/mode
 import { AppError } from '../../../../shared/http/error-mapper.js'
 import { optionalField } from '../../../../shared/object/optional-field.js'
 
-/** 将领域或应用错误映射为不会泄漏内部细节的 SSE 错误事件。 */
+/**
+ * 将领域或应用错误映射为不会泄漏内部细节的 SSE 错误事件。
+ *
+ * 落点是通用的 5000 + 固定文案——SSE 是一条已经打开的流，头部早已发出，
+ * 这里没有 HTTP 状态码可用，错误只能以事件形式传递，因此更要小心不要把内部信息写进去。
+ * 会话不存在映射为 4004、交互冲突映射为 4009，是给前端做分支用的稳定业务码。
+ */
 export function toStreamErrorEvent(error: unknown): StreamErrorEvent {
   if (error instanceof SessionStoreError) {
     if (error.code === SESSION_STORE_ERROR_CODES.NOT_FOUND) {
@@ -109,6 +115,8 @@ function localizedStatus(event: AgentStatusEvent | LocalizedStatusEvent): Locali
     case AGENT_STATUS_CODES.ANALYZING_RESULTS:
       content = '正在分析结果...'
       break
+    // 这里减 1 是为了把运行时口径换算成用户口径：runtime 的 attempt/maxAttempts 把首次尝试也算在内，
+    // 而用户看到的「第 N 次重试」不含首次。两侧都取 max(…, 1) 兜底，避免出现「第 0 次」。
     case AGENT_STATUS_CODES.LLM_RETRY:
       content = `LLM 请求失败，正在进行第 ${String(Math.max(attempt - 1, 1))}/${String(Math.max(maxAttempts - 1, 1))} 次重试...`
       break

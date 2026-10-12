@@ -24,6 +24,11 @@ export class ChatController {
     this.#chat = chat
   }
 
+  /**
+   * 发起对话。只翻译**这一层能理解**的错误码，其余原样上抛——
+   * 应用层错误没有 HTTP 语义，把它映射成状态码是 Controller 的职责；
+   * 而基础设施错误该由全局错误处理器统一兜底，在这里顺手转换只会丢掉原始类型。
+   */
   public async start(input: ChatRequestDto, context: ChatRequestContext): Promise<StartedChatRun> {
     try {
       return await this.#chat.start(this.#startCommand(input, context))

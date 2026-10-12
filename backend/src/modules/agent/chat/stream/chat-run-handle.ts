@@ -59,6 +59,10 @@ export class ManagedChatRunHandle implements ChatRunHandle {
     this.#queue.push(event)
   }
 
+  /**
+   * 正常完成。已关闭过就什么都不做——**关闭优先于完成**：
+   * 一旦有人调用 `close`，这次运行对外就该报告为取消，哪怕生产者随后跑完了全部逻辑。
+   */
   public complete(): void {
     if (this.#settled) return
     this.#settled = true
@@ -70,6 +74,7 @@ export class ManagedChatRunHandle implements ChatRunHandle {
     )
   }
 
+  /** 失败收尾；与 `complete` 同样的「关闭优先」规则，结果里带上错误供上层诊断。 */
   public fail(error: Error): void {
     if (this.#settled) return
     this.#settled = true
@@ -81,6 +86,16 @@ export class ManagedChatRunHandle implements ChatRunHandle {
     )
   }
 
+  /**
+   * 主动关闭：中止运行、关掉事件队列，然后**等 `completion` 兑现**。
+   *
+   * 最后那个 await 是关键——`completion` 由生产者（`ProductAgentRunService`）在
+   * session 保存等收尾动作全部完成后才结算，所以调用方在 `close()` 返回时就能确信
+   * 基础设施可以安全释放了。少了它，停机方会在运行还在写库时拆掉连接池。
+   *
+   * `#closeReason ??= reason` 只记第一个原因：后续的重复关闭（如同时收到断连与停机）
+   * 不该覆盖最初那个，否则排障时看到的是一个次生原因。
+   */
   public async close(reason: ChatRunCloseReason): Promise<void> {
     if (this.#settled) return
     this.#closeReason ??= reason
