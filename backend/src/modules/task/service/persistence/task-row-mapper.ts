@@ -99,16 +99,23 @@ const viewStateRowSchema = z.object({
   updated_at: nullableDateSchema,
 })
 
+/** 只取 `retry_count` 的行 schema；重试路径只需要这一个字段，不必拉整行。 */
 export const retryCountRowSchema = z.object({ retry_count: z.number().int().nonnegative() })
 interface TaskListCursor {
   readonly createdAt: Date
   readonly taskId: string
 }
 
+/** 键集分页游标：`created_at` 与 `task_id` 一起编码，避免同一毫秒内建的任务在翻页时被跳过或重复。 */
 export function encodeTaskListCursor(createdAt: Date, taskId: string): string {
   return Buffer.from(`${createdAt.toISOString()}\n${taskId}`, 'utf8').toString('base64url')
 }
 
+/**
+ * 解码游标；空串与任何畸形输入都返回 `undefined`，由调用方决定回退语义（通常是取首页）。
+ * 这里刻意不抛错：游标是客户端回传的数据，把它当作不可信输入处理，坏游标不该让整个列表 500。
+ * `isCanonicalBase64Url` 用来挡掉「同一串字节的多种 base64 写法」，保证游标可比较。
+ */
 export function decodeTaskListCursor(value: string): TaskListCursor | undefined {
   if (value === '') return undefined
   let decoded: string
@@ -126,12 +133,14 @@ export function decodeTaskListCursor(value: string): TaskListCursor | undefined 
   return { createdAt, taskId }
 }
 
+/** 校验并映射单行 `scheduled_tasks`；schema 不匹配直接抛错，不做「尽力填默认值」的兜底。 */
 export function mapScheduledTaskRow(value: unknown): AgentTaskDefinition {
   const parsed = scheduledTaskRowSchema.safeParse(value)
   if (!parsed.success) throw new Error('定时任务行数据无效', { cause: parsed.error })
   return toTaskDefinition(parsed.data)
 }
 
+/** 校验并映射单行 `agent_task_executions`；可空列经 `optionalField` 折叠成「字段缺失」而非 `null`。 */
 export function mapExecutionRow(value: unknown): AgentTaskExecution {
   const parsed = executionRowSchema.safeParse(value)
   if (!parsed.success) throw new Error('执行记录行数据无效', { cause: parsed.error })
@@ -152,6 +161,12 @@ export function mapExecutionRow(value: unknown): AgentTaskExecution {
   }
 }
 
+/**
+ * 映射列表行：任务本体 + 会话标题 + 最近执行摘要。
+ * 摘要「有 id 就必须有状态与调度时间」是全有或全无的判定——半截数据说明 SQL 与 schema 已经漂移，
+ * 与其渲染出一张空摘要卡片，不如在这里就失败。
+ * 标题与摘要文案都做截断，列表接口不该被单条超长文本撑大。
+ */
 export function mapTaskListRow(value: unknown): AgentTaskListItem {
   const parsed = taskListRowSchema.safeParse(value)
   if (!parsed.success) throw new Error('任务列表行数据无效', { cause: parsed.error })
@@ -180,6 +195,7 @@ export function mapTaskListRow(value: unknown): AgentTaskListItem {
   return { ...item, latestExecution }
 }
 
+/** 映射已读/折叠偏好行；三个可空字段缺省即表示「用户未设置」，由前端按默认规则决定呈现。 */
 export function mapViewStateRow(value: unknown): ExecutionViewState {
   const parsed = viewStateRowSchema.safeParse(value)
   if (!parsed.success) throw new Error('invalid task view-state row', { cause: parsed.error })
@@ -230,12 +246,18 @@ function toMessageMeta(row: z.infer<typeof messageMetaSchema>): MessageMeta {
     ...optionalField('runStartedAt', row.run_started_at),
   }
 }
+/** 只校验不映射，供需要读到原始列（如算游标用的 `created_at`）的调用点使用。 */
 export function parseTaskListRow(value: unknown): z.infer<typeof taskListRowSchema> {
   const parsed = taskListRowSchema.safeParse(value)
   if (!parsed.success) throw new Error('任务列表行数据无效', { cause: parsed.error })
   return parsed.data
 }
 
+/**
+ * 任务分页：多取一行来判断是否存在下页，再截断到 `limit`。
+ * 游标取自截断后最后一行的 `created_at`——用被丢弃的那一行会让下一页从错误的边界开始。
+ * 空串游标表示没有下页，这是分页约定的终止值。
+ */
 export function taskPage(
   rows: readonly unknown[],
   limit: number,
@@ -255,6 +277,7 @@ export function taskPage(
   }
 }
 
+/** 执行记录分页；与 `taskPage` 同为「多取一行」策略，但整页先全量校验再映射，坏行不会被静默跳过。 */
 export function executionPage(
   rows: readonly unknown[],
   limit: number

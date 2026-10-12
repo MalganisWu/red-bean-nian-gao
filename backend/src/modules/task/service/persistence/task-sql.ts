@@ -7,6 +7,7 @@ import {
   type AgentTaskExecution,
 } from './../../model/task.js'
 
+/** `scheduled_tasks` 的列清单，供 SELECT 拼接；增删列时需同步 `scheduledTaskRowSchema`。 */
 export const TASK_COLUMNS = `
   scheduled_task_id,
   session_id,
@@ -22,6 +23,7 @@ export const TASK_COLUMNS = `
   created_at
 `
 
+/** `agent_task_executions` 的列清单，供 SELECT 拼接；增删列时需同步 `executionRowSchema`。 */
 export const EXECUTION_COLUMNS = `
   execution_id,
   task_id,
@@ -38,6 +40,12 @@ export const EXECUTION_COLUMNS = `
   created_at
 `
 
+/**
+ * 任务列表查询：一次取回任务本体、会话标题与最近一次执行摘要。
+ * `session_title` 取该会话首条非空 user 消息——列表要的是「这个任务在聊什么」，
+ * 用最新一条会让标题随着对话推进不断变化。`latest` 用 `LEFT JOIN LATERAL` 只为每行取一条，
+ * 避免为取摘要再发一轮查询。
+ */
 export const TASK_LIST_SELECT = `
   SELECT
     task.scheduled_task_id,
@@ -86,6 +94,11 @@ interface SerializedExecution {
   readonly displayMessages: string
 }
 
+/**
+ * 把领域执行记录转成落库形态。
+ * 展示消息必须**先经 Presenter 转成 DTO 再序列化**，不能直接 `JSON.stringify(execution)`：
+ * 落库的是 wire 形状的快照，读取方（列表与导出）依赖这个稳定的字段约定。
+ */
 export function serializeExecution(execution: AgentTaskExecution): SerializedExecution {
   return {
     execution,
@@ -125,22 +138,27 @@ export async function insertExecution(
   )
 }
 
+/** 空串在库里统一存 NULL，避免「空串」与「未设置」两种表示并存导致查询条件要写两遍。 */
 export function emptyStringToNull(value: string): string | null {
   return value === '' ? null : value
 }
 
+/** 分页 limit 的前置校验；`context` 会进错误信息，用来定位是哪个查询传了非法值。 */
 export function requirePositiveLimit(limit: number, context: string): void {
   if (!Number.isInteger(limit) || limit <= 0) throw new Error(`${context}: limit 必须大于 0`)
 }
 
+/** 「任务不存在」与「无权操作」共用一个错误码，使调用方无法靠错误差异探测他人任务是否存在。 */
 export function notAuthorizedError(): TaskRepositoryError {
   return new TaskRepositoryError(TASK_REPOSITORY_ERROR_CODES.NOT_AUTHORIZED, '任务不存在或无权操作')
 }
 
+/** 执行租约已失效：说明另一个调度者已接手这次执行，本次写入应当放弃而不是覆盖。 */
 export function staleExecutionError(): TaskRepositoryError {
   return new TaskRepositoryError(TASK_REPOSITORY_ERROR_CODES.STALE_EXECUTION, '任务执行租约已失效')
 }
 
+/** 给解析失败补上调用点上下文；否则行数据校验错误在日志里看不出是哪个查询产生的。 */
 export function parseWithContext<TValue>(
   value: unknown,
   parser: (input: unknown) => TValue,

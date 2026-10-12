@@ -1,13 +1,17 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { optionalField } from '../../shared/object/optional-field.js'
 
+/** 日志级别；权重见 `LEVEL_WEIGHT`，低于下限的调用在 `#emit` 里被直接丢掉。 */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+/** 结构化字段；值不限制类型，Error 等不可枚举对象由 `errorJsonReplacer` 负责展开。 */
 export type LogFields = Readonly<Record<string, unknown>>
 
+/** 输出目标；抽成接口是为了让测试断言写出的行，而不必去抓 stdout。 */
 export interface LogDestination {
   write(line: string): void
 }
 
+/** 构造选项；`destination` 与 `now` 可注入，测试因此不依赖真实时钟与终端。 */
 export interface LoggerOptions {
   readonly format: string
   readonly level: string
@@ -15,6 +19,7 @@ export interface LoggerOptions {
   readonly now?: () => Date
 }
 
+/** 应用内统一的日志入口；请求级字段用 `child` 派生，不要共享实例就地改状态。 */
 export interface Logger {
   child(fields: LogFields): Logger
   debug(message: string, fields?: LogFields): void
@@ -125,6 +130,7 @@ export class LoggerContext {
   }
 }
 
+/** 造一个根 logger；请求级字段一律经 `child` 派生，避免并发请求互相污染。 */
 export function createLogger(options: LoggerOptions): Logger {
   return new StructuredLogger(options)
 }

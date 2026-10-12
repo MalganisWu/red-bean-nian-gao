@@ -12,15 +12,18 @@ const DEFAULT_MIN_CONNECTIONS = 5
 const DEFAULT_MAX_LIFETIME_SECONDS = 30 * 60
 const DEFAULT_IDLE_TIMEOUT_MILLISECONDS = 5 * 60 * 1_000
 
+/** 查询结果的最小投影：`rowCount` 已把 pg 返回的 `null` 归一成 0。 */
 export interface SqlQueryResult {
   readonly rows: readonly unknown[]
   readonly rowCount: number
 }
 
+/** 查询入口；Repository 只依赖这一层，不感知连接、池与事务。 */
 export interface SqlExecutor {
   query(sql: string, parameters: readonly unknown[], signal: AbortSignal): Promise<SqlQueryResult>
 }
 
+/** 在 `SqlExecutor` 之上增加事务能力；`transaction` 内的查询共用同一条连接与同一个事务。 */
 export interface TransactionalSqlExecutor extends SqlExecutor {
   transaction<TValue>(
     signal: AbortSignal,
@@ -28,17 +31,20 @@ export interface TransactionalSqlExecutor extends SqlExecutor {
   ): Promise<TValue>
 }
 
+/** 单条连接的驱动抽象；`release()` 必须被调用，否则连接不会还给池子。 */
 export interface SqlConnectionDriver {
   query(sql: string, parameters?: readonly unknown[]): Promise<SqlQueryResult>
   release(): void
 }
 
+/** 连接池驱动抽象；抽出来是为了让测试注入假实现，不必依赖真实 pg。 */
 export interface PostgresPoolDriver {
   query(sql: string, parameters?: readonly unknown[]): Promise<SqlQueryResult>
   connect(): Promise<SqlConnectionDriver>
   end(): Promise<void>
 }
 
+/** 建池参数；默认值见文件顶部那组常量，这里全是必填以杜绝「漏传即静默用默认」。 */
 export interface PostgresPoolOptions {
   readonly connectionString: string
   readonly maxConnections: number
@@ -47,6 +53,7 @@ export interface PostgresPoolOptions {
   readonly idleTimeoutMilliseconds: number
 }
 
+/** 造池的工厂；默认实现直接 new 出 `pg.Pool`，测试可替换成内存实现。 */
 export interface PostgresPoolDriverFactory {
   create(options: PostgresPoolOptions): PostgresPoolDriver
 }

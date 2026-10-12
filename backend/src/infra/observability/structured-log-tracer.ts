@@ -3,19 +3,24 @@ import { randomBytes } from 'node:crypto'
 
 import type { TraceAttribute, TraceSpan, TracerPort } from '../../shared/observability/tracer.js'
 
+/** 只有三档：span 开始固定记 debug，结束按成败记 info / error。 */
 export type StructuredLogLevel = 'debug' | 'info' | 'error'
+/** 字段值限标量：采集器要能直接索引，嵌套结构会退化成不可查询的字符串。 */
 export type StructuredLogValue = string | number
 
+/** 一条 span 日志；字段平铺，键名即索引键（`trace_id`、`span.name` 等）。 */
 export interface StructuredLogRecord {
   readonly level: StructuredLogLevel
   readonly message: string
   readonly fields: Readonly<Record<string, StructuredLogValue>>
 }
 
+/** 输出目标；默认实现往 stdout 写一行 JSON。 */
 export interface StructuredLogSink {
   write(record: StructuredLogRecord): void
 }
 
+/** 构造选项；全部可注入，测试因此能在不碰 stdout、不依赖真实随机源的前提下断言 span。 */
 export interface StructuredLogTracerOptions {
   readonly sink?: StructuredLogSink | undefined
   readonly traceIdGenerator?: (() => string) | undefined
@@ -172,6 +177,7 @@ export function newTraceId(): string {
   return randomHexId(16)
 }
 
+/** 返回非零的 8 字节 span ID（`traceparent` 的 span-id 段）。 */
 export function newSpanId(): string {
   return randomHexId(8)
 }
