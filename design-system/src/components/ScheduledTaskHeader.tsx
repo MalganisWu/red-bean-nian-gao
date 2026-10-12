@@ -7,6 +7,7 @@ import {
   type ScheduledTaskLifecycle,
 } from './scheduledTaskTypes'
 
+/** 任务详情页头部的 Props；页签受控，两个动作槽位由调用方注入现成按钮。 */
 export interface ScheduledTaskHeaderProps {
   title: string
   source?: string | undefined

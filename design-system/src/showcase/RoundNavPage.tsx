@@ -13,6 +13,7 @@ const ROUNDS = [
   ['r5', '整理为表格', '已整理 4 项结果', '6s'],
 ] as const
 
+/** 「轮次导航」组件页：多轮次下的悬停摘要与选中态。 */
 export function RoundNavPage() {
   const [currentId, setCurrentId] = useState('r2')
   const current = ROUNDS.find((round) => round[0] === currentId) ?? ROUNDS[0]

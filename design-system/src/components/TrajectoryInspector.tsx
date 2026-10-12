@@ -11,6 +11,7 @@ import {
   type TrajectoryAttempt,
 } from './trajectoryTypes'
 
+/** 轨迹详情面板的 Props；`record` / `compaction` / `request` 三者互斥（后两者是压缩事件与尝试明细）。 */
 export interface TrajectoryInspectorProps {
   /** 当前选中的记录；null 时不渲染（由消费方决定挂载与否）。 */
   record: TrajectoryRecord | undefined

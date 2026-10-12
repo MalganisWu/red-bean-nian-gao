@@ -24,6 +24,7 @@ function Bean({ size }: { size: number }) {
   )
 }
 
+/** 「品牌」页：字标展示与使用边界。 */
 export function BrandPage() {
   return (
     <div className="uikit-container">

@@ -39,6 +39,7 @@ const EDGE_SAMPLE = `## 边界内容
 
 \`task_01J9QGX2K8SVR4H3M6D1N7CPAW_task_01J9QGX2K8SVR4H3M6D1N7CPAW\``
 
+/** 「Markdown」组件页：正文排版与代码围栏渲染的示例。 */
 export function MarkdownPage() {
   return (
     <div className="conversation-showcase markdown-showcase">

@@ -23,6 +23,7 @@ const LANES: readonly { key: LaneKey; label: string; match: (r: TrajectoryRecord
   { key: 'cmp', label: '压缩', match: () => false },
 ]
 
+/** 轨迹时间轴的 Props；`onSelect` 与 `onRangeFocus` 分别对应点选与拖选两种交互。 */
 export interface TrajectoryTimelineProps {
   /** 轮次数据（时序排列）。 */
   turns: TrajectoryTurn[]

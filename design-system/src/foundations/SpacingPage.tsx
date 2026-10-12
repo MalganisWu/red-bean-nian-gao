@@ -80,6 +80,7 @@ const USAGE_MAP = [
   },
 ]
 
+/** 「间距」基础页：间距刻度及其倍数关系。 */
 export function SpacingPage() {
   return (
     <div className="module-container">

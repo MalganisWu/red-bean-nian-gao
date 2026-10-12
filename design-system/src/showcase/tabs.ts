@@ -1,16 +1,20 @@
+/** 展示站的分组：基础与组件。 */
 export type TabGroupId = 'foundations' | 'components'
 
+/** 分组定义；`label` 是展示用的中英文名。 */
 export interface TabGroupDefinition {
   id: TabGroupId
   label: string
 }
 
+/** 页签定义；`group` 决定它挂在哪个分组下。 */
 export interface TabDefinition {
   id: TabId
   label: string
   group: TabGroupId
 }
 
+/** 页签 ID 的联合；每一项对应展示站里的一个页面。 */
 export type TabId =
   | 'philosophy'
   | 'color'
@@ -36,11 +40,13 @@ export type TabId =
   | 'markdown'
   | 'brand'
 
+/** 分组清单；数组顺序即侧栏展示顺序。 */
 export const TAB_GROUPS: readonly TabGroupDefinition[] = [
   { id: 'foundations', label: '基础 · Foundations' },
   { id: 'components', label: '组件 · Components' },
 ]
 
+/** 页签清单；`id` 同时用作路由段与页面查找键，改名等于改 URL。 */
 export const TABS: readonly TabDefinition[] = [
   { id: 'philosophy', label: '设计理念 · Philosophy', group: 'foundations' },
   { id: 'color', label: '颜色 · Color', group: 'foundations' },

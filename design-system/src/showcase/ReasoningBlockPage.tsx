@@ -3,6 +3,7 @@ import { ReasoningBlock } from '@/components/ReasoningBlock'
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
+/** 「推理块」组件页：说明它已降级为兼容入口，视觉统一归入 Process 轨道。 */
 export function ReasoningBlockPage() {
   return (
     <div className="conversation-showcase">

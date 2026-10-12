@@ -5,6 +5,7 @@ import { Tooltip } from '@/components/Tooltip'
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
+/** 「提示」组件页：中性高对比样式与可访问性要求。 */
 export function TooltipPage(): React.ReactElement {
   return (
     <div className="conversation-showcase">

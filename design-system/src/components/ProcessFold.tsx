@@ -6,9 +6,12 @@ import { ChevronRight } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { ToolItem, type ToolItemProps } from './ToolItem'
 
+/** 过程整体的状态；决定折叠标题的文案与配色。 */
 export type ProcessStatus = 'running' | 'awaiting' | 'completed' | 'failed' | 'cancelled'
+/** 单个步骤的完成度：已完成 / 进行中 / 等待中。 */
 export type ProcessStepState = 'complete' | 'active' | 'waiting'
 
+/** 过程轨道里的一步；`kind` 标明步骤类型，对应的载荷字段按需填入，其余忽略。 */
 export interface ProcessStep {
   kind: 'think' | 'narration' | 'tool' | 'sub_agent' | 'approval'
   content?: string | undefined
@@ -20,12 +23,17 @@ export interface ProcessStep {
   active?: boolean | undefined
 }
 
+/** 过程折叠轨道的 Props。 */
 export interface ProcessFoldProps {
+  /** 按时间顺序排好的步骤；空数组会渲染成空轨道，调用方应自行决定是否渲染本组件。 */
   steps: ProcessStep[]
+  /** 过程整体状态；缺省时按 `isStreaming` 推导。 */
   status?: ProcessStatus | undefined
   /** 兼容旧调用方；未显式传 status 时映射为 running / completed。 */
   isStreaming?: boolean | undefined
+  /** 过程总耗时的展示文案（已格式化的字符串）；缺省则不显示。 */
   totalDuration?: string | undefined
+  /** 首次挂载是否展开；后续开合由用户操作主导，不受此属性影响。 */
   defaultExpanded?: boolean | undefined
 }
 

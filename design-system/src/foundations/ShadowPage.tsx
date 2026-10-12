@@ -1,5 +1,6 @@
 import './ShadowPage.css'
 
+/** 「阴影」基础页：文档流与浮层两级高度——默认没有阴影。 */
 export function ShadowPage() {
   return (
     <div className="module-container shadow-page">

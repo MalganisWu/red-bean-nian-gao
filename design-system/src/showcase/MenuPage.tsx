@@ -8,6 +8,7 @@ import './conversation-showcase.css'
 const triggerClassName =
   'flex min-h-11 min-w-48 cursor-pointer items-center justify-between rounded-md border border-border-strong bg-background px-3 font-sans text-xs font-medium text-foreground-body hover:border-foreground-faint hover:text-foreground sm:min-h-9'
 
+/** 「菜单」组件页：触发器、菜单项与危险操作的示例。 */
 export function MenuPage(): React.ReactElement {
   return (
     <div className="conversation-showcase">

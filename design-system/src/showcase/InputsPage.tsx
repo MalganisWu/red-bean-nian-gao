@@ -21,6 +21,7 @@ function FieldExample({ label, hint, children }: FieldExampleProps): React.React
   )
 }
 
+/** 「输入框」组件页：字段、提示与校验态的示例。 */
 export function InputsPage(): React.ReactElement {
   return (
     <div className="conversation-showcase">

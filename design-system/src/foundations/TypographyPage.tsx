@@ -24,6 +24,7 @@ const WEIGHTS = [
   ['650', 'Heading', 'Final 标题与确认动作'],
 ] as const
 
+/** 「排版」基础页：各文本角色的字号、行高、字重与字族。 */
 export function TypographyPage() {
   return (
     <div className="module-container typography-page">

@@ -9,6 +9,7 @@ import { ChevronRight } from 'lucide-react'
 
 import { cn } from '../lib/utils'
 
+/** 工具行的 Props；`status` 决定配色与图标，`duration` 为已格式化的耗时文案。 */
 export interface ToolItemProps {
   name: string
   callId?: string | undefined

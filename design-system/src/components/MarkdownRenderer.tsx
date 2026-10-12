@@ -7,6 +7,7 @@ import { cn } from '../lib/utils'
 import { MarkdownCodeBlock } from './MarkdownCodeBlock'
 import './markdown.css'
 
+/** Markdown 渲染器的 Props；`className` 追加在 `markdown-body` 之后。 */
 export interface MarkdownRendererProps {
   content: string
   className?: string

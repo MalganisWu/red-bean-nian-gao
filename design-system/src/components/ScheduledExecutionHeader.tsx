@@ -1,6 +1,7 @@
 import { cn } from '../lib/utils'
 import { scheduledTaskRunLabel, type ScheduledTaskRunStatus } from './scheduledTaskTypes'
 
+/** 执行详情页头部的 Props；带 Label 后缀的字段都是**已格式化的展示文案**，组件自身不做时间换算。 */
 export interface ScheduledExecutionHeaderProps {
   taskTitle: string
   executionTitle: string

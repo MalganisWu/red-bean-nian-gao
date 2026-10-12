@@ -45,6 +45,7 @@ const CONFIRM_LABELS: Record<string, string> = {
   [PATCH_ONLY_OPTION]: '确认：只生成补丁',
 }
 
+/** 「确认卡」组件页：单选 / 多选 / 自定义 / 跳过四种作答形态。 */
 export function QuestionCardPage() {
   const [resolution, setResolution] = useState<'pending' | 'answered' | 'refused'>('pending')
   const [submittedAnswers, setSubmittedAnswers] = useState<

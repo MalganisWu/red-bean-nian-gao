@@ -1,6 +1,7 @@
 import { cn } from '../lib/utils'
 import { MarkdownRenderer } from './MarkdownRenderer'
 
+/** 最终回答容器的 Props；`className` 追加在裸排容器之后。 */
 export interface MarkdownAnswerProps {
   content: string
   className?: string

@@ -80,6 +80,7 @@ function languageLabel(className?: string): string {
   return LANGUAGE_LABELS[language] ?? language
 }
 
+/** 代码块容器；从 children 里提取语言标签并提供复制动作，复制结果用短暂状态反馈。 */
 export function MarkdownCodeBlock({ children }: MarkdownCodeBlockProps) {
   const [copyState, setCopyState] = useState<CopyState>('idle')
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)

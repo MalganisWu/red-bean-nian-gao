@@ -1,9 +1,15 @@
+/*
+ * 复合件 · QuestionCard（确认卡）。
+ * 一次需要人工确认的交互的可作答表单：单选 / 多选 / 自定义输入 / 跳过四种作答方式，
+ * 并覆盖已答与拒答之后的只读形态。
+ */
 'use client'
 
 import { useId, useState, type ReactNode } from 'react'
 
 import { cn } from '../lib/utils'
 
+/** 卡片里的一个问题；`options` 与 `select` 成对使用，缺省按单选处理。 */
 export interface QuestionCardQuestion {
   id: string
   text: string
@@ -13,25 +19,34 @@ export interface QuestionCardQuestion {
   select?: 'single' | 'multi' | undefined
 }
 
+/** 单个问题的作答；`value` 用于单选与自定义输入，`values` 用于多选，`skip` 两者都不用。 */
 export interface QuestionCardAnswer {
   kind: 'option' | 'multi' | 'custom' | 'skip'
   value?: string | undefined
   values?: string[] | undefined
 }
 
+/** 确认卡 Props。 */
 export interface QuestionCardProps {
+  /** 要用户确认的问题列表；调用方应保证非空，空数组渲染出来是一张无内容的卡片。 */
   questions: QuestionCardQuestion[]
+  /** 卡片状态；缺省按 `pending` 处理，`answered` / `refused` 时转为只读展示。 */
   status?: 'pending' | 'answered' | 'refused' | undefined
+  /** 受控回填的作答；缺省时单选问题会默认选中第一个选项。 */
   answers?: Record<string, QuestionCardAnswer> | undefined
+  /** 正在提交：锁定交互并显示提交中态。 */
   submitting?: boolean | undefined
   /** 当前仍有另一条流在收尾时锁定交互，但不显示“正在提交”。 */
   disabled?: boolean | undefined
+  /** 提交失败的原因；有值时卡片保持可编辑，以便原地重试。 */
   error?: string | undefined
   /** 只有业务明确允许自由输入时才显示，确认卡默认保持基准的纯选项形态。 */
   allowCustomAnswer?: boolean | undefined
   /** 业务明确知道动作时可给出更直接的确认文案；函数形态可随当前选择变化。 */
   confirmLabel?: string | ((answer: QuestionCardAnswer | undefined) => string) | undefined
+  /** 确认回调；入参是按问题 id 索引的完整作答。 */
   onConfirm?: ((answers: Record<string, QuestionCardAnswer>) => void) | undefined
+  /** 拒绝回调；不传则整张卡片不渲染拒绝入口。 */
   onRefuse?: (() => void) | undefined
 }
 

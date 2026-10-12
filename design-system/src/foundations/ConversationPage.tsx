@@ -65,6 +65,7 @@ function SpecTable({
   )
 }
 
+/** 「对话」基础页：把过程折叠、确认卡与最终回答组合成完整的对话语境。 */
 export function ConversationPage() {
   const [decision, setDecision] = useState<Record<string, QuestionCardAnswer> | undefined>()
   const [refused, setRefused] = useState(false)

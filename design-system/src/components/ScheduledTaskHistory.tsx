@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { scheduledTaskRunLabel, type ScheduledTaskRunSummary } from './scheduledTaskTypes'
 
+/** 执行历史列表的 Props；分页与排序都是受控的，数据获取与状态推进由调用方负责。 */
 export interface ScheduledTaskHistoryProps {
   records: ScheduledTaskRunSummary[]
   onSelect: (record: ScheduledTaskRunSummary) => void

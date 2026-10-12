@@ -14,6 +14,7 @@ import {
   type ScheduledTaskRunStatus,
 } from './scheduledTaskTypes'
 
+/** 任务列表的 Props；筛选与排序受控，`filterCounts` 用于在档位上显示条数。 */
 export interface ScheduledTaskListProps {
   items: ScheduledTaskListItemData[]
   filter?: ScheduledTaskFilter | undefined

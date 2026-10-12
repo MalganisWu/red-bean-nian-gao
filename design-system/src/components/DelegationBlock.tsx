@@ -1,3 +1,8 @@
+/*
+ * 复合件 · DelegationBlock（子 Agent 委派行）。
+ * Process 轨道内的一行紧凑子任务：展开后只加深一层缩进，不嵌套第二条 Process，
+ * 否则「子代理再嵌套子代理」会把轨道读成一棵树。
+ */
 'use client'
 
 import { useState } from 'react'
@@ -8,16 +13,25 @@ import { MarkdownRenderer } from './MarkdownRenderer'
 import { ToolItem } from './ToolItem'
 import type { ReasonItem } from './ReasoningBlock'
 
+/** 委派状态；前六项对齐后端 `SubExecutionStatus`，`incomplete` 是流结束时仍未闭合的派生态。 */
 export type DelegationStatus =
   'running' | 'completed' | 'failed' | 'awaiting_user' | 'cancelled' | 'incomplete'
 
+/** 委派行的 Props。 */
 export interface DelegationBlockProps {
+  /** 被委派的子 Agent 名称，作为这一行的主标题。 */
   agentName: string
+  /** 委派状态；决定状态文案，也参与首次挂载时的默认展开判断。 */
   status: DelegationStatus
+  /** 已格式化的耗时文案；缺省则不渲染耗时列。 */
   duration?: string | undefined
+  /** 子执行内部的过程项。 */
   items: ReasonItem[]
+  /** 子执行的最终输出（Markdown），与 `items` 一同构成可展开的详情。 */
   output?: string | undefined
+  /** 收起态的一行摘要。 */
   summary?: string | undefined
+  /** 首次挂载是否展开；缺省时「运行中 / 等待确认 / 失败」三种状态默认展开。 */
   defaultExpanded?: boolean | undefined
 }
 

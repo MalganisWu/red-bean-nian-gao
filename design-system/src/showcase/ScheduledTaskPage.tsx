@@ -230,6 +230,7 @@ function TaskActions({ active, title }: { active: boolean; title: string }) {
   )
 }
 
+/** 「定时任务」组件页：列表 / 概览 / 历史 / 详情四类视图的组合示例。 */
 export function ScheduledTaskPage() {
   const [view, setView] = useState<DemoView>('list')
   const [filter, setFilter] = useState<ScheduledTaskFilter>('all')

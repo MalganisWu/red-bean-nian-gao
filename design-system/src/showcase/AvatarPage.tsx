@@ -5,6 +5,7 @@ import { Avatar } from '@/components/Avatar'
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
+/** 「头像」组件页：尺寸档位与中性回退形态。 */
 export function AvatarPage(): React.ReactElement {
   return (
     <div className="conversation-showcase">

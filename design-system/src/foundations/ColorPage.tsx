@@ -297,6 +297,7 @@ function ColorGroup({ title, colors }: { title: string; colors: readonly ThemeCo
   )
 }
 
+/** 「颜色」基础页：表面色与语义色的对照表，含明暗两套取值与用途说明。 */
 export function ColorPage() {
   return (
     <div className="module-container color-page">

@@ -28,6 +28,7 @@ const COMPLETED_STEPS: ProcessStep[] = [
   },
 ]
 
+/** 「过程折叠」组件页：按状态展示过程轨道。 */
 export function ProcessFoldPage() {
   return (
     <div className="conversation-showcase">

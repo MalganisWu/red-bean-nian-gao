@@ -1,6 +1,7 @@
 import { cn } from '../lib/utils'
 import { scheduledTaskRunLabel, type ScheduledTaskRunSummary } from './scheduledTaskTypes'
 
+/** 任务概览面板的 Props；字段都是已格式化的展示文案，缺省即不渲染对应行。 */
 export interface ScheduledTaskOverviewProps {
   scheduleLabel: string
   nextRunLabel?: string | undefined

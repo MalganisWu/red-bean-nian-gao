@@ -29,6 +29,7 @@ const RULES = [
   ['Approval', '确认按钮透明无填充，仅文字豆沙红；确认后在原节点保留问题与回答。'],
 ] as const
 
+/** 「设计理念」页：原则条目，以及可下载的哲学文档正文。 */
 export function PhilosophyPage() {
   return (
     <div className="module-container philosophy-page">

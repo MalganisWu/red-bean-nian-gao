@@ -43,6 +43,7 @@ export {
   trajectoryEndStateLabel,
 } from './trajectoryTypes'
 
+/** 轨迹记录表的 Props；`turns` 是唯一必填项，其余都是可选的增强能力。 */
 export interface TrajectoryLedgerProps {
   /**
    * 轮次数据（时序排列）。`endState` 缺省表示该轮仍在流式进行中：

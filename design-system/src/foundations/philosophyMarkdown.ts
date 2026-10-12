@@ -1,3 +1,4 @@
+/** 把设计哲学正文作为 Markdown 文件下载，供理念页上的下载入口调用。 */
 export function downloadDesignPhilosophyMarkdown(): void {
   const markdown = `# red-bean-nian-gao Design System
 

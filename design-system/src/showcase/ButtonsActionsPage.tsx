@@ -5,6 +5,7 @@ import { Button } from '@/components/Button'
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
+/** 「按钮」组件页：各变体与尺寸的组合示例。 */
 export function ButtonsActionsPage(): React.ReactElement {
   return (
     <div className="conversation-showcase">

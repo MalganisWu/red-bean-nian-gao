@@ -76,6 +76,7 @@ function DelegationStep({ status }: { status: DelegationStatus }): ProcessStep {
   }
 }
 
+/** 「子代理委派」组件页：按状态枚举展示委派行的各种形态。 */
 export function AgentDelegationPage() {
   return (
     <div className="conversation-showcase">

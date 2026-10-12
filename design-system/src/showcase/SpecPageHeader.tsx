@@ -1,9 +1,16 @@
+/*
+ * 内部件 · SpecPageHeader。
+ * 展示站各组件页共用的标题区（标题 / 说明 / 备注三段），不对外承诺 API。
+ */
+
+/** 规范页头部 Props；三段文字依次渲染为标题、说明与备注，均为必填。 */
 export interface SpecPageHeaderProps {
   title: string
   description: string
   note: string
 }
 
+/** 规范页头部：展示站组件页的标题区。 */
 export function SpecPageHeader({ title, description, note }: SpecPageHeaderProps) {
   return (
     <header className="spec-page__header">

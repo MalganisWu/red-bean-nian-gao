@@ -16,6 +16,7 @@ const MAP = [
   ['Dialog / Popover', '12px', '只有脱离文档流的浮层使用大圆角。'],
 ] as const
 
+/** 「圆角」基础页：圆角刻度，以及「哪类元素该用哪一档」的映射表。 */
 export function RadiusPage() {
   return (
     <div className="module-container radius-page">

@@ -1,3 +1,8 @@
+/*
+ * 原子件 · Button。
+ * 设计系统的按钮基元：变体与尺寸由 `buttonVariants` 一处给出，调用方只选择组合，
+ * 不自行拼接 Tailwind 类——否则「主按钮长什么样」会在各处漂移。
+ */
 import { Button as BaseButton } from '@base-ui/react/button'
 import { cva } from 'class-variance-authority'
 import React from 'react'
@@ -39,7 +44,12 @@ const buttonVariants = cva(
   }
 )
 
+/** 按钮 Props；`variant` / `size` 走内置变体表，其余属性透传给底层 button 元素。 */
 export interface IButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /**
+   * 视觉变体，默认 `default`（文字型主操作）。
+   * `destructive` 是文字型危险操作，`destructive-outline` 是描边型危险操作，两者语义相同、视觉权重不同。
+   */
   variant?:
     | 'default'
     | 'secondary'
@@ -49,10 +59,13 @@ export interface IButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     | 'solid'
     | 'link'
     | 'ghost'
+  /** 尺寸，默认 `md`；`icon` 是正方形图标位，不承载文本。 */
   size?: 'sm' | 'md' | 'lg' | 'icon'
+  /** 透传给 base-ui 的 render 槽，用于把按钮渲染成其它元素（如链接）。 */
   render?: React.ComponentProps<typeof BaseButton>['render']
 }
 
+/** 按钮组件；`children` 为内容，其余属性原样透传，`className` 追加在内置变体之后。 */
 export const Button = ({
   children,
   size = 'md',

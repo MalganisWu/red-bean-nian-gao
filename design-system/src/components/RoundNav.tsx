@@ -1,18 +1,27 @@
+/*
+ * 复合件 · RoundNav（轮次导航边沟）。
+ * 对话页的轮次索引：每轮一根横杠，悬停出摘要卡、点击回调跳转。
+ * 纯展示组件——轮次数据派生与滚动定位都在调用方。
+ */
 'use client'
 
 import { useRef, useState, type ReactNode } from 'react'
 import { cn } from '../lib/utils'
 
+/** 一个轮次对应的一根横杠。 */
 export interface RoundNavEntry {
   id: string
   /** 悬停摘要卡内容（调用方渲染，如 Q+A+meta）；无则悬停不出卡 */
   preview?: ReactNode
 }
 
+/** 轮次导航的 Props。 */
 export interface RoundNavProps {
+  /** 按轮次顺序排列的条目；数组顺序即横杠的视觉顺序。 */
   entries: RoundNavEntry[]
   /** 当前轮 id（豆沙红伸长态） */
   currentId?: string | undefined
+  /** 选中某一轮的回调；滚动定位由调用方实现，本组件不碰滚动容器。 */
   onSelect?: ((id: string) => void) | undefined
 }
 

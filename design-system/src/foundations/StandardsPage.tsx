@@ -35,6 +35,7 @@ const ACCESSIBILITY = [
   '支持 prefers-reduced-motion，并检查 200% 缩放与 360px 宽度。',
 ] as const
 
+/** 「规范」页：资产治理归属表与交互状态清单。 */
 export function StandardsPage() {
   return (
     <div className="module-container standards-page">

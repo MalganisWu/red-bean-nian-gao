@@ -6,6 +6,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   className?: string
 }
 
+/** 文本输入原子件；`type` 与 `placeholder` 有缺省值，其余属性透传给原生 input。 */
 export function Input({
   type = 'text',
   placeholder = '输入文本',
