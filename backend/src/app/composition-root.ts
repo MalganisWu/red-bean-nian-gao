@@ -35,6 +35,17 @@ export interface BuildApplicationOptions {
 /**
  * 全局 Composition Root 只连接基础设施、平台能力和业务 Module。
  * Module 内部的 Port → 实现映射分别位于对应的 `*.module.ts`。
+ *
+ * 五步的**顺序本身是依赖关系**，不是编号习惯：
+ * 1. 基础设施先立起来，每建一个就把关闭责任登记到 lifecycle；
+ * 2. Identity 要先于 bootstrap，因为建默认用户需要它的密码散列；
+ * 3. Provider 注册表在启动期一次建好并封闭，运行期不再改能力图；
+ * 4. Agent 与 Task 互为依赖（Task 用 Agent 执行、Agent 用 Task 投递），
+ *    因此拆成 core → task → agent 三步，避免循环构造；
+ * 5. HTTP 层最后组装，且只拿到各 Module 输出的 Port 绑定表，不直接接触实现。
+ *
+ * 整个函数体跑在 `buildManaged` 里：中途任一步失败，前面已建好的资源会被按登记顺序反向释放，
+ * 不会留下半启动的进程。
  */
 export function buildApplication(
   config: AppConfig,
@@ -165,6 +176,11 @@ export function buildApplication(
   })
 }
 
+/**
+ * 把中性观测层的日志出口接到项目 logger 上。
+ * 两者的级别名集合略有差异（观测层只有 debug/info/error，没有 warn），
+ * 这里按同名直传；span 因此与业务日志进同一条流，按 trace_id 一次检索即可对齐。
+ */
 function traceLogSink(logger: Logger): {
   readonly write: (record: {
     readonly level: 'debug' | 'info' | 'error'

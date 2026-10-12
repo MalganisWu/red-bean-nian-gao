@@ -36,7 +36,14 @@ export interface DatabaseBootstrapOptions {
   readonly migrator?: DatabaseMigrationGatePort | undefined
 }
 
-/** 应用或校验冻结的数据库结构，并以幂等方式创建必需的默认记录。 */
+/**
+ * 应用或校验冻结的数据库结构，并以幂等方式创建必需的默认记录。
+ *
+ * `auto_migrate` 的两种取值对应两种部署形态，行为刻意不对称：
+ * - `true`（本地开发）：直接跑迁移，方便 `make run` 一步到位。
+ * - `false`（生产）：**只读校验**，有未应用的迁移就拒绝启动。生产迁移由独立 job 执行，
+ *   应用实例并发跑 DDL 会互相踩；而且「启动时顺手改 schema」在生产是不可接受的隐式行为。
+ */
 export async function bootstrapDatabase(options: DatabaseBootstrapOptions): Promise<void> {
   const migrator = options.migrator ?? new PostgresMigrator(options.database)
   if (options.config.database.autoMigrate) {
@@ -65,6 +72,12 @@ export async function bootstrapDatabase(options: DatabaseBootstrapOptions): Prom
   )
 }
 
+/**
+ * 幂等地补齐默认记录：固定 ID + `ON CONFLICT DO NOTHING`。
+ *
+ * 幂等靠的是 ID 固定而不是「先查再插」——后者在并发启动时会两个实例都查到不存在、都去插。
+ * 不在冲突时更新也是有意的：用户在界面上改过的默认配置不该被每次重启重置。
+ */
 async function seedDefaults(
   database: SqlExecutor,
   config: AppConfig,
@@ -117,6 +130,15 @@ async function seedDefaults(
     ],
     signal
   )
+  /*
+   * 每次启动都**先摘掉三个高权限工具再并入白名单**，这不是冗余清理，而是一条安全不变量：
+   * `sys_fetch_url` / `sys_http_request` 能出网，`sys_read_file` 能读文件系统，
+   * 默认助手一律不予授权（`DEFAULT_AGENT_TOOL_IDS` 里没有它们）。
+   *
+   * 之所以要「摘」而不只是「并」：库里可能存着历史版本写过、或有人手工加上的授权。
+   * 只做并集的话，这些残留会在每次启动时被保留下来，安全默认值就形同虚设。
+   * 顺序也关键——先 array_remove 再 `||`，反过来会把自己刚并进去的又删掉。
+   */
   await database.query(
     `UPDATE core_agents
      SET sys_tool_ids = ARRAY(
@@ -138,6 +160,11 @@ async function seedDefaults(
   logger.info('database defaults initialized')
 }
 
+/**
+ * 建开发账号，仅在配置里同时给了用户名与密码时。
+ * 已存在就**直接返回**而不是更新：重置密码会覆盖使用者自己改过的口令，
+ * 而每次重启都把口令变回配置值是一种很难排查的困扰。
+ */
 async function seedDefaultUser(
   database: SqlExecutor,
   config: AppConfig,
