@@ -17,7 +17,15 @@ export interface ErrorEnvelope {
   }
 }
 
-/** 可安全向客户端返回公开文案的应用错误。 */
+/**
+ * 可安全向客户端返回公开文案的应用错误。
+ *
+ * 三个字段的边界是这个类的全部意义，别混用：
+ * - `message`：**会原样进响应体**，必须是可以公开的中文文案。
+ * - `logMessage` / `cause`：只进服务端日志，绝不进响应。
+ * 因此「把内部错误直接当 AppError 抛出」是一条会泄漏实现细节的路径——
+ * 未知错误一律经 `loggedInternalError` 转换，见文件末尾的 `errorResponse`。
+ */
 export class AppError extends Error {
   public readonly httpStatus: number
   public readonly code: number
@@ -70,6 +78,10 @@ export function internalError(): AppError {
   })
 }
 
+/**
+ * 把未知错误包装成 500，**保留 cause 供日志、对外仍只给通用文案**。
+ * 这是内部错误进入 HTTP 层的唯一合法通道。
+ */
 export function loggedInternalError(logMessage: string, cause: unknown): AppError {
   return new AppError({
     httpStatus: 500,
@@ -80,6 +92,11 @@ export function loggedInternalError(logMessage: string, cause: unknown): AppErro
   })
 }
 
+/**
+ * 构造对外的错误信封。非 `AppError` 一律降级为通用 500——
+ * 这里如果顺手把 `error.message` 传出去，一个未预期的 TypeError 就会把内部结构暴露给调用方。
+ * 信封形状 `{code, message, data: null}` 由 api-contract 固定，三个字段都不能少。
+ */
 export function errorResponse(error: unknown): ErrorEnvelope {
   const safeError = error instanceof AppError ? error : internalError()
   return {

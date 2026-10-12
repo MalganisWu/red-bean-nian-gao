@@ -31,9 +31,15 @@ export function authenticatedRequest(
     if (authorization === undefined || authorization === '') {
       throw unauthorizedError('缺少认证凭证')
     }
+    // 长度判断排除 `Authorization: Bearer `（有前缀但没 token），否则会把空串当凭证交给校验器。
     if (!authorization.startsWith('Bearer ') || authorization.length === 'Bearer '.length) {
       throw unauthorizedError(options.malformedMessage ?? '认证头格式错误，应为 Bearer <token>')
     }
+    /*
+     * 校验失败统一映射为「无效或已过期」，**不区分**签名错、过期、用户不存在等具体原因——
+     * 区分它们等于给攻击者一个探测 token 状态的接口。
+     * 空 userId 也走这里：校验器返回空串说明实现有问题，但对外仍是同一个不可用的结论。
+     */
     try {
       const userId = await authService.validateToken(
         authorization.slice('Bearer '.length),
@@ -47,7 +53,11 @@ export function authenticatedRequest(
   }
 }
 
-/** 读取由 authenticatedRequest 写入的当前身份；未经过认证前置处理器时拒绝访问。 */
+/**
+ * 读取由 `authenticatedRequest` 写入的当前身份；**没有就拒绝访问**。
+ * fail-closed 而不是返回一个空身份：忘了挂 auth 钩子的路由会得到 401，
+ * 而不是以一个「无人」的身份悄悄放行。
+ */
 export function authenticatedPrincipal(request: FastifyRequest): RequestPrincipal {
   const principal = requestPrincipals.get(request)
   if (principal === undefined) throw unauthorizedError('未授权')
