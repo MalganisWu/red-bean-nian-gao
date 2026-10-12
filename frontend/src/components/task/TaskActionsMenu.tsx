@@ -9,6 +9,7 @@ interface TaskActionsMenuProps {
   onDelete: () => void
 }
 
+/** 任务卡片的操作菜单；删除走二次确认，删除进行中时禁用交互。 */
 export function TaskActionsMenu({
   taskTitle,
   confirmingDelete = false,

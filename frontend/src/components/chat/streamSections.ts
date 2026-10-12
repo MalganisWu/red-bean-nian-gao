@@ -16,6 +16,11 @@ export function applyToken(sections: MessageSection[], content: string): Message
   return [...sections, { type: 'content', content, timestamp: Date.now() }]
 }
 
+/**
+ * 追加一段推理增量。
+ * 与相邻 section 的合并规则：紧邻 reason 且步骤号相同 → 并入同一项；
+ * 紧邻 tool_group → 把整组工具收进新的 reason section，以保持「思考 → 工具 → 继续思考」的时序。
+ */
 export function applyReasonStep(
   sections: MessageSection[],
   step: number,
@@ -49,6 +54,7 @@ export function applyReasonStep(
   ]
 }
 
+/** 登记一次工具调用为 running 并打上计时起点；params 为空对象时不写该字段。 */
 export function applyToolStart(
   sections: MessageSection[],
   callId: string,
@@ -110,6 +116,7 @@ function mapTool(
   })
 }
 
+/** 按 callId 把工具标记为成功并写入结果，同时结算耗时。 */
 export function applyToolResult(
   sections: MessageSection[],
   callId: string,
@@ -118,6 +125,7 @@ export function applyToolResult(
   return mapTool(sections, callId, (t) => ({ status: 'success', result, ...settleDuration(t) }))
 }
 
+/** 按 callId 把工具标记为失败并写入错误，同时结算耗时。 */
 export function applyToolFail(
   sections: MessageSection[],
   callId: string,

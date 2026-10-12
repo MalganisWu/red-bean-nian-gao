@@ -8,6 +8,7 @@ interface BackLinkProps {
   onClick: () => void
 }
 
+/** 返回入口；`label` 由调用方给出上一层的名称。 */
 export function BackLink({ label, onClick }: BackLinkProps) {
   return (
     <button

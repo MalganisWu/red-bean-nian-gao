@@ -16,6 +16,7 @@ interface ChatMessageItemProps {
   taskExecutionIsLatest?: boolean | undefined
 }
 
+/** 单条消息的渲染单元；对列表项做 memo，避免流式增量导致整列重渲染。 */
 export const ChatMessageItem = memo(function ChatMessageItem({
   message,
   isStreaming,

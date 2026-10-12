@@ -4,6 +4,7 @@ import type { RefObject, UIEvent } from 'react'
 /** 距底部超过该像素数视为用户主动上滚；回到底部阈值内自动恢复跟随。 */
 export const FOLLOW_TAIL_THRESHOLD_PX = 40
 
+/** 跟随选项；`contentKey` 引用变化即视为内容增长（传展示内容数组的当前引用即可）。 */
 export interface FollowTailOptions {
   /**
    * 跟随生效期（流式进行中传 true）。false 时跟随意图复位：
@@ -17,6 +18,7 @@ export interface FollowTailOptions {
   contentKey: unknown
 }
 
+/** 跟随所需的两处绑定：容器 ref 与 onScroll 处理器。 */
 export interface FollowTail {
   /** 绑定到滚动容器的 ref。 */
   readonly containerRef: RefObject<HTMLDivElement | null>

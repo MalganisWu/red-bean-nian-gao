@@ -10,6 +10,7 @@ import { TasksPage } from '@/pages/tasks/TasksPage'
 import { TaskDetailPage } from '@/pages/tasks/TaskDetailPage'
 import { ExecutionResultPage } from '@/pages/tasks/ExecutionResultPage'
 
+/** 应用路由表；认证页与主应用分属不同的 layout。 */
 export function Routes() {
   return (
     <RouterRoutes>

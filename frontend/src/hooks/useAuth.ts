@@ -15,6 +15,7 @@ interface AuthControls {
   user: User | null
 }
 
+/** 认证动作集合：登录、注册与登出，并同步维护 auth store 中的令牌与用户信息。 */
 export function useAuth(): AuthControls {
   const { setAuth, clearAuth, setUser, isAuthenticated, user } = useAuthStore()
 

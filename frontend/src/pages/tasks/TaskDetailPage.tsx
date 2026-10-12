@@ -3,6 +3,7 @@ import { TaskDetailPanel } from '@/components/task/TaskDetailPanel'
 import { ROUTES } from '@/lib/constants'
 import type { ScheduledTaskDetailTab } from '@/components/retroui/scheduledTaskTypes'
 
+/** 任务详情页；当前 Tab 存在查询参数里，因此刷新与分享链接都能停在同一个页签。 */
 export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()

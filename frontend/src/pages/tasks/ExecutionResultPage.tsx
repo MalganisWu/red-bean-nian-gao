@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ExecutionResultView } from '@/pages/chat/ExecutionResultView'
 import { ROUTES } from '@/lib/constants'
 
+/** 执行结果页；任务与执行 ID 都取自路由，任一缺失即不渲染。 */
 export function ExecutionResultPage() {
   const { id, eid } = useParams<{ id: string; eid: string }>()
   const navigate = useNavigate()

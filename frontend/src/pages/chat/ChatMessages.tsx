@@ -28,6 +28,7 @@ interface ChatMessagesProps {
   cardSubmission?: CardSubmissionState | null | undefined
 }
 
+/** 消息区：渲染历史与流式中的消息，并承载底部跟随滚动与错误重试入口。 */
 export function ChatMessages({
   messages,
   isStreaming,

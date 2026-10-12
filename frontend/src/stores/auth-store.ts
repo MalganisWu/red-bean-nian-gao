@@ -15,6 +15,7 @@ interface AuthActions {
   setUser: (user: User) => void
 }
 
+/** 认证状态 store；token 持久化在 localStorage，`isAuthenticated` 初值即由它的存在性推导。 */
 export const useAuthStore = create<AuthState & AuthActions>()((set) => ({
   token: localStorage.getItem(TOKEN_KEY),
   user: null,

@@ -70,6 +70,7 @@ export interface TrajectoryHistoryBase {
   readonly turnBase: number
 }
 
+/** 轨迹实时投影的状态与动作；轮次号以 `turnBase` 为基准，与持久化历史对齐。 */
 export interface TrajectoryLiveState {
   /** 正在进行流式的会话 id；null = 无实时投影。 */
   readonly streamingSessionId: string | null
@@ -122,6 +123,7 @@ function currentTurn(turns: readonly LiveTurn[]): LiveTurn | undefined {
   return turns.at(-1)
 }
 
+/** 轨迹专用 store；与 chat 主投影消费同一批 SSE 事件，但各自维护独立投影。 */
 export const useTrajectoryStore = create<TrajectoryLiveState>()((set) => ({
   streamingSessionId: null,
   liveSessionId: null,

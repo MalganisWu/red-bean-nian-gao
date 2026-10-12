@@ -153,6 +153,7 @@ function clearChatState(state: ChatState, extra?: Partial<ChatState>): Partial<C
   }
 }
 
+/** 对话主投影 store：消息列表、流式状态、待处理 section 与卡片提交态。 */
 export const useChatStore = create<ChatState & ChatActions>()((set, get) => ({
   ...initialState,
 

@@ -92,6 +92,7 @@ let executionDetailRequestSerial = 0
 let taskDetailRequestSerial = 0
 let executionListRequestSerial = 0
 
+/** 任务 store：会话内任务、任务详情与执行列表；每类请求带自增序号，用于丢弃过期响应。 */
 export const useTaskStore = create<TaskState & TaskActions>()((set, get) => ({
   ...initialState,
 

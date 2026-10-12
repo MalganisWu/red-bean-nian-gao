@@ -5,6 +5,7 @@ import { isWireSSEEventType, SSE_EVENT_TYPES } from '@/types/events'
 import type { ParsedSSEEvent } from '@/types/events'
 import type { ChatRequest, AnswerRequest } from '@/types/chat'
 
+/** SSE 连接参数：目标端点（缺省为对话端点）、请求体与三个回调。 */
 export interface SSEConnectionOptions {
   /** 目标端点，默认 API_ROUTES.CHAT.path；answer 用 API_ROUTES.CHAT_ANSWER.path */
   url?: string | undefined

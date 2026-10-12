@@ -6,6 +6,7 @@ import { Button } from '@/components/retroui/Button'
 import { Input } from '@/components/retroui/Input'
 import { toast } from 'sonner'
 
+/** 注册页；注册成功后按登录态继续后续跳转。 */
 export function RegisterPage() {
   const navigate = useNavigate()
   const { register } = useAuth()

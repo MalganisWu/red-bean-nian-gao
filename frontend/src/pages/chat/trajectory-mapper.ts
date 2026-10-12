@@ -82,6 +82,7 @@ function mapEndState(end: TrajectoryEndStateDto): TrajectoryTurnEnd {
   }
 }
 
+/** 会话轨迹的视图模型：轮次列表、压缩记录、结束标记与 token 合计。 */
 export interface SessionTrajectoryView {
   readonly sessionId: string
   readonly title: string

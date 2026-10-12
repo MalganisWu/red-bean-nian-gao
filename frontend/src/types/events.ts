@@ -31,11 +31,13 @@ export type {
   ToolStartEventDto as ToolStartEvent,
 } from '@red-bean/api-contract'
 
+/** 解析后的 SSE 帧：事件名 + **尚未校验**的原始载荷（形状由调用方按 `eventType` 判）。 */
 export interface ParsedSSEEvent {
   readonly eventType: SSEEventType
   readonly data: unknown
 }
 
+/** 判定字符串是否为已知事件名；未知事件名应被调用方丢弃，而不是当成解析失败。 */
 export function isWireSSEEventType(value: string): value is SSEEventType {
   return Object.values(SSE_EVENT_TYPES).some((eventType) => eventType === value)
 }

@@ -16,6 +16,7 @@ interface SessionTaskListViewProps {
   onSelectExecution: (taskId: string, executionId: string) => void
 }
 
+/** 会话内的任务列表视图；支持按生命周期筛选，并可进入任务详情或某次执行。 */
 export function SessionTaskListView({
   onBack,
   onSelectTask,

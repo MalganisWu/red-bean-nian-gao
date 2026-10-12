@@ -48,6 +48,7 @@ function validDate(value: string | null | undefined): Date | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date
 }
 
+/** 任务标题：取 task_input 的首个非空行并截断到 48 字；输入为空时回落为「未命名任务」。 */
 export function taskTitle(task: Task): string {
   const source = task.TaskInput.trim() || '未命名任务'
   const firstLine =
@@ -58,17 +59,20 @@ export function taskTitle(task: Task): string {
   return firstLine.length > 48 ? `${firstLine.slice(0, 47)}…` : firstLine
 }
 
+/** 完整指令文本；与标题相同时返回 `undefined`，避免详情页把同一句话渲染两遍。 */
 export function taskInstruction(task: Task): string | undefined {
   const instruction = task.TaskInput.trim()
   if (!instruction || instruction === taskTitle(task)) return undefined
   return instruction
 }
 
+/** 由启用状态与调度类型推出生命周期：单次且已停 = 已结束，周期且已停 = 暂停。 */
 export function toScheduledTaskLifecycle(task: Task): ScheduledTaskLifecycle {
   if (task.IsActive) return 'active'
   return task.ScheduleType === 'once' ? 'ended' : 'paused'
 }
 
+/** 把调度配置渲染成一行可读文案；只识别常见 cron 形态，认不出的一律回落为「周期任务」。 */
 export function formatScheduleLabel(task: Task): string {
   if (task.ScheduleType === 'once') {
     return isAbsentTime(task.RunAt) ? '单次任务' : `单次 · ${formatShortDateTime(task.RunAt)}`
@@ -96,6 +100,7 @@ export function formatScheduleLabel(task: Task): string {
   return '周期任务'
 }
 
+/** 由起止时间算耗时；缺任一端或时间倒挂时返回 `undefined`，调用方据此隐藏耗时。 */
 export function formatExecutionDuration(
   startedAt: string | null | undefined,
   completedAt: string | null | undefined
@@ -109,6 +114,7 @@ export function formatExecutionDuration(
   return `${(duration / 1000).toFixed(1)}s`
 }
 
+/** 把一次执行投影成列表摘要行：失败态展示错误、其余展示结果；`unread` 表示尚未被查看。 */
 export function toScheduledTaskRunSummary(
   execution: TaskExecution | TaskExecutionSummary,
   viewState?: ExecutionViewState
@@ -125,6 +131,10 @@ export function toScheduledTaskRunSummary(
   }
 }
 
+/**
+ * 把任务投影成列表项。
+ * `nextRunLabel` 按生命周期三态给出不同措辞；`latest_execution` 缺失时不渲染最近一次执行区块。
+ */
 export function toScheduledTaskListItem(
   task: TaskListItem,
   viewState?: ExecutionViewState,

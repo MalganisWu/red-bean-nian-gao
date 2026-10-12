@@ -2,6 +2,7 @@ import { Moon, Sun } from 'lucide-react'
 
 import { useTheme } from '@/app/ThemeProvider'
 
+/** 明暗主题切换按钮；当前态经 `aria-pressed` 与无障碍名称对外表达。 */
 export function ThemeToggle() {
   const { theme, toggleTheme } = useTheme()
   const isDark = theme === 'dark'

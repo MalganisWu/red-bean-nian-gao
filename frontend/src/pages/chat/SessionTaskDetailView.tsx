@@ -9,6 +9,7 @@ interface SessionTaskDetailViewProps {
   onViewExecution: (executionId: string) => void
 }
 
+/** 会话内的任务详情视图；以 Tab 在概览与执行历史之间切换。 */
 export function SessionTaskDetailView({
   taskId,
   activeTab,

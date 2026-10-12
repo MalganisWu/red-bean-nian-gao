@@ -13,6 +13,7 @@ export interface ApiError {
 
 export { API_ERROR_CODES }
 
+/** 前端统一错误类型；`status` 是 HTTP 状态、`code` 是后端业务码，二者解耦。 */
 export class AppError extends Error {
   status: number
   /** 后端业务码（4001-5000），与 HTTP status 解耦，供按码分流（i18n/重试） */

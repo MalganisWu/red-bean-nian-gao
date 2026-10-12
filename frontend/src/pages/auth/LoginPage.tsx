@@ -6,6 +6,7 @@ import { Button } from '@/components/retroui/Button'
 import { Input } from '@/components/retroui/Input'
 import { toast } from 'sonner'
 
+/** 登录页；提交成功后进入主应用。 */
 export function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuth()

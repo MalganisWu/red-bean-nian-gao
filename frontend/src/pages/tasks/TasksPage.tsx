@@ -12,6 +12,7 @@ import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 import { ROUTES } from '@/lib/constants'
 import { useTaskStore } from '@/stores/task-store'
 
+/** 定时任务列表页；按生命周期筛选，并用无限滚动分页加载。 */
 export function TasksPage() {
   const navigate = useNavigate()
   const [filter, setFilter] = useState<ScheduledTaskFilter>('all')

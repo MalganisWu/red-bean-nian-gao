@@ -33,8 +33,11 @@ export interface CardSubmissionState {
 // ── Chat Request（来自共享 API 契约）──────────────────
 
 export type ChatRequest = ChatRequestDto
+/** 一条对话消息（用户或助手）；结构等同共享契约的同名 DTO。 */
 export type ChatMessage = ChatMessageDto
+/** 取消运行的请求体。 */
 export type ChatCancelRequest = CancelRequestDto
+/** 提交卡片作答的请求体。 */
 export type AnswerRequest = AnswerRequestDto
 
 // ── Message Sections（线性渲染分段）───────────────────
@@ -44,6 +47,7 @@ export interface ReasonStep {
   content: string
 }
 
+/** 工具卡片；`cancelled` / `incomplete` 是前端派生展示态，后端 SSE 不会发出这两个取值。 */
 export interface ToolCard {
   callId: string
   name: string
@@ -60,6 +64,7 @@ export interface ToolCard {
   startedAtMs?: number | undefined
 }
 
+/** reason section 里的一项：一段思考步骤，或一次工具调用。 */
 export interface ReasonItem {
   itemType: 'step' | 'tool'
   index?: number | undefined
@@ -67,6 +72,7 @@ export interface ReasonItem {
   tool?: ToolCard | undefined
 }
 
+/** 工具卡片的持久化形态；实时流中的卡片用 `ToolCard`，两者字段一致但生命周期不同。 */
 export type PersistedToolCard = PersistedToolCardDto
 
 // ── 子 Agent 委派（sub_agent section）─────────────────
@@ -101,6 +107,10 @@ export interface ProcessStepItem {
   approval?: CardSectionData | undefined
 }
 
+/**
+ * 消息的分段联合；`type` 决定其余字段。
+ * `process` 是**纯渲染态**：它由前端把一轮里的零散 section 收束而成，只用于折叠展示，不落库。
+ */
 export type MessageSection =
   | { type: 'reason'; items: ReasonItem[]; timestamp: number; duration?: number | undefined }
   | { type: 'tool_group'; tools: ToolCard[]; timestamp: number; duration?: number | undefined }
@@ -109,12 +119,15 @@ export type MessageSection =
   | { type: 'sub_agent'; items: SubAgentSectionData; timestamp: number }
   | { type: 'process'; steps: ProcessStepItem[]; timestamp: number }
 
+/** 子 Agent section 的持久化形态（字段 snake_case 透传，不经过转换层）。 */
 export type PersistedSubAgentSectionData = PersistedSubAgentSectionDataDto
+/** 消息 section 的持久化联合；与 `MessageSection` 的差别是它没有 `process`。 */
 export type PersistedMessageSection = PersistedMessageSectionDto
 
 // ── 消息来源 / 元信息（TaskResultCard 用）─────────────
 
 export type ScheduledTaskMeta = ScheduledTaskMetaDto
+/** 展示元信息：定时任务来源、本轮运行开始时间，或过程块的终止状态。 */
 export type DisplayMessageMeta = DisplayMessageMetaDto
 
 // ── 前端展示消息 ────────────────────────────────────

@@ -16,6 +16,7 @@ function initialTheme(): Theme {
   return saved === 'dark' ? 'dark' : 'light'
 }
 
+/** 主题上下文；把主题同步到 `documentElement` 与 localStorage，刷新后保持。 */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(initialTheme)
 

@@ -19,6 +19,7 @@ import { trapTabFocus } from '@/lib/focus-trap'
 // awaiting 的最大确认等待：超过即视为连接异常，强制复位（见 handleSend 下方兜底 effect）
 const AWAITING_TIMEOUT_MS = 30_000
 
+/** 对话主页面：串起输入区、流式状态与消息区，并持有「已发出、待 START 确认」的输入锁。 */
 export function ChatPage() {
   const chat = useChatStream()
   const [input, setInput] = useState('')
