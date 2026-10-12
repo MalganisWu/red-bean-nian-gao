@@ -284,6 +284,13 @@ function danglingToolCallId(messages: readonly AgentMessage[], toolName: string)
   return ''
 }
 
+/**
+ * 运行期能力探测：仓储是否支持 fencing。
+ * 用结构判断而不是让 Port 自己声明，是因为 `SessionRepository` 是结构性类型——
+ * 内存实现天然没有 `advanceFence`，而生产实现有；让调用方在这里显式分流，
+ * 比逼所有实现都提供一个「我不支持」的空方法要干净。
+ * 判据是「方法存在且可调用」，而不是单纯 `in`：属性存在但为 undefined 同样不可用。
+ */
 function isFencedRepository(repository: SessionRepository): repository is FencedSessionRepository {
   return 'advanceFence' in repository && typeof repository.advanceFence === 'function'
 }

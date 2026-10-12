@@ -80,6 +80,11 @@ export function hasPendingCard(messages: readonly DisplayMessage[]): boolean {
   )
 }
 
+/**
+ * 找一张**仍处于 pending** 的卡片。
+ * 卡片存在但已 answered/refused 时返回 undefined，与「根本没这张卡」走同一条分支——
+ * 调用方据此判定「这个交互已经处理过了」，从而把重复的应答请求挡掉。
+ */
 export function findPendingCard(
   messages: readonly DisplayMessage[],
   interactionId: string
@@ -110,6 +115,13 @@ export function buildAnswerToolResult(card: AskCardData, marker: AnswerMarker): 
   })
 }
 
+/**
+ * 断言 D2 不变量：发起 ask 之后、resume 之前，历史里不得再出现 user 或 assistant 消息。
+ *
+ * 破坏它意味着有人绕过卡片回答路径继续推进了会话——那样 resume 时补进来的
+ * tool 结果会落在一条早已过期的上下文里，模型看到的是「问题之后已经聊过别的」的错乱历史。
+ * 这里刻意抛错而不是修补：这类结构损坏无法可靠地自动修复，早点暴露比留下一个语义错乱的历史强。
+ */
 export function assertAskIsLast(messages: readonly AgentMessage[], interactionId: string): void {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
@@ -149,6 +161,13 @@ export function resolveCard(
   })
 }
 
+/**
+ * 把 resume 之后产生的展示 section 插到卡片所在的位置（卡片之后、原后续之前），
+ * 而不是简单追加到末尾——这样前端渲染出来的顺序与用户实际经历的时序一致。
+ *
+ * `merged` 标志保证只插一次：卡片只应出现一次，但万一历史里有重复，
+ * 反复插入会把同一段内容复制多份。
+ */
 export function mergeContinuation(
   messages: readonly DisplayMessage[],
   interactionId: string,
@@ -179,6 +198,14 @@ export function mergeContinuation(
   })
 }
 
+/**
+ * 拼接两段历史时去掉重叠部分：从最长的可能重叠长度往下试，
+ * 第一个匹配上的就是真实重叠。
+ *
+ * 场景是崩溃恢复——checkpoint 里的已有消息与 buffer 里的增量消息在边界处会有重叠
+ * （同一条消息既进了 checkpoint 又留在 buffer）。不识别的话，恢复后模型会看到重复的对话轮次。
+ * 用深比较而不是按 id 匹配：`AgentMessage` 没有稳定主键，内容相同即视为同一条。
+ */
 export function appendWithoutOverlap(
   existing: readonly AgentMessage[],
   recovered: readonly AgentMessage[]

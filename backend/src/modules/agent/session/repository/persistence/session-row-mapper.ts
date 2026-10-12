@@ -31,6 +31,11 @@ const displayMessageSchema = z.object({
   meta: messageMetaSchema.optional(),
   timestamp: z.number().finite(),
 })
+/*
+ * revision / fencing_token 接受三种形态不是随手放宽：`pg` 默认把 BIGINT 以字符串返回
+ * （超出 JS 安全整数范围，不能用 number），但驱动配置不同或走了别的路径时也可能是 number 或 bigint。
+ * 与其假设驱动行为，不如在边界上把三种都收下来再统一转成 bigint（见 toBigInt）。
+ */
 const sessionRowSchema = z.object({
   session_id: z.string(),
   user_id: z.string(),
@@ -100,6 +105,11 @@ export function parseFencingToken(value: unknown): bigint {
   return toBigInt(parsed.data.token, 'fencing token')
 }
 
+/**
+ * 把数据库里的三种形态统一成 bigint，并拒绝负数。
+ * 负数在这里没有语义（revision 与 fencing token 都只增不减），
+ * 出现负值说明数据被写坏了——静默接受会让它一路传到 CAS 比较里，变成一个无法解释的冲突。
+ */
 export function toBigInt(value: string | number | bigint, name: string): bigint {
   try {
     const parsed = BigInt(value)
@@ -145,6 +155,7 @@ function toMessageMeta(value: z.infer<typeof messageMetaSchema>): MessageMeta {
   }
 }
 
+/** 取首条用户消息作为标题；`Array.from` 按码点切，避免把 emoji 或星形平面汉字截成半个。 */
 function extractTitle(messages: readonly DisplayMessage[]): string {
   for (const message of messages) {
     if (message.role !== 'user' || message.content === undefined) continue
