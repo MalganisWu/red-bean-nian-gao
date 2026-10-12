@@ -1,3 +1,4 @@
+/** `server` 段：监听地址、环境名与日志格式/级别。 */
 export interface ServerConfig {
   readonly host: string
   readonly port: string
@@ -6,19 +7,23 @@ export interface ServerConfig {
   readonly logLevel: string
 }
 
+/** `database` 段：连接串与是否在启动时自动迁移（生产必须关闭）。 */
 export interface DatabaseConfig {
   readonly url: string
   readonly autoMigrate: boolean
 }
 
+/** `redis` 段：连接串。会话锁、取消注册表与投递队列共用这一个连接。 */
 export interface RedisConfig {
   readonly url: string
 }
 
+/** `jwt` 段：签发密钥。生产环境要求至少 32 字节。 */
 export interface JwtConfig {
   readonly secret: string
 }
 
+/** `minio` 段：对象存储的端点、凭据与默认桶。 */
 export interface MinioConfig {
   readonly endpoint: string
   readonly accessKey: string
@@ -28,16 +33,19 @@ export interface MinioConfig {
   readonly region: string
 }
 
+/** `cors` 段：允许的来源，逗号分隔；单值 `*` 表示全部放行（仅限本地）。 */
 export interface CorsConfig {
   readonly origins: string
 }
 
+/** `llm` 段：默认 provider 凭据与模型名；仅用于播种默认记录，不是 Agent 实际使用的配置。 */
 export interface LlmConfig {
   readonly apiKey: string
   readonly baseUrl: string
   readonly model: string
 }
 
+/** `dev_user` 段：本地开发账号；用户名或密码为空则不创建。 */
 export interface DevUserConfig {
   readonly username: string
   readonly password: string
@@ -45,6 +53,7 @@ export interface DevUserConfig {
   readonly email: string
 }
 
+/** `scheduled_task` 段：调度器的扫描节奏、并发上限、重试策略与超时预算。 */
 export interface ScheduledTaskConfig {
   readonly maxRetries: number
   readonly retryInterval: string
@@ -55,12 +64,14 @@ export interface ScheduledTaskConfig {
   readonly executionTimeout: string
 }
 
+/** `observability` 段：tracing 后端（structured / otlp）、服务名与采样率。 */
 export interface ObservabilityConfig {
   readonly exporter: string
   readonly serviceName: string
   readonly sampleRatio: number
 }
 
+/** 应用配置全集；由 `config.yaml` 与环境变量合并而成，`loadConfig` 之后不再变化。 */
 export interface AppConfig {
   readonly server: ServerConfig
   readonly database: DatabaseConfig
@@ -77,6 +88,7 @@ export interface AppConfig {
 type Environment = Readonly<Record<string, string | undefined>>
 type UnknownRecord = Record<string, unknown>
 
+/** 加载选项；两个字段都可注入，测试因此无需依赖真实文件系统与环境变量。 */
 export interface LoadConfigOptions {
   readonly directory?: string
   readonly environment?: Environment

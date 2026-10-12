@@ -1,5 +1,6 @@
 import { API_ERROR_CODES } from '@red-bean/api-contract'
 
+/** 构造 `AppError` 的入参；`message` 会进响应体，`logMessage`/`cause` 只进日志。 */
 export interface AppErrorOptions {
   readonly httpStatus: number
   readonly code: number
@@ -8,6 +9,7 @@ export interface AppErrorOptions {
   readonly cause?: unknown
 }
 
+/** 对外错误信封的形状；`data` 恒为 null，由 api-contract 固定。 */
 export interface ErrorEnvelope {
   readonly status: number
   readonly body: {
@@ -42,34 +44,42 @@ export class AppError extends Error {
   }
 }
 
+/** 400：入参不合法。 */
 export function validationError(message: string): AppError {
   return new AppError({ httpStatus: 400, code: API_ERROR_CODES.VALIDATION, message })
 }
 
+/** 401：未认证或凭证无效。 */
 export function unauthorizedError(message: string): AppError {
   return new AppError({ httpStatus: 401, code: API_ERROR_CODES.UNAUTHORIZED, message })
 }
 
+/** 403：已认证但无权限。 */
 export function forbiddenError(message: string): AppError {
   return new AppError({ httpStatus: 403, code: API_ERROR_CODES.FORBIDDEN, message })
 }
 
+/** 404：资源不存在。越权场景也复用它，以免暴露「存在但不属于你」。 */
 export function notFoundError(message: string): AppError {
   return new AppError({ httpStatus: 404, code: API_ERROR_CODES.NOT_FOUND, message })
 }
 
+/** 409：与当前状态冲突（如交互已被处理）。 */
 export function conflictError(message: string): AppError {
   return new AppError({ httpStatus: 409, code: API_ERROR_CODES.CONFLICT, message })
 }
 
+/** 429：限流。复用 `CONFLICT` 错误码是因为契约里没有单独的限流码，前端按 HTTP 状态分支即可。 */
 export function rateLimitError(message: string): AppError {
   return new AppError({ httpStatus: 429, code: API_ERROR_CODES.CONFLICT, message })
 }
 
+/** 413：请求体超过限制。 */
 export function payloadTooLargeError(message: string): AppError {
   return new AppError({ httpStatus: 413, code: API_ERROR_CODES.VALIDATION, message })
 }
 
+/** 500：通用内部错误；不接收 message，避免调用方顺手把内部细节传进来。 */
 export function internalError(): AppError {
   return new AppError({
     httpStatus: 500,
