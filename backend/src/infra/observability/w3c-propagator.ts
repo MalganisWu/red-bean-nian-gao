@@ -38,6 +38,11 @@ const headerSetter: TextMapSetter<Record<string, string>> = {
 export class W3CTraceContextExtractor implements TraceContextExtractorPort {
   readonly #propagator = new core.W3CTraceContextPropagator()
 
+  /**
+   * 从入站 header 解析远端父链路。
+   * 额外要求 `isRemote === true`：传播器在没有 `traceparent` 时也会返回一个本地上下文的 span，
+   * 那不是「远端父」，当成远端父会让每次请求都被误判为接续了外部链路。
+   */
   public extract(headers: IncomingHttpHeaders): ExtractedW3CTraceContext | undefined {
     const extracted = this.#propagator.extract(ROOT_CONTEXT, headers, headerGetter)
     const spanContext = trace.getSpanContext(extracted)
@@ -57,6 +62,12 @@ export class W3CTraceContextExtractor implements TraceContextExtractorPort {
     }
   }
 
+  /**
+   * 把当前上下文写进出站 header。**拒绝注入远端上下文**：
+   * 那意味着本进程只是把上游的链路原样转手，注入一份并非自己产生的 `traceparent`
+   * 会让下游把本进程误认为链路中的一段。
+   * 返回 `false` 表示没注入（上下文无效或本就是远端的），调用方据此可以跳过写 header。
+   */
   public inject(context: Context, headers: Record<string, string>): boolean {
     const spanContext = trace.getSpanContext(context)
     if (

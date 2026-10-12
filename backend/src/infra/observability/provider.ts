@@ -20,6 +20,7 @@ export interface ObservabilityProviderDependencies {
   readonly logSink?: StructuredLogSink | undefined
 }
 
+/** 观测后端的持有者：业务只见 `TracerPort`，Provider 关闭时负责把在途 span 刷出去。 */
 export class ObservabilityProvider {
   readonly #tracer: TracerPort
   readonly #shutdown: (() => Promise<void>) | undefined
@@ -34,13 +35,22 @@ export class ObservabilityProvider {
     return this.#tracer
   }
 
+  /** 幂等：并发或重复关闭共享同一次 shutdown，不会重复刷两次 exporter。 */
   public shutdown(): Promise<void> {
     this.#shutdownPromise ??= this.#shutdown?.() ?? Promise.resolve()
     return this.#shutdownPromise
   }
 }
 
-/** 按配置构造产品 tracing 后端，同时避免 OTel 类型泄漏到业务代码。 */
+/**
+ * 按配置构造产品 tracing 后端，同时避免 OTel 类型泄漏到业务代码。
+ *
+ * 两种模式：
+ * - `structured`（默认）：零依赖的结构化日志，不建任何网络连接，适合本地与轻量部署。
+ * - `otlp`：建 SDK Provider，配 `ParentBased(TraceIdRatioBased)` 采样与 BatchSpanProcessor。
+ *   采样是父级优先的——上游决定采样时本地跟随，只有根 span 才按 `sampleRatio` 掷骰子。
+ *   这样一条已经开始的链路不会在中途因为某个服务的采样率而断掉。
+ */
 export function createObservabilityProvider(
   options: ObservabilityProviderOptions,
   dependencies: ObservabilityProviderDependencies = {}
