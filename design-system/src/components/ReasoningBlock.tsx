@@ -26,15 +26,18 @@ export interface ReasoningBlockProps {
   defaultExpanded?: boolean | undefined
 }
 
+/** 把一项 reason 记录摊平成 0 或 1 个 Process 步骤；无内容的项直接丢弃。 */
+function reasonItemToSteps(item: ReasonItem): ProcessStep[] {
+  if (item.itemType === 'tool' && item.tool) return [{ kind: 'tool', tool: item.tool }]
+  if (item.itemType === 'step' && item.content) return [{ kind: 'think', content: item.content }]
+  return []
+}
+
 /**
  * 兼容入口：ReasoningBlock 不再拥有独立视觉语言，而是归入统一 Process 轨道。
  */
 export function ReasoningBlock({ items, isStreaming, defaultExpanded }: ReasoningBlockProps) {
-  const steps = items.flatMap<ProcessStep>((item): ProcessStep[] => {
-    if (item.itemType === 'tool' && item.tool) return [{ kind: 'tool', tool: item.tool }]
-    if (item.itemType === 'step' && item.content) return [{ kind: 'think', content: item.content }]
-    return []
-  })
+  const steps = items.flatMap<ProcessStep>(reasonItemToSteps)
 
   return (
     <ProcessFold

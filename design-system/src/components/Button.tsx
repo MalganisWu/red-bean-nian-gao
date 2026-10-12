@@ -66,7 +66,7 @@ export interface IButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 /** 按钮组件；`children` 为内容，其余属性原样透传，`className` 追加在内置变体之后。 */
-export const Button = ({
+export function Button({
   children,
   size = 'md',
   className = '',
@@ -74,7 +74,7 @@ export const Button = ({
   render,
   ref,
   ...props
-}: IButtonProps & { ref?: React.Ref<HTMLButtonElement> }): React.ReactElement => {
+}: IButtonProps & { ref?: React.Ref<HTMLButtonElement> }): React.ReactElement {
   return (
     <BaseButton
       ref={ref}

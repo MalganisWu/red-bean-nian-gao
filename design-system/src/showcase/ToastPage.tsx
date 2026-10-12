@@ -40,22 +40,31 @@ function showErrorToast(): void {
   })
 }
 
+/** 依次展示普通、成功与失败三种预览通知。 */
+function showAllPreviewToasts(): void {
+  showNoticeToast()
+  showSuccessToast()
+  showErrorToast()
+}
+
+/** 进入页面后延迟展示三种预览通知；返回清理函数，撤销定时器并关闭残留通知。 */
+function mountPreviewToasts(): () => void {
+  const previewTimer = window.setTimeout(showAllPreviewToasts, 400)
+
+  /** 卸载时撤销定时器，并关掉可能仍在屏幕上的预览通知。 */
+  function clearPreviewToasts(): void {
+    window.clearTimeout(previewTimer)
+    toast.dismiss(PREVIEW_IDS.notice)
+    toast.dismiss(PREVIEW_IDS.success)
+    toast.dismiss(PREVIEW_IDS.error)
+  }
+
+  return clearPreviewToasts
+}
+
 /** 「通知」组件页：三种语义的通知示例，固定 id 便于重复预览。 */
 export function ToastPage(): React.ReactElement {
-  useEffect(() => {
-    const previewTimer = window.setTimeout(() => {
-      showNoticeToast()
-      showSuccessToast()
-      showErrorToast()
-    }, 400)
-
-    return () => {
-      window.clearTimeout(previewTimer)
-      toast.dismiss(PREVIEW_IDS.notice)
-      toast.dismiss(PREVIEW_IDS.success)
-      toast.dismiss(PREVIEW_IDS.error)
-    }
-  }, [])
+  useEffect(mountPreviewToasts, [])
 
   return (
     <div className="conversation-showcase">

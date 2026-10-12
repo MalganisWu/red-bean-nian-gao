@@ -70,6 +70,12 @@ export function ConversationPage() {
   const [decision, setDecision] = useState<Record<string, QuestionCardAnswer> | undefined>()
   const [refused, setRefused] = useState(false)
 
+  /** 记录确认卡提交的作答，并从拒答态回到已作答。 */
+  function handleConfirm(answers: Record<string, QuestionCardAnswer>): void {
+    setDecision(answers)
+    setRefused(false)
+  }
+
   const approvalQuestion = [
     {
       id: 'scope',
@@ -254,10 +260,7 @@ export function ConversationPage() {
                 ? (CONFIRM_LABELS[answer.value] ?? '确认并继续')
                 : '确认并继续'
             }
-            onConfirm={(answers) => {
-              setDecision(answers)
-              setRefused(false)
-            }}
+            onConfirm={handleConfirm}
             onRefuse={() => setRefused(true)}
           />
         </div>

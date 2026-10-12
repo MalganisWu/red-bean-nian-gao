@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { ChevronRight } from 'lucide-react'
 
 import { cn } from '../lib/utils'
@@ -85,6 +85,114 @@ export function ScheduledTaskList({
 }: ScheduledTaskListProps) {
   const visibleItems = items.filter((item) => matchesFilter(item, filter))
 
+  /** 渲染一行定时任务：标题、计划、最近执行、生命周期与动作槽位。 */
+  function renderTaskItem(item: ScheduledTaskListItemData): ReactElement {
+    const latestRun = item.latestRun
+    return (
+      <li
+        key={item.id}
+        className="grid min-h-[89px] grid-cols-[minmax(260px,1.45fr)_minmax(150px,.82fr)_minmax(170px,.9fr)_86px_36px] items-center gap-x-[18px] border-b border-border px-4 py-[15px] transition-colors last:border-b-0 hover:bg-surface-hover focus-within:bg-surface-hover max-[860px]:grid-cols-[minmax(220px,1.25fr)_minmax(140px,.8fr)_minmax(145px,.85fr)_74px_34px] max-[860px]:gap-x-3 max-[700px]:grid-cols-[minmax(0,1fr)_auto] max-[700px]:gap-x-3.5 max-[700px]:gap-y-2.5 max-[700px]:px-0.5"
+      >
+        <button
+          type="button"
+          onClick={() => onSelectTask(item)}
+          className="min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left max-[700px]:col-start-1 max-[700px]:row-start-1"
+        >
+          <span className="flex min-w-0 items-center gap-2 font-sans text-sm font-semibold leading-6 text-foreground">
+            <span className="truncate max-[700px]:whitespace-normal">{item.title}</span>
+            {latestRun?.unread && (
+              <span
+                aria-label="有未读执行结果"
+                className="h-[5px] w-[5px] shrink-0 rounded-full bg-brand-indicator"
+              />
+            )}
+          </span>
+          {item.source && (
+            <span className="mt-1 block truncate font-sans text-xs leading-[1.4] text-foreground-muted max-[700px]:whitespace-normal">
+              {item.source}
+            </span>
+          )}
+        </button>
+
+        <div className="min-w-0 max-[700px]:col-start-1 max-[700px]:row-start-2">
+          <span className="block font-sans text-xs leading-6 text-foreground-secondary">
+            <span className="hidden text-foreground-muted max-[700px]:inline">计划 · </span>
+            {item.scheduleLabel}
+          </span>
+          {item.nextRunLabel && (
+            <span className="mt-0.5 block truncate font-sans text-xs text-foreground-muted max-[700px]:whitespace-normal">
+              {item.nextRunLabel}
+            </span>
+          )}
+        </div>
+
+        {latestRun ? (
+          <button
+            type="button"
+            onClick={() => onSelectExecution?.(item)}
+            disabled={!onSelectExecution}
+            className="min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left disabled:cursor-default max-[700px]:col-start-1 max-[700px]:row-start-3"
+          >
+            <span
+              className={cn(
+                'flex items-center gap-1.5 font-sans text-xs leading-6',
+                runStatusClass(latestRun.status)
+              )}
+            >
+              <span className="hidden text-foreground-muted max-[700px]:inline">最近 ·</span>
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'h-[5px] w-[5px] shrink-0 rounded-full',
+                  runStatusIndicatorClass(latestRun.status),
+                  latestRun.status === 'running' &&
+                    'motion-safe:animate-[process-breathe_1.8s_ease-in-out_infinite]'
+                )}
+              />
+              {scheduledTaskRunLabel(latestRun.status)}
+            </span>
+            <span
+              className={cn(
+                'mt-0.5 block truncate font-sans text-xs text-foreground-muted max-[700px]:whitespace-normal',
+                latestRun.status === 'failed' && 'text-danger'
+              )}
+            >
+              {latestRun.summary ||
+                [latestRun.timeLabel, latestRun.durationLabel].filter(Boolean).join(' · ')}
+            </span>
+          </button>
+        ) : (
+          <span className="text-xs text-foreground-faint max-[700px]:col-start-1 max-[700px]:row-start-3">
+            <span className="hidden max-[700px]:inline">最近 · </span>
+            暂无执行摘要
+          </span>
+        )}
+
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 justify-self-start whitespace-nowrap font-sans text-xs',
+            lifecycleClass(item.lifecycle),
+            'max-[700px]:col-start-2 max-[700px]:row-start-1'
+          )}
+        >
+          {scheduledTaskLifecycleLabel(item.lifecycle)}
+        </span>
+
+        <div className="max-[700px]:col-start-2 max-[700px]:row-start-2 max-[700px]:row-end-4 max-[700px]:self-center">
+          {renderActions ? (
+            renderActions(item)
+          ) : (
+            <ChevronRight
+              aria-hidden="true"
+              className="h-4 w-4 text-foreground-faint"
+              strokeWidth={1.4}
+            />
+          )}
+        </div>
+      </li>
+    )
+  }
+
   return (
     <div className="min-w-0">
       <div className="mb-3 flex items-end justify-between gap-4">
@@ -161,120 +269,7 @@ export function ScheduledTaskList({
               )}
             </div>
           ) : (
-            <ul className="m-0 list-none p-0">
-              {visibleItems.map((item) => {
-                const latestRun = item.latestRun
-                return (
-                  <li
-                    key={item.id}
-                    className="grid min-h-[89px] grid-cols-[minmax(260px,1.45fr)_minmax(150px,.82fr)_minmax(170px,.9fr)_86px_36px] items-center gap-x-[18px] border-b border-border px-4 py-[15px] transition-colors last:border-b-0 hover:bg-surface-hover focus-within:bg-surface-hover max-[860px]:grid-cols-[minmax(220px,1.25fr)_minmax(140px,.8fr)_minmax(145px,.85fr)_74px_34px] max-[860px]:gap-x-3 max-[700px]:grid-cols-[minmax(0,1fr)_auto] max-[700px]:gap-x-3.5 max-[700px]:gap-y-2.5 max-[700px]:px-0.5"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => onSelectTask(item)}
-                      className="min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left max-[700px]:col-start-1 max-[700px]:row-start-1"
-                    >
-                      <span className="flex min-w-0 items-center gap-2 font-sans text-sm font-semibold leading-6 text-foreground">
-                        <span className="truncate max-[700px]:whitespace-normal">{item.title}</span>
-                        {latestRun?.unread && (
-                          <span
-                            aria-label="有未读执行结果"
-                            className="h-[5px] w-[5px] shrink-0 rounded-full bg-brand-indicator"
-                          />
-                        )}
-                      </span>
-                      {item.source && (
-                        <span className="mt-1 block truncate font-sans text-xs leading-[1.4] text-foreground-muted max-[700px]:whitespace-normal">
-                          {item.source}
-                        </span>
-                      )}
-                    </button>
-
-                    <div className="min-w-0 max-[700px]:col-start-1 max-[700px]:row-start-2">
-                      <span className="block font-sans text-xs leading-6 text-foreground-secondary">
-                        <span className="hidden text-foreground-muted max-[700px]:inline">
-                          计划 ·{' '}
-                        </span>
-                        {item.scheduleLabel}
-                      </span>
-                      {item.nextRunLabel && (
-                        <span className="mt-0.5 block truncate font-sans text-xs text-foreground-muted max-[700px]:whitespace-normal">
-                          {item.nextRunLabel}
-                        </span>
-                      )}
-                    </div>
-
-                    {latestRun ? (
-                      <button
-                        type="button"
-                        onClick={() => onSelectExecution?.(item)}
-                        disabled={!onSelectExecution}
-                        className="min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left disabled:cursor-default max-[700px]:col-start-1 max-[700px]:row-start-3"
-                      >
-                        <span
-                          className={cn(
-                            'flex items-center gap-1.5 font-sans text-xs leading-6',
-                            runStatusClass(latestRun.status)
-                          )}
-                        >
-                          <span className="hidden text-foreground-muted max-[700px]:inline">
-                            最近 ·
-                          </span>
-                          <span
-                            aria-hidden="true"
-                            className={cn(
-                              'h-[5px] w-[5px] shrink-0 rounded-full',
-                              runStatusIndicatorClass(latestRun.status),
-                              latestRun.status === 'running' &&
-                                'motion-safe:animate-[process-breathe_1.8s_ease-in-out_infinite]'
-                            )}
-                          />
-                          {scheduledTaskRunLabel(latestRun.status)}
-                        </span>
-                        <span
-                          className={cn(
-                            'mt-0.5 block truncate font-sans text-xs text-foreground-muted max-[700px]:whitespace-normal',
-                            latestRun.status === 'failed' && 'text-danger'
-                          )}
-                        >
-                          {latestRun.summary ||
-                            [latestRun.timeLabel, latestRun.durationLabel]
-                              .filter(Boolean)
-                              .join(' · ')}
-                        </span>
-                      </button>
-                    ) : (
-                      <span className="text-xs text-foreground-faint max-[700px]:col-start-1 max-[700px]:row-start-3">
-                        <span className="hidden max-[700px]:inline">最近 · </span>
-                        暂无执行摘要
-                      </span>
-                    )}
-
-                    <span
-                      className={cn(
-                        'inline-flex items-center gap-1.5 justify-self-start whitespace-nowrap font-sans text-xs',
-                        lifecycleClass(item.lifecycle),
-                        'max-[700px]:col-start-2 max-[700px]:row-start-1'
-                      )}
-                    >
-                      {scheduledTaskLifecycleLabel(item.lifecycle)}
-                    </span>
-
-                    <div className="max-[700px]:col-start-2 max-[700px]:row-start-2 max-[700px]:row-end-4 max-[700px]:self-center">
-                      {renderActions ? (
-                        renderActions(item)
-                      ) : (
-                        <ChevronRight
-                          aria-hidden="true"
-                          className="h-4 w-4 text-foreground-faint"
-                          strokeWidth={1.4}
-                        />
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+            <ul className="m-0 list-none p-0">{visibleItems.map(renderTaskItem)}</ul>
           )}
         </div>
       )}

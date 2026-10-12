@@ -7,18 +7,24 @@ import {
   type ReactElement,
 } from 'react'
 
-import { TABS, TAB_GROUPS, type TabId } from './showcase/tabs'
+import { TABS, TAB_GROUPS, type TabGroupDefinition, type TabId } from './showcase/tabs'
 
 type PageComponent = () => ReactElement
+
+/** 拉取展示页模块并取出其中的页面组件，供 `React.lazy` 作为加载函数使用。 */
+async function loadPageModule<TModule>(
+  loadModule: () => Promise<TModule>,
+  selectPage: (module: TModule) => PageComponent
+): Promise<{ default: PageComponent }> {
+  const module = await loadModule()
+  return { default: selectPage(module) }
+}
 
 function lazyPage<TModule>(
   loadModule: () => Promise<TModule>,
   selectPage: (module: TModule) => PageComponent
 ): LazyExoticComponent<PageComponent> {
-  return lazy(async (): Promise<{ default: PageComponent }> => {
-    const module = await loadModule()
-    return { default: selectPage(module) }
-  })
+  return lazy(() => loadPageModule(loadModule, selectPage))
 }
 
 const PAGES: Record<TabId, LazyExoticComponent<PageComponent>> = {
@@ -124,6 +130,13 @@ function PageLoading(): ReactElement {
   )
 }
 
+/** 把主题同步到根元素与本地存储，下次打开时直接恢复。 */
+function applyTheme(theme: 'light' | 'dark'): void {
+  document.documentElement.classList.toggle('dark', theme === 'dark')
+  document.documentElement.style.colorScheme = theme
+  window.localStorage.setItem('rbng-design-theme', theme)
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('philosophy')
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
@@ -131,11 +144,32 @@ export default function App() {
   )
   const ActivePage = PAGES[activeTab]
 
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-    document.documentElement.style.colorScheme = theme
-    window.localStorage.setItem('rbng-design-theme', theme)
-  }, [theme])
+  useEffect(() => applyTheme(theme), [theme])
+
+  /** 渲染一个侧栏分组；分组下没有页签时不渲染。 */
+  function renderNavGroup(group: TabGroupDefinition): ReactElement | null {
+    const items = TABS.filter((tab) => tab.group === group.id)
+    if (items.length === 0) return null
+    return (
+      <div key={group.id} className="ds-nav-group">
+        <h2 className="ds-nav-group__title">{group.label}</h2>
+        <div className="ds-nav-list" role="tablist" aria-label={group.label}>
+          {items.map((tab) => (
+            <button
+              key={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              className={`ds-nav-btn${activeTab === tab.id ? ' active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="ds-nav-btn__bullet" aria-hidden="true" />
+              <span className="ds-nav-btn__label">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="ds-app">
@@ -146,29 +180,7 @@ export default function App() {
         </div>
 
         <nav className="ds-nav" aria-label="模块导航">
-          {TAB_GROUPS.map((group) => {
-            const items = TABS.filter((tab) => tab.group === group.id)
-            if (items.length === 0) return null
-            return (
-              <div key={group.id} className="ds-nav-group">
-                <h2 className="ds-nav-group__title">{group.label}</h2>
-                <div className="ds-nav-list" role="tablist" aria-label={group.label}>
-                  {items.map((tab) => (
-                    <button
-                      key={tab.id}
-                      role="tab"
-                      aria-selected={activeTab === tab.id}
-                      className={`ds-nav-btn${activeTab === tab.id ? ' active' : ''}`}
-                      onClick={() => setActiveTab(tab.id)}
-                    >
-                      <span className="ds-nav-btn__bullet" aria-hidden="true" />
-                      <span className="ds-nav-btn__label">{tab.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
+          {TAB_GROUPS.map(renderNavGroup)}
         </nav>
 
         <div className="ds-sidebar__theme-toggle">

@@ -497,6 +497,39 @@ for (const t of APPROVAL_TURNS) {
 
 const EMPTY_TURNS: TrajectoryTurn[] = []
 
+/** 在演示数据中按 id 查一条记录，子调用也算记录。 */
+function findRecord(id: string | undefined): TrajectoryRecord | undefined {
+  if (!id) return undefined
+  for (const t of TURNS) {
+    for (const r of t.records) {
+      if (r.id === id) return r
+      for (const c of r.children ?? []) if (c.id === id) return c
+    }
+  }
+  return undefined
+}
+
+/** 在演示数据中按 id 查一次尝试明细。 */
+function findAttempt(id: string | undefined): TrajectoryAttempt | undefined {
+  if (!id) return undefined
+  for (const t of TURNS) {
+    for (const r of t.records) {
+      for (const q of r.attempts ?? []) if (q.id === id) return q
+    }
+  }
+  return undefined
+}
+
+/** 按 id 反查它所属轮次的标签，供检查器标题使用。 */
+function turnLabelOf(id: string | undefined): string | undefined {
+  for (const t of TURNS) {
+    if (t.records.some((r) => r.id === id || (r.children ?? []).some((c) => c.id === id)))
+      return `轮次 ${t.turn}`
+    if (t.records.some((r) => (r.attempts ?? []).some((q) => q.id === id))) return `轮次 ${t.turn}`
+  }
+  return undefined
+}
+
 /** 会话轨迹视图 Showcase：泳道时序概览 + 轮次记录表 + 记录检查器。 */
 export function TrajectoryPage() {
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
@@ -505,33 +538,10 @@ export function TrajectoryPage() {
   const [filter, setFilter] = useState('')
   const [focusIds, setFocusIds] = useState<ReadonlySet<string> | null>(null)
 
-  const findRecord = (id: string | undefined): TrajectoryRecord | undefined => {
-    if (!id) return undefined
-    for (const t of TURNS) {
-      for (const r of t.records) {
-        if (r.id === id) return r
-        for (const c of r.children ?? []) if (c.id === id) return c
-      }
-    }
-    return undefined
-  }
-  const findAttempt = (id: string | undefined): TrajectoryAttempt | undefined => {
-    if (!id) return undefined
-    for (const t of TURNS) {
-      for (const r of t.records) {
-        for (const q of r.attempts ?? []) if (q.id === id) return q
-      }
-    }
-    return undefined
-  }
-  const turnLabelOf = (id: string | undefined): string | undefined => {
-    for (const t of TURNS) {
-      if (t.records.some((r) => r.id === id || (r.children ?? []).some((c) => c.id === id)))
-        return `轮次 ${t.turn}`
-      if (t.records.some((r) => (r.attempts ?? []).some((q) => q.id === id)))
-        return `轮次 ${t.turn}`
-    }
-    return undefined
+  /** 选中记录：记住产出行带来的 tab；再点一次同一条（未带 tab）即清空选中。 */
+  function handleSelect(id: string, tab?: string): void {
+    setSelectedTab(tab)
+    setSelectedId((cur) => (cur === id && tab === undefined ? undefined : id))
   }
 
   const selectedRecord = findRecord(selectedId)
@@ -572,10 +582,7 @@ export function TrajectoryPage() {
                 filterText={filter}
                 onFilterChange={setFilter}
                 selectedId={selectedId}
-                onSelect={(id, tab) => {
-                  setSelectedTab(tab)
-                  setSelectedId((cur) => (cur === id && tab === undefined ? undefined : id))
-                }}
+                onSelect={handleSelect}
                 focusIds={focusIds}
               />
             </div>

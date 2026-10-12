@@ -4,7 +4,8 @@ import { Toaster as Sonner } from 'sonner'
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
-const Toaster = ({ ...props }: ToasterProps): React.ReactElement => {
+/** 通知浮层出口：装配 Quiet Tool 的通知样式并透传其余 Toaster 属性。 */
+function Toaster({ ...props }: ToasterProps): React.ReactElement {
   return (
     <Sonner
       toastOptions={{

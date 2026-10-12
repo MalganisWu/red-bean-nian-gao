@@ -5,7 +5,7 @@
  */
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
 
 import { cn } from '../lib/utils'
@@ -42,6 +42,21 @@ const STATUS_TEXT: Record<DelegationStatus, string> = {
   awaiting_user: '等待确认',
   cancelled: '已取消',
   incomplete: '未完成',
+}
+
+/** 渲染子执行里的一条过程项；无内容的项不渲染。 */
+function renderDelegationItem(item: ReasonItem, index: number): ReactElement | null {
+  if (item.itemType === 'step') {
+    return (
+      <p key={`step-${index}`} className="m-0">
+        {item.content}
+      </p>
+    )
+  }
+  if (item.itemType === 'tool' && item.tool) {
+    return <ToolItem key={`tool-${index}`} {...item.tool} />
+  }
+  return null
 }
 
 /** Process 内的紧凑子任务行；详情只增加一层缩进，不嵌套第二条 Process。 */
@@ -123,19 +138,7 @@ export function DelegationBlock({
       {hasDetail && expanded && (
         <div className="mb-[3px] ml-5 mt-1.5 border-l border-border-strong py-px pl-3 text-[10.5px] leading-[1.75] text-foreground-muted max-[760px]:ml-[17px]">
           <div className="space-y-2">
-            {items.map((item, index) => {
-              if (item.itemType === 'step') {
-                return (
-                  <p key={`step-${index}`} className="m-0">
-                    {item.content}
-                  </p>
-                )
-              }
-              if (item.itemType === 'tool' && item.tool) {
-                return <ToolItem key={`tool-${index}`} {...item.tool} />
-              }
-              return null
-            })}
+            {items.map(renderDelegationItem)}
             {output && (
               <MarkdownRenderer
                 content={output}

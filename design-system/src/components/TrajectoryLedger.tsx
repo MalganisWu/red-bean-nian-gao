@@ -1,6 +1,13 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
+import {
+  Fragment,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactElement,
+} from 'react'
 import { ChevronRight } from 'lucide-react'
 
 import { cn } from '../lib/utils'
@@ -335,6 +342,15 @@ function AttemptRow({
       .toLowerCase()
       .includes(q)
   const failed = attempt.status === 'error'
+
+  /** 键盘等价于点击：Enter / 空格选中这条尝试。 */
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onSelect?.(attempt.id)
+    }
+  }
+
   return (
     <div
       role="button"
@@ -343,12 +359,7 @@ function AttemptRow({
       aria-selected={selectedId === attempt.id}
       data-hidden={!hit || undefined}
       onClick={() => onSelect?.(attempt.id)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onSelect?.(attempt.id)
-        }
-      }}
+      onKeyDown={handleKeyDown}
       className={cn(
         `relative grid min-h-[30px] cursor-default ${GRID} items-center gap-x-2.5 border-b border-border/40 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus-ring`,
         'hover:bg-surface-hover',
@@ -526,6 +537,21 @@ function requestModel(call: TrajectoryRecord): string | undefined {
   return call.model ?? call.attempts?.at(-1)?.model
 }
 
+/** 不可变地切换集合里的一项：有则删、无则加。 */
+function toggleInSet<T>(source: ReadonlySet<T>, value: T): ReadonlySet<T> {
+  const next = new Set(source)
+  if (next.has(value)) next.delete(value)
+  else next.add(value)
+  return next
+}
+
+/** 不可变地从集合里删掉一项。 */
+function removeFromSet<T>(source: ReadonlySet<T>, value: T): ReadonlySet<T> {
+  const next = new Set(source)
+  next.delete(value)
+  return next
+}
+
 function RequestHeaderRow({
   index,
   call,
@@ -545,6 +571,26 @@ function RequestHeaderRow({
   /** 折叠开关；缺省表示该请求没有可折叠的工具执行。 */
   onToggleFold?: (() => void) | undefined
 }) {
+  /** 键盘等价于点击：Enter / 空格选中这次请求。 */
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onSelect?.(call.id, '概览')
+    }
+  }
+
+  /** 点请求边界圆点：只选中这次调用，不触发行选中。 */
+  function handleBoundaryClick(event: MouseEvent<HTMLButtonElement>): void {
+    event.stopPropagation()
+    onSelect?.(call.id, '概览')
+  }
+
+  /** 点折叠箭头：只切换折叠，不触发行选中。 */
+  function handleToggleFoldClick(event: MouseEvent<SVGSVGElement>): void {
+    event.stopPropagation()
+    onToggleFold?.()
+  }
+
   return (
     <div
       role="button"
@@ -555,12 +601,7 @@ function RequestHeaderRow({
       /* 点请求行 → 打开该次调用的详情（模型 / 入·出·缓 / 尝试明细）。
          tab 固定给「概览」：请求的默认落点就是这次调用的用量与耗时。 */
       onClick={() => onSelect?.(call.id, '概览')}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onSelect?.(call.id, '概览')
-        }
-      }}
+      onKeyDown={handleKeyDown}
       className={cn(
         `relative grid min-h-[30px] cursor-default ${GRID} items-center gap-x-2.5 border-b border-border/40 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus-ring`,
         'bg-[color-mix(in_srgb,var(--foreground)_3%,var(--background))]',
@@ -580,10 +621,7 @@ function RequestHeaderRow({
       <button
         type="button"
         aria-label={`请求 #${index}`}
-        onClick={(e) => {
-          e.stopPropagation()
-          onSelect?.(call.id, '概览')
-        }}
+        onClick={handleBoundaryClick}
         className="group absolute left-3 top-[-8px] z-[6] inline-flex h-4 w-4 items-center justify-center rounded-full focus-visible:outline-none"
       >
         <span
@@ -612,10 +650,7 @@ function RequestHeaderRow({
         {onToggleFold !== undefined && (
           <ChevronRight
             aria-hidden="true"
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggleFold()
-            }}
+            onClick={handleToggleFoldClick}
             className={cn(
               'h-3 w-3 shrink-0 cursor-pointer text-foreground-faintest transition-transform',
               !folded && 'rotate-90'
@@ -688,6 +723,15 @@ function EndRow({
         : state === 'interrupt'
           ? 'border-brand-indicator text-brand-text'
           : 'border-control-border text-foreground-muted'
+
+  /** 键盘等价于点击：Enter / 空格选中这条终态记录。 */
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onSelect?.(record.id)
+    }
+  }
+
   return (
     <div
       role="button"
@@ -696,12 +740,7 @@ function EndRow({
       aria-selected={selectedId === record.id}
       data-hidden={!hit || undefined}
       onClick={() => onSelect?.(record.id)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onSelect?.(record.id)
-        }
-      }}
+      onKeyDown={handleKeyDown}
       className={cn(
         `relative grid min-h-[30px] cursor-default ${GRID} items-center gap-x-2.5 border-b border-border/40 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus-ring`,
         'hover:bg-surface-hover',
@@ -797,6 +836,20 @@ function LedgerRow({
   const isInstant = record.durationMs === undefined
   const isEnd = record.kind === 'turn-end' || record.kind === 'session-end'
 
+  /** 键盘等价于点击：Enter / 空格选中这条记录。 */
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onSelect?.(record.id)
+    }
+  }
+
+  /** 展开 / 收起这条记录的产出与尝试明细，不触发行选中。 */
+  function handleToggleChildren(event: MouseEvent<SVGSVGElement>): void {
+    event.stopPropagation()
+    setChildrenOpen((v) => !v)
+  }
+
   return (
     <Fragment>
       <div
@@ -806,12 +859,7 @@ function LedgerRow({
         aria-selected={selectedId === record.id}
         data-hidden={!hit || undefined}
         onClick={() => onSelect?.(record.id)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onSelect?.(record.id)
-          }
-        }}
+        onKeyDown={handleKeyDown}
         className={cn(
           `relative grid min-h-[30px] cursor-default ${GRID} items-center gap-x-2.5 border-b border-border/40 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus-ring`,
           'hover:bg-surface-hover',
@@ -849,10 +897,7 @@ function LedgerRow({
           {collapsible && (
             <ChevronRight
               aria-hidden="true"
-              onClick={(e) => {
-                e.stopPropagation()
-                setChildrenOpen((v) => !v)
-              }}
+              onClick={handleToggleChildren}
               className={cn(
                 'h-3 w-3 shrink-0 cursor-pointer text-foreground-faint transition-transform',
                 childrenOpen && 'rotate-90'
@@ -1012,18 +1057,22 @@ function CompactionCard({
   const ratio = compaction.afterTokens / compaction.beforeTokens
   const released = compaction.beforeTokens - compaction.afterTokens
   const status = compaction.status ?? 'success'
+
+  /** 键盘等价于点击：Enter / 空格选中这条压缩事件。 */
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onSelect?.(compaction.id)
+    }
+  }
+
   return (
     <div
       role="button"
       tabIndex={0}
       aria-selected={selectedId === compaction.id}
       onClick={() => onSelect?.(compaction.id)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onSelect?.(compaction.id)
-        }
-      }}
+      onKeyDown={handleKeyDown}
       className={cn(
         `grid cursor-pointer ${GRID} items-center gap-x-2.5 py-2`,
         selectedId === compaction.id && 'bg-primary-soft'
@@ -1103,6 +1152,78 @@ function CompactionCard({
   )
 }
 
+/** 找出含选中记录的轮次号；没有选中或找不到时返回 undefined。 */
+function findActiveTurn(
+  turns: TrajectoryTurn[],
+  selectedId: string | undefined
+): number | undefined {
+  if (selectedId === undefined) return undefined
+  for (const turn of turns) {
+    const hit = turn.records.some(
+      (r) => r.id === selectedId || (r.attempts ?? []).some((q) => q.id === selectedId)
+    )
+    if (hit) return turn.turn
+  }
+  return undefined
+}
+
+/** 推导每轮之前的间隔项：压缩事件前后各一段空档，没有压缩时只剩等待用户的空档。 */
+function computeIntervalsBefore(
+  turns: TrajectoryTurn[],
+  compaction: TrajectoryCompaction | undefined
+): Map<number, Array<{ kind: 'gap'; gap: TrajectoryGap } | { kind: 'cmp' }>> {
+  const sec = (t: string) => trajectoryTimeToSeconds(t)
+
+  /** 秒数格式化为 HH:MM:SS。 */
+  function toHMS(s: number): string {
+    /** 两位补零。 */
+    function p(n: number): string {
+      return String(n).padStart(2, '0')
+    }
+    return `${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(Math.floor(s % 60))}`
+  }
+
+  const map = new Map<number, Array<{ kind: 'gap'; gap: TrajectoryGap } | { kind: 'cmp' }>>()
+  for (let i = 1; i < turns.length; i++) {
+    const prev = turns[i - 1]
+    const cur = turns[i]
+    if (!prev || !cur) continue
+    const prevEnd = sec(prev.startedAt) + prev.durationMs / 1000
+    const list: Array<{ kind: 'gap'; gap: TrajectoryGap } | { kind: 'cmp' }> = []
+    const cmp = compaction && compaction.afterTurn === prev.turn ? compaction : undefined
+    if (cmp) {
+      const cmpAt = sec(cmp.at)
+      list.push({
+        kind: 'gap',
+        gap: { seconds: cmpAt - prevEnd, from: toHMS(prevEnd), to: cmp.at, label: '会话空闲' },
+      })
+      list.push({ kind: 'cmp' })
+      const cmpEnd = cmpAt + cmp.durationMs / 1000
+      list.push({
+        kind: 'gap',
+        gap: {
+          seconds: sec(cur.startedAt) - cmpEnd,
+          from: toHMS(cmpEnd),
+          to: cur.startedAt,
+          label: '等待用户输入',
+        },
+      })
+    } else {
+      list.push({
+        kind: 'gap',
+        gap: {
+          seconds: sec(cur.startedAt) - prevEnd,
+          from: toHMS(prevEnd),
+          to: cur.startedAt,
+          label: '等待用户输入',
+        },
+      })
+    }
+    map.set(cur.turn, list)
+  }
+  return map
+}
+
 /* ---------- 轮次与主体 ---------- */
 
 /**
@@ -1135,66 +1256,350 @@ export function TrajectoryLedger({
    */
   const [collapsedCalls, setCollapsedCalls] = useState<ReadonlySet<string>>(new Set())
   /** 当前轮次 = 含选中记录的轮次；turnRail 只画在它上面。 */
-  const activeTurn = useMemo(() => {
-    if (selectedId === undefined) return undefined
-    for (const turn of turns) {
-      const hit = turn.records.some(
-        (r) => r.id === selectedId || (r.attempts ?? []).some((q) => q.id === selectedId)
-      )
-      if (hit) return turn.turn
-    }
-    return undefined
-  }, [turns, selectedId])
+  const activeTurn = useMemo(() => findActiveTurn(turns, selectedId), [turns, selectedId])
   const scale = scaleMs ?? Math.max(...turns.map((t) => t.durationMs), 1)
   const query = filterText ?? ''
 
   /* 每轮之前的间隔项（空档 / 压缩 + 两侧空档），由轮次起止与压缩时刻推导 */
-  const intervalsBefore = useMemo(() => {
-    const sec = (t: string) => trajectoryTimeToSeconds(t)
-    const toHMS = (s: number) => {
-      const p = (n: number) => String(n).padStart(2, '0')
-      return `${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(Math.floor(s % 60))}`
+  const intervalsBefore = useMemo(
+    () => computeIntervalsBefore(turns, compaction),
+    [turns, compaction]
+  )
+
+  /** 展开全部：清空轮次与调用两级的折叠集合。 */
+  function expandAll(): void {
+    setCollapsedTurns(new Set())
+    setCollapsedCalls(new Set())
+  }
+
+  /** 轮次标题行的键盘激活：等价于点击它（切换本轮折叠）。 */
+  function handleTurnKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      event.currentTarget.click()
     }
-    const map = new Map<number, Array<{ kind: 'gap'; gap: TrajectoryGap } | { kind: 'cmp' }>>()
-    for (let i = 1; i < turns.length; i++) {
-      const prev = turns[i - 1]
-      const cur = turns[i]
-      if (!prev || !cur) continue
-      const prevEnd = sec(prev.startedAt) + prev.durationMs / 1000
-      const list: Array<{ kind: 'gap'; gap: TrajectoryGap } | { kind: 'cmp' }> = []
-      const cmp = compaction && compaction.afterTurn === prev.turn ? compaction : undefined
-      if (cmp) {
-        const cmpAt = sec(cmp.at)
-        list.push({
-          kind: 'gap',
-          gap: { seconds: cmpAt - prevEnd, from: toHMS(prevEnd), to: cmp.at, label: '会话空闲' },
-        })
-        list.push({ kind: 'cmp' })
-        const cmpEnd = cmpAt + cmp.durationMs / 1000
-        list.push({
-          kind: 'gap',
-          gap: {
-            seconds: sec(cur.startedAt) - cmpEnd,
-            from: toHMS(cmpEnd),
-            to: cur.startedAt,
-            label: '等待用户输入',
-          },
-        })
-      } else {
-        list.push({
-          kind: 'gap',
-          gap: {
-            seconds: sec(cur.startedAt) - prevEnd,
-            from: toHMS(prevEnd),
-            to: cur.startedAt,
-            label: '等待用户输入',
-          },
-        })
+  }
+
+  /** 轮次标题里的 token 列：三段用量合计，未采集时退化为一个短横。 */
+  function renderTurnUsage(turn: TrajectoryTurn): ReactElement | string {
+    const usage = turnUsage(turn.records)
+    if (usage === undefined) return '—'
+    return (
+      <>
+        <span className="text-foreground-faint">入</span>
+        {formatTrajectoryTokens(usage.input)}
+        <span className="text-foreground-faint">·出</span>
+        {formatTrajectoryTokens(usage.output)}
+        <span className="text-foreground-faint">·缓</span>
+        {formatTrajectoryTokens(usage.cache)}
+      </>
+    )
+  }
+
+  /** 渲染一轮：间隔带、轮次标题行、折叠摘要行与本轮全部记录。 */
+  function renderTurn(turn: TrajectoryTurn, turnIndex: number): ReactElement {
+    const collapsed = collapsedTurns.has(turn.turn)
+    const children = turn.records.flatMap((r) => r.children ?? [])
+    const toolCount = turn.records.filter((r) => r.kind === 'tool').length + children.length
+    const errCount = [...turn.records, ...children].filter((r) => r.status === 'error').length
+    const hasSub = turn.records.some((r) => r.kind === 'subagent')
+    /* 轮次的首要计数单位是**请求**（一次用户提问会引发多次模型网关调用），
+       「条记录」是拍平后的旧口径，与两级结构对不上。 */
+    const requestCount = turn.records.filter((r) => r.kind === 'call').length
+    const intervals = intervalsBefore.get(turn.turn) ?? []
+    const items = groupRequests(turn.records)
+    /* 被请求级折叠收走的系统执行：它们仍然与请求平级（语义不变），只是渲染时收进摘要行。
+       用 id 集合跳过，而不是把工具挂进请求的子项——那会与「独立阶段」的模型冲突。 */
+    const foldedSystemIds = new Set<string>()
+    for (const item of items) {
+      if (
+        item.kind === 'request' &&
+        item.callBlocks.length > 0 &&
+        collapsedCalls.has(item.call.id)
+      ) {
+        for (const tool of item.callBlocks) foldedSystemIds.add(tool.id)
       }
-      map.set(cur.turn, list)
     }
-    return map
-  }, [turns, compaction])
+
+    /** 渲染本轮的一个阶段项：请求组、系统执行或普通记录。 */
+    function renderTurnItem(item: TurnItem): ReactElement | null {
+      if (item.kind === 'request') {
+        return (
+          <Fragment key={item.call.id}>
+            <RequestHeaderRow
+              index={item.index}
+              call={item.call}
+              toolCount={item.callBlocks.length}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              folded={item.callBlocks.length > 0 && collapsedCalls.has(item.call.id)}
+              onToggleFold={
+                item.callBlocks.length === 0
+                  ? undefined
+                  : () => setCollapsedCalls((prev) => toggleInSet(prev, item.call.id))
+              }
+            />
+            {item.call.thinking !== undefined && (
+              <OutputRow
+                label="思考"
+                text={item.call.thinking}
+                callId={item.call.id}
+                selectedId={selectedId}
+                onSelect={onSelect}
+                filterText={query}
+              />
+            )}
+            {item.call.reply !== undefined && (
+              <OutputRow
+                label="正文"
+                text={item.call.reply}
+                callId={item.call.id}
+                selectedId={selectedId}
+                onSelect={onSelect}
+                filterText={query}
+              />
+            )}
+            {/* 工具调用是**模型写出的原始字符串**，属于本次请求的产出 */}
+            {/* 请求级折叠摘要行：只说「有几个、叫什么」 */}
+            {item.callBlocks.length > 0 && collapsedCalls.has(item.call.id) && (
+              <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={false}
+                onClick={() => setCollapsedCalls((prev) => removeFromSet(prev, item.call.id))}
+                className={`grid min-h-[20px] cursor-pointer ${GRID} items-center gap-x-2.5 border-b border-border/40 text-label text-foreground-muted transition-colors hover:bg-surface-hover`}
+              >
+                <span />
+                <span />
+                <span className="relative self-stretch">
+                  <span
+                    aria-hidden="true"
+                    className="absolute bottom-0 left-1/2 top-0 w-px bg-border-strong"
+                  />
+                </span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span aria-hidden="true" className="text-foreground-faintest">
+                    …
+                  </span>
+                  <span className="truncate">
+                    {item.callBlocks.length} 个工具调用 ·{' '}
+                    {item.callBlocks
+                      .map((t) => t.name ?? '')
+                      .filter((n) => n !== '')
+                      .join(', ')}
+                  </span>
+                  <span className="shrink-0 text-foreground-faintest">（点此展开）</span>
+                </span>
+                <span />
+                <span />
+                <span />
+              </div>
+            )}
+            {!collapsedCalls.has(item.call.id) &&
+              item.callBlocks.map((tool) => (
+                <OutputRow
+                  key={`call-${tool.id}`}
+                  label="工具调用"
+                  text={toolCallText(tool)}
+                  callId={item.call.id}
+                  selectedId={selectedId}
+                  onSelect={onSelect}
+                  filterText={query}
+                />
+              ))}
+          </Fragment>
+        )
+      }
+      if (item.kind === 'system-run') {
+        /* 已被上方请求级折叠收进摘要行 → 这里不再单独渲染 */
+        if (foldedSystemIds.has(item.record.id)) return null
+        /* 系统执行是**独立阶段**，与请求平级：不缩进、也不加左边框。
+           它「不产出模型 token」由 chip「工具执行」承担，不靠线条表达。 */
+        return (
+          <LedgerRow
+            key={`sys-${item.record.id}`}
+            record={item.record}
+            scaleMs={scale}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            filterText={query}
+            focusIds={focusIds}
+          />
+        )
+      }
+      return (
+        <LedgerRow
+          key={item.record.id}
+          record={item.record}
+          scaleMs={scale}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          filterText={query}
+          focusIds={focusIds}
+        />
+      )
+    }
+
+    return (
+      <Fragment key={turn.turn}>
+        {intervals.map((item, i) =>
+          item.kind === 'gap' ? (
+            <GapBand key={`g${i}`} gap={item.gap} />
+          ) : (
+            compaction && (
+              <CompactionCard
+                key="cmp"
+                compaction={compaction}
+                scaleMs={scale}
+                selectedId={selectedId}
+                onSelect={onSelect}
+              />
+            )
+          )
+        )}
+        <div className="relative">
+          {/* turnRail：2px、贯穿整轮，**只画在含选中记录的当前轮次**上；
+              它不是「每轮一个装饰」，而是「你现在在哪一轮」的指示。 */}
+          {activeTurn === turn.turn && (
+            <span
+              aria-hidden="true"
+              className="trajectory-turn-rail pointer-events-none absolute bottom-0 left-0 top-[-1px] z-[4] w-0.5"
+            />
+          )}
+          <div
+            role="button"
+            tabIndex={0}
+            aria-expanded={!collapsed}
+            onDoubleClick={() => setCollapsedTurns((prev) => toggleInSet(prev, turn.turn))}
+            onClick={() => setCollapsedTurns((prev) => toggleInSet(prev, turn.turn))}
+            onKeyDown={handleTurnKeyDown}
+            /* **不 sticky**：轮次标题是记录流的一部分，随内容滚动（轮次标记只是
+               行内角标）。只有工具栏与列头钉在顶部——多钉一层会让被穿过的行与它重叠，
+               看起来像断层。 */
+            className={`relative grid min-h-[42px] cursor-pointer select-none ${GRID} items-center gap-x-2.5 border-b border-border/40 bg-muted`}
+          >
+            {/* 轮次起线：2px、骑在行边界上、贯通整行。第一轮不画。 */}
+            {turnIndex > 0 && (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-0.5 -translate-y-1/2 bg-border/40"
+              />
+            )}
+            <span />
+            <span className="text-label font-semibold tabular-nums text-foreground-secondary">
+              {turn.startedAt}
+            </span>
+            <span className="relative self-stretch">
+              <span
+                aria-hidden="true"
+                className="absolute bottom-0 left-1/2 top-0 w-px bg-border-strong"
+              />
+              <span
+                aria-hidden="true"
+                className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-control-border bg-background"
+              />
+            </span>
+            <span className="flex min-w-0 items-center gap-2.5">
+              <ChevronRight
+                aria-hidden="true"
+                className={cn(
+                  'h-3 w-3 shrink-0 text-foreground-faint transition-transform',
+                  !collapsed && 'rotate-90'
+                )}
+                strokeWidth={1.4}
+              />
+              <span className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-foreground">
+                轮次 {turn.turn}
+              </span>
+              {/* meta / note 都是 nowrap 文本，不设收窄就会直接压到右侧 token 列上
+                  （实测：长 note「上下文 8,100 tok 起（压缩后）」与「18,092 tok」重叠）。
+                  所以**任何宽度**都要能截断，而不是只在窄容器下让位。 */}
+              <span className="min-w-0 truncate whitespace-nowrap text-label text-foreground-faint">
+                {requestCount} 个请求 · 工具 ×{toolCount}
+                {hasSub ? ' · 子 Agent ×1' : ''}
+                {errCount > 0 && <span className="text-danger-text"> · {errCount} 失败</span>}
+              </span>
+              {/* endState 缺省 = 该轮仍在流式进行中。没有这个标记时，「进行中」与
+                  「已结束但没有终态」在记录表里外观完全一致，用户会误判会话已结束。 */}
+              {turn.endState === undefined && (
+                <span className="inline-flex h-[19px] shrink-0 items-center rounded-md bg-muted px-[5px] py-0 text-label leading-none font-semibold tracking-[0.035em] text-foreground-muted">
+                  进行中
+                </span>
+              )}
+              {turn.note && (
+                <span className="min-w-0 truncate whitespace-nowrap text-label text-foreground-muted">
+                  {turn.note}
+                </span>
+              )}
+            </span>
+            <span className="min-w-0 truncate whitespace-nowrap text-right text-label tabular-nums text-foreground-secondary">
+              {renderTurnUsage(turn)}
+            </span>
+            <span className="block @max-[760px]:hidden">
+              <DurationBar ms={turn.durationMs} tone="turn" scaleMs={scale} />
+            </span>
+            {/* 时长：未终结轮次显示的 durationMs 只是已知活动区间的下界（终态到达后才补齐最终耗时），
+                数字格式不变，口径差异由标题行的「进行中」标记表达 */}
+            <span className="whitespace-nowrap text-right text-label tabular-nums text-foreground-muted">
+              {formatTrajectoryDuration(turn.durationMs)}
+            </span>
+          </div>
+          {/* 折叠后插入 20px 摘要行：只说「有多少」，点它展开。
+              摘要行占「记录」列，右侧 5 个数字列留空——否则七列会错位。 */}
+          {collapsed && (
+            <div
+              role="button"
+              tabIndex={0}
+              aria-expanded={false}
+              onClick={() => setCollapsedTurns((prev) => removeFromSet(prev, turn.turn))}
+              className={`grid min-h-[20px] cursor-pointer ${GRID} items-center gap-x-2.5 border-b border-border/40 text-label text-foreground-muted transition-colors hover:bg-surface-hover`}
+            >
+              <span />
+              <span />
+              <span className="relative self-stretch">
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-0 left-1/2 top-0 w-px bg-border-strong"
+                />
+              </span>
+              <span className="flex min-w-0 items-center gap-2">
+                <span aria-hidden="true" className="text-foreground-faintest">
+                  …
+                </span>
+                <span className="truncate">
+                  {requestCount} 个请求 · 工具 ×{toolCount}
+                </span>
+                <span className="shrink-0 text-foreground-faintest">（点此展开）</span>
+              </span>
+              <span />
+              <span />
+              <span />
+            </div>
+          )}
+          {!collapsed && (
+            <>
+              {items.map(renderTurnItem)}
+              {turn.endState && (
+                <EndRow
+                  record={endRowRecord(
+                    'turn-end',
+                    turn.endState.at,
+                    turn.endState.seq,
+                    /* 状态由空心 chip 承担，正文不再重复它；note 保留（如失败原因） */
+                    `轮次 ${turn.turn} 结束${turn.endState.note ? ` · ${turn.endState.note}` : ''}`
+                  )}
+                  state={turn.endState.state}
+                  selectedId={selectedId}
+                  onSelect={onSelect}
+                  filterText={query}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </Fragment>
+    )
+  }
 
   return (
     <div role="table" aria-label="会话轨迹记录表" className="@container min-w-0">
@@ -1209,10 +1614,7 @@ export function TrajectoryLedger({
         </button>
         <button
           type="button"
-          onClick={() => {
-            setCollapsedTurns(new Set())
-            setCollapsedCalls(new Set())
-          }}
+          onClick={expandAll}
           className="inline-flex h-5 items-center gap-1 rounded-sm px-[7px] text-label text-foreground-secondary transition-colors hover:bg-surface-hover"
         >
           ⊞ 展开全部
@@ -1244,359 +1646,7 @@ export function TrajectoryLedger({
         <span className="text-right text-label font-medium text-foreground-faint">时长</span>
       </div>
 
-      {turns.map((turn, turnIndex) => {
-        const collapsed = collapsedTurns.has(turn.turn)
-        const children = turn.records.flatMap((r) => r.children ?? [])
-        const toolCount = turn.records.filter((r) => r.kind === 'tool').length + children.length
-        const errCount = [...turn.records, ...children].filter((r) => r.status === 'error').length
-        const hasSub = turn.records.some((r) => r.kind === 'subagent')
-        /* 轮次的首要计数单位是**请求**（一次用户提问会引发多次模型网关调用），
-           「条记录」是拍平后的旧口径，与两级结构对不上。 */
-        const requestCount = turn.records.filter((r) => r.kind === 'call').length
-        const intervals = intervalsBefore.get(turn.turn) ?? []
-        const items = groupRequests(turn.records)
-        /* 被请求级折叠收走的系统执行：它们仍然与请求平级（语义不变），只是渲染时收进摘要行。
-           用 id 集合跳过，而不是把工具挂进请求的子项——那会与「独立阶段」的模型冲突。 */
-        const foldedSystemIds = new Set<string>()
-        for (const item of items) {
-          if (
-            item.kind === 'request' &&
-            item.callBlocks.length > 0 &&
-            collapsedCalls.has(item.call.id)
-          ) {
-            for (const tool of item.callBlocks) foldedSystemIds.add(tool.id)
-          }
-        }
-        return (
-          <Fragment key={turn.turn}>
-            {intervals.map((item, i) =>
-              item.kind === 'gap' ? (
-                <GapBand key={`g${i}`} gap={item.gap} />
-              ) : (
-                compaction && (
-                  <CompactionCard
-                    key="cmp"
-                    compaction={compaction}
-                    scaleMs={scale}
-                    selectedId={selectedId}
-                    onSelect={onSelect}
-                  />
-                )
-              )
-            )}
-            <div className="relative">
-              {/* turnRail：2px、贯穿整轮，**只画在含选中记录的当前轮次**上；
-                  它不是「每轮一个装饰」，而是「你现在在哪一轮」的指示。 */}
-              {activeTurn === turn.turn && (
-                <span
-                  aria-hidden="true"
-                  className="trajectory-turn-rail pointer-events-none absolute bottom-0 left-0 top-[-1px] z-[4] w-0.5"
-                />
-              )}
-              <div
-                role="button"
-                tabIndex={0}
-                aria-expanded={!collapsed}
-                onDoubleClick={() =>
-                  setCollapsedTurns((prev) => {
-                    const next = new Set(prev)
-                    if (next.has(turn.turn)) next.delete(turn.turn)
-                    else next.add(turn.turn)
-                    return next
-                  })
-                }
-                onClick={() =>
-                  setCollapsedTurns((prev) => {
-                    const next = new Set(prev)
-                    if (next.has(turn.turn)) next.delete(turn.turn)
-                    else next.add(turn.turn)
-                    return next
-                  })
-                }
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    e.currentTarget.click()
-                  }
-                }}
-                /* **不 sticky**：轮次标题是记录流的一部分，随内容滚动（轮次标记只是
-                   行内角标）。只有工具栏与列头钉在顶部——多钉一层会让被穿过的行与它重叠，
-                   看起来像断层。 */
-                className={`relative grid min-h-[42px] cursor-pointer select-none ${GRID} items-center gap-x-2.5 border-b border-border/40 bg-muted`}
-              >
-                {/* 轮次起线：2px、骑在行边界上、贯通整行。第一轮不画。 */}
-                {turnIndex > 0 && (
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-0.5 -translate-y-1/2 bg-border/40"
-                  />
-                )}
-                <span />
-                <span className="text-label font-semibold tabular-nums text-foreground-secondary">
-                  {turn.startedAt}
-                </span>
-                <span className="relative self-stretch">
-                  <span
-                    aria-hidden="true"
-                    className="absolute bottom-0 left-1/2 top-0 w-px bg-border-strong"
-                  />
-                  <span
-                    aria-hidden="true"
-                    className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-control-border bg-background"
-                  />
-                </span>
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <ChevronRight
-                    aria-hidden="true"
-                    className={cn(
-                      'h-3 w-3 shrink-0 text-foreground-faint transition-transform',
-                      !collapsed && 'rotate-90'
-                    )}
-                    strokeWidth={1.4}
-                  />
-                  <span className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-foreground">
-                    轮次 {turn.turn}
-                  </span>
-                  {/* meta / note 都是 nowrap 文本，不设收窄就会直接压到右侧 token 列上
-                      （实测：长 note「上下文 8,100 tok 起（压缩后）」与「18,092 tok」重叠）。
-                      所以**任何宽度**都要能截断，而不是只在窄容器下让位。 */}
-                  <span className="min-w-0 truncate whitespace-nowrap text-label text-foreground-faint">
-                    {requestCount} 个请求 · 工具 ×{toolCount}
-                    {hasSub ? ' · 子 Agent ×1' : ''}
-                    {errCount > 0 && <span className="text-danger-text"> · {errCount} 失败</span>}
-                  </span>
-                  {/* endState 缺省 = 该轮仍在流式进行中。没有这个标记时，「进行中」与
-                      「已结束但没有终态」在记录表里外观完全一致，用户会误判会话已结束。 */}
-                  {turn.endState === undefined && (
-                    <span className="inline-flex h-[19px] shrink-0 items-center rounded-md bg-muted px-[5px] py-0 text-label leading-none font-semibold tracking-[0.035em] text-foreground-muted">
-                      进行中
-                    </span>
-                  )}
-                  {turn.note && (
-                    <span className="min-w-0 truncate whitespace-nowrap text-label text-foreground-muted">
-                      {turn.note}
-                    </span>
-                  )}
-                </span>
-                <span className="min-w-0 truncate whitespace-nowrap text-right text-label tabular-nums text-foreground-secondary">
-                  {turnUsage(turn.records) === undefined
-                    ? '—'
-                    : (() => {
-                        const u = turnUsage(turn.records)
-                        if (u === undefined) return '—'
-                        return (
-                          <>
-                            <span className="text-foreground-faint">入</span>
-                            {formatTrajectoryTokens(u.input)}
-                            <span className="text-foreground-faint">·出</span>
-                            {formatTrajectoryTokens(u.output)}
-                            <span className="text-foreground-faint">·缓</span>
-                            {formatTrajectoryTokens(u.cache)}
-                          </>
-                        )
-                      })()}
-                </span>
-                <span className="block @max-[760px]:hidden">
-                  <DurationBar ms={turn.durationMs} tone="turn" scaleMs={scale} />
-                </span>
-                {/* 时长：未终结轮次显示的 durationMs 只是已知活动区间的下界（终态到达后才补齐最终耗时），
-                    数字格式不变，口径差异由标题行的「进行中」标记表达 */}
-                <span className="whitespace-nowrap text-right text-label tabular-nums text-foreground-muted">
-                  {formatTrajectoryDuration(turn.durationMs)}
-                </span>
-              </div>
-              {/* 折叠后插入 20px 摘要行：只说「有多少」，点它展开。
-                  摘要行占「记录」列，右侧 5 个数字列留空——否则七列会错位。 */}
-              {collapsed && (
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-expanded={false}
-                  onClick={() =>
-                    setCollapsedTurns((prev) => {
-                      const next = new Set(prev)
-                      next.delete(turn.turn)
-                      return next
-                    })
-                  }
-                  className={`grid min-h-[20px] cursor-pointer ${GRID} items-center gap-x-2.5 border-b border-border/40 text-label text-foreground-muted transition-colors hover:bg-surface-hover`}
-                >
-                  <span />
-                  <span />
-                  <span className="relative self-stretch">
-                    <span
-                      aria-hidden="true"
-                      className="absolute bottom-0 left-1/2 top-0 w-px bg-border-strong"
-                    />
-                  </span>
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span aria-hidden="true" className="text-foreground-faintest">
-                      …
-                    </span>
-                    <span className="truncate">
-                      {requestCount} 个请求 · 工具 ×{toolCount}
-                    </span>
-                    <span className="shrink-0 text-foreground-faintest">（点此展开）</span>
-                  </span>
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              )}
-              {!collapsed && (
-                <>
-                  {items.map((item) => {
-                    if (item.kind === 'request') {
-                      return (
-                        <Fragment key={item.call.id}>
-                          <RequestHeaderRow
-                            index={item.index}
-                            call={item.call}
-                            toolCount={item.callBlocks.length}
-                            selectedId={selectedId}
-                            onSelect={onSelect}
-                            folded={item.callBlocks.length > 0 && collapsedCalls.has(item.call.id)}
-                            onToggleFold={
-                              item.callBlocks.length === 0
-                                ? undefined
-                                : () =>
-                                    setCollapsedCalls((prev) => {
-                                      const next = new Set(prev)
-                                      if (next.has(item.call.id)) next.delete(item.call.id)
-                                      else next.add(item.call.id)
-                                      return next
-                                    })
-                            }
-                          />
-                          {item.call.thinking !== undefined && (
-                            <OutputRow
-                              label="思考"
-                              text={item.call.thinking}
-                              callId={item.call.id}
-                              selectedId={selectedId}
-                              onSelect={onSelect}
-                              filterText={query}
-                            />
-                          )}
-                          {item.call.reply !== undefined && (
-                            <OutputRow
-                              label="正文"
-                              text={item.call.reply}
-                              callId={item.call.id}
-                              selectedId={selectedId}
-                              onSelect={onSelect}
-                              filterText={query}
-                            />
-                          )}
-                          {/* 工具调用是**模型写出的原始字符串**，属于本次请求的产出 */}
-                          {/* 请求级折叠摘要行：只说「有几个、叫什么」 */}
-                          {item.callBlocks.length > 0 && collapsedCalls.has(item.call.id) && (
-                            <div
-                              role="button"
-                              tabIndex={0}
-                              aria-expanded={false}
-                              onClick={() =>
-                                setCollapsedCalls((prev) => {
-                                  const next = new Set(prev)
-                                  next.delete(item.call.id)
-                                  return next
-                                })
-                              }
-                              className={`grid min-h-[20px] cursor-pointer ${GRID} items-center gap-x-2.5 border-b border-border/40 text-label text-foreground-muted transition-colors hover:bg-surface-hover`}
-                            >
-                              <span />
-                              <span />
-                              <span className="relative self-stretch">
-                                <span
-                                  aria-hidden="true"
-                                  className="absolute bottom-0 left-1/2 top-0 w-px bg-border-strong"
-                                />
-                              </span>
-                              <span className="flex min-w-0 items-center gap-2">
-                                <span aria-hidden="true" className="text-foreground-faintest">
-                                  …
-                                </span>
-                                <span className="truncate">
-                                  {item.callBlocks.length} 个工具调用 ·{' '}
-                                  {item.callBlocks
-                                    .map((t) => t.name ?? '')
-                                    .filter((n) => n !== '')
-                                    .join(', ')}
-                                </span>
-                                <span className="shrink-0 text-foreground-faintest">
-                                  （点此展开）
-                                </span>
-                              </span>
-                              <span />
-                              <span />
-                              <span />
-                            </div>
-                          )}
-                          {!collapsedCalls.has(item.call.id) &&
-                            item.callBlocks.map((tool) => (
-                              <OutputRow
-                                key={`call-${tool.id}`}
-                                label="工具调用"
-                                text={toolCallText(tool)}
-                                callId={item.call.id}
-                                selectedId={selectedId}
-                                onSelect={onSelect}
-                                filterText={query}
-                              />
-                            ))}
-                        </Fragment>
-                      )
-                    }
-                    if (item.kind === 'system-run') {
-                      /* 已被上方请求级折叠收进摘要行 → 这里不再单独渲染 */
-                      if (foldedSystemIds.has(item.record.id)) return null
-                      /* 系统执行是**独立阶段**，与请求平级：不缩进、也不加左边框。
-                         它「不产出模型 token」由 chip「工具执行」承担，不靠线条表达。 */
-                      return (
-                        <LedgerRow
-                          key={`sys-${item.record.id}`}
-                          record={item.record}
-                          scaleMs={scale}
-                          selectedId={selectedId}
-                          onSelect={onSelect}
-                          filterText={query}
-                          focusIds={focusIds}
-                        />
-                      )
-                    }
-                    return (
-                      <LedgerRow
-                        key={item.record.id}
-                        record={item.record}
-                        scaleMs={scale}
-                        selectedId={selectedId}
-                        onSelect={onSelect}
-                        filterText={query}
-                        focusIds={focusIds}
-                      />
-                    )
-                  })}
-                  {turn.endState && (
-                    <EndRow
-                      record={endRowRecord(
-                        'turn-end',
-                        turn.endState.at,
-                        turn.endState.seq,
-                        /* 状态由空心 chip 承担，正文不再重复它；note 保留（如失败原因） */
-                        `轮次 ${turn.turn} 结束${turn.endState.note ? ` · ${turn.endState.note}` : ''}`
-                      )}
-                      state={turn.endState.state}
-                      selectedId={selectedId}
-                      onSelect={onSelect}
-                      filterText={query}
-                    />
-                  )}
-                </>
-              )}
-            </div>
-          </Fragment>
-        )
-      })}
+      {turns.map(renderTurn)}
       {sessionEnd && (
         <EndRow
           record={endRowRecord('session-end', sessionEnd.at, sessionEnd.seq, '会话结束')}

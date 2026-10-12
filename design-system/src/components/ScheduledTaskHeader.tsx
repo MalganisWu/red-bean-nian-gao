@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 
 import { cn } from '../lib/utils'
 import {
@@ -40,6 +40,28 @@ export function ScheduledTaskHeader({
 }: ScheduledTaskHeaderProps) {
   const Heading = headingLevel === 1 ? 'h1' : 'h2'
 
+  /** 渲染一个详情页签：选中态由 `activeTab` 决定，历史页签附带条数。 */
+  function renderTab(tab: ScheduledTaskDetailTab): ReactElement {
+    const selected = activeTab === tab
+    const label = tab === 'overview' ? '概览' : '执行记录'
+    return (
+      <button
+        key={tab}
+        type="button"
+        aria-pressed={selected}
+        onClick={() => onTabChange(tab)}
+        className={cn(
+          'relative min-h-11 cursor-pointer border-0 bg-transparent px-0 py-2 font-sans text-xs text-foreground-muted sm:min-h-0',
+          selected &&
+            'font-semibold text-brand-text after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-brand-indicator'
+        )}
+      >
+        {label}
+        {tab === 'history' && historyCount !== undefined ? ` ${historyCount}` : ''}
+      </button>
+    )
+  }
+
   return (
     <header>
       <button
@@ -80,26 +102,7 @@ export function ScheduledTaskHeader({
         role="group"
         aria-label="任务详情视图"
       >
-        {(['overview', 'history'] as const).map((tab) => {
-          const selected = activeTab === tab
-          const label = tab === 'overview' ? '概览' : '执行记录'
-          return (
-            <button
-              key={tab}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => onTabChange(tab)}
-              className={cn(
-                'relative min-h-11 cursor-pointer border-0 bg-transparent px-0 py-2 font-sans text-xs text-foreground-muted sm:min-h-0',
-                selected &&
-                  'font-semibold text-brand-text after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-brand-indicator'
-              )}
-            >
-              {label}
-              {tab === 'history' && historyCount !== undefined ? ` ${historyCount}` : ''}
-            </button>
-          )
-        })}
+        {(['overview', 'history'] as const).map(renderTab)}
       </div>
     </header>
   )

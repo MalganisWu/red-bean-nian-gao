@@ -53,6 +53,12 @@ export function QuestionCardPage() {
   >()
   const continued = resolution !== 'pending'
 
+  /** 记录确认卡的作答，并把过程推进到已作答。 */
+  function handleConfirm(nextAnswers: Record<string, QuestionCardAnswer>): void {
+    setSubmittedAnswers(nextAnswers)
+    setResolution('answered')
+  }
+
   const steps: ProcessStep[] = [
     { kind: 'think', content: '范围已经明确。准备把状态读写收口到既有事务边界。' },
     {
@@ -72,10 +78,7 @@ export function QuestionCardPage() {
               ? (CONFIRM_LABELS[answer.value] ?? '确认并继续')
               : '确认并继续'
           }
-          onConfirm={(nextAnswers) => {
-            setSubmittedAnswers(nextAnswers)
-            setResolution('answered')
-          }}
+          onConfirm={handleConfirm}
           onRefuse={() => setResolution('refused')}
         />
       ),

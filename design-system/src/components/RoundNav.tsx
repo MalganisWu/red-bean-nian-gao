@@ -5,7 +5,7 @@
  */
 'use client'
 
-import { useRef, useState, type ReactNode } from 'react'
+import { useRef, useState, type FocusEvent, type ReactNode } from 'react'
 import { cn } from '../lib/utils'
 
 /** 一个轮次对应的一根横杠。 */
@@ -53,7 +53,7 @@ export function RoundNav({ entries, currentId, onSelect }: RoundNavProps) {
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([])
 
   // 摘要默认向轨道左侧展开；空间不足时回退到右侧。
-  const showPreview = (entry: RoundNavEntry, el: HTMLButtonElement, clientY?: number) => {
+  function showPreview(entry: RoundNavEntry, el: HTMLButtonElement, clientY?: number): void {
     if (!entry.preview) {
       setHover(null)
       return
@@ -70,7 +70,8 @@ export function RoundNav({ entries, currentId, onSelect }: RoundNavProps) {
     })
   }
 
-  const activateAt = (position: number, clientY?: number) => {
+  /** 把位置吸附到最近的横杠：更新波纹宽度并展示该轮摘要。 */
+  function activateAt(position: number, clientY?: number): void {
     if (entries.length === 0) return
     const clamped = Math.max(0, Math.min(entries.length - 1, position))
     const nearestIndex = Math.round(clamped)
@@ -80,7 +81,8 @@ export function RoundNav({ entries, currentId, onSelect }: RoundNavProps) {
     if (button && entry) showPreview(entry, button, clientY)
   }
 
-  const resetWave = () => {
+  /** 清空波纹与悬停摘要，回到静止态。 */
+  function resetWave(): void {
     setWavePosition(null)
     setHover(null)
   }
@@ -88,7 +90,14 @@ export function RoundNav({ entries, currentId, onSelect }: RoundNavProps) {
   const remainsInRail = (target: EventTarget | null): boolean =>
     target instanceof Node && Boolean(listRef.current?.contains(target))
 
-  const handlePointerMove = (clientY: number) => {
+  /** 键盘聚焦某根横杠时，用它的中心高度激活波纹与摘要。 */
+  function handleMarkerFocus(index: number, event: FocusEvent<HTMLButtonElement>): void {
+    const rect = event.currentTarget.getBoundingClientRect()
+    activateAt(index, rect.top + rect.height / 2)
+  }
+
+  /** 把指针的纵向位置换算成横杠序号（首杠中心为原点，杠距为步长）。 */
+  function handlePointerMove(clientY: number): void {
     const first = buttonRefs.current[0]
     const second = buttonRefs.current[1]
     if (!first) return
@@ -125,10 +134,7 @@ export function RoundNav({ entries, currentId, onSelect }: RoundNavProps) {
             onMouseLeave={(event) => {
               if (!remainsInRail(event.relatedTarget)) resetWave()
             }}
-            onFocus={(event) => {
-              const rect = event.currentTarget.getBoundingClientRect()
-              activateAt(i, rect.top + rect.height / 2)
-            }}
+            onFocus={(event) => handleMarkerFocus(i, event)}
             onBlur={(event) => {
               if (!remainsInRail(event.relatedTarget)) resetWave()
             }}

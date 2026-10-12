@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactElement } from 'react'
 
 import { cn } from '../lib/utils'
 import {
@@ -106,6 +106,50 @@ export function TrajectoryInspector({
 
   if (!target) return null
 
+  /** 切换详情页签；用户主动点过就同时记住这次选择，别的记录也沿用。 */
+  function selectTab(tab: string): void {
+    setActiveTab(tab)
+    setRememberedTab(tab)
+  }
+
+  /** 渲染一次尝试的按钮行；非最后一次的失败额外标注「触发重试」。 */
+  function renderAttempt(
+    req: TrajectoryAttempt,
+    index: number,
+    all: TrajectoryAttempt[]
+  ): ReactElement {
+    /* 非最后一次的失败 = 这次失败**触发了重试**，把原因显式说出来；
+       最后一次失败就是这次调用最终失败，不带「触发重试」。 */
+    const triggeredRetry = req.status === 'error' && index < all.length - 1
+    return (
+      <button
+        key={req.id}
+        type="button"
+        onClick={() => onSelectRecord?.(req.id)}
+        className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-2 text-left text-xs text-foreground-body transition-colors hover:bg-surface-hover"
+      >
+        <span className="font-mono">{req.model}</span>
+        <span className="shrink-0 text-foreground-faint">尝试 {req.attempt}</span>
+        {req.status === 'error' ? (
+          <span className="min-w-0 truncate text-danger-text">
+            {req.error ?? '失败（未记录原因）'}
+          </span>
+        ) : (
+          <span className="shrink-0 text-foreground-faint">
+            入 {formatTrajectoryTokens(req.tokens?.input ?? 0)} · 出{' '}
+            {formatTrajectoryTokens(req.tokens?.output ?? 0)}
+          </span>
+        )}
+        {triggeredRetry && (
+          <span className="shrink-0 text-label text-foreground-muted">→ 触发重试</span>
+        )}
+        <span className="ml-auto shrink-0 text-label tabular-nums text-foreground-faint">
+          {formatTrajectoryDuration(req.durationMs)}
+        </span>
+      </button>
+    )
+  }
+
   const title =
     record?.kind === 'user'
       ? `${record.at} · 用户消息`
@@ -158,10 +202,7 @@ export function TrajectoryInspector({
             type="button"
             role="tab"
             aria-selected={currentTab === t}
-            onClick={() => {
-              setActiveTab(t)
-              setRememberedTab(t)
-            }}
+            onClick={() => selectTab(t)}
             className={cn(
               'relative h-full px-[9px] text-[13px] transition-colors',
               'after:absolute after:inset-x-[9px] after:bottom-0 after:h-0.5 after:rounded-t-[1px]',
@@ -240,42 +281,7 @@ export function TrajectoryInspector({
                     : ''}
                   ）
                 </div>
-                <div className="grid gap-1.5">
-                  {record.attempts?.map((req, i, all) => {
-                    /* 非最后一次的失败 = 这次失败**触发了重试**，把原因显式说出来；
-                       最后一次失败就是这次调用最终失败，不带「触发重试」。 */
-                    const triggeredRetry = req.status === 'error' && i < all.length - 1
-                    return (
-                      <button
-                        key={req.id}
-                        type="button"
-                        onClick={() => onSelectRecord?.(req.id)}
-                        className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-2 text-left text-xs text-foreground-body transition-colors hover:bg-surface-hover"
-                      >
-                        <span className="font-mono">{req.model}</span>
-                        <span className="shrink-0 text-foreground-faint">尝试 {req.attempt}</span>
-                        {req.status === 'error' ? (
-                          <span className="min-w-0 truncate text-danger-text">
-                            {req.error ?? '失败（未记录原因）'}
-                          </span>
-                        ) : (
-                          <span className="shrink-0 text-foreground-faint">
-                            入 {formatTrajectoryTokens(req.tokens?.input ?? 0)} · 出{' '}
-                            {formatTrajectoryTokens(req.tokens?.output ?? 0)}
-                          </span>
-                        )}
-                        {triggeredRetry && (
-                          <span className="shrink-0 text-label text-foreground-muted">
-                            → 触发重试
-                          </span>
-                        )}
-                        <span className="ml-auto shrink-0 text-label tabular-nums text-foreground-faint">
-                          {formatTrajectoryDuration(req.durationMs)}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
+                <div className="grid gap-1.5">{record.attempts?.map(renderAttempt)}</div>
               </div>
             )}
           </>

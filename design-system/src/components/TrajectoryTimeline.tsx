@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactElement } from 'react'
 
 import { cn } from '../lib/utils'
 import {
@@ -51,60 +51,128 @@ interface Positioned {
  * 序列模式下全部记录等宽按序。四条泳道共享同一 x 轴，同一列 ≈ 同一时刻附近。
  * 请求子记录不占泳道，但继承所属步骤的位置（供区域选择的淡隐判断）。
  */
+function computePositions(
+  turns: TrajectoryTurn[],
+  compaction: TrajectoryCompaction | undefined,
+  mode: 'time' | 'seq'
+): Map<string, Positioned> {
+  const items: { id: string; at: number; dur: number }[] = []
+  for (const t of turns) {
+    for (const r of t.records) {
+      items.push({ id: r.id, at: trajectoryTimeToSeconds(r.at), dur: (r.durationMs ?? 0) / 1000 })
+    }
+  }
+  if (compaction) {
+    items.push({
+      id: compaction.id,
+      at: trajectoryTimeToSeconds(compaction.at),
+      dur: compaction.durationMs / 1000,
+    })
+  }
+  items.sort((a, b) => a.at - b.at)
+
+  const pos = new Map<string, Positioned>()
+  if (items.length === 0) return pos
+  if (mode === 'seq') {
+    const n = items.length
+    items.forEach((it, i) => pos.set(it.id, { id: it.id, left: (i / n) * 100, width: 100 / n }))
+  } else {
+    const GAP_EQ = 2.5
+    const THRESH = 2
+    let x = 0
+    let prevEnd = items[0]?.at ?? 0
+    for (const it of items) {
+      const g = it.at - prevEnd
+      x += g > THRESH ? GAP_EQ : Math.max(g, 0)
+      pos.set(it.id, { id: it.id, left: x, width: it.dur })
+      x += it.dur
+      prevEnd = Math.max(prevEnd, it.at + it.dur)
+    }
+    const total = x || 1
+    for (const p of pos.values()) {
+      p.left = (p.left / total) * 100
+      p.width = Math.max((p.width / total) * 100, 0.9)
+    }
+  }
+  /* 请求子记录继承所属步骤位置 */
+  for (const t of turns) {
+    for (const r of t.records) {
+      const p = pos.get(r.id)
+      if (!p) continue
+      for (const q of r.attempts ?? []) pos.set(q.id, p)
+    }
+  }
+  return pos
+}
+
+/** 位置表的记忆化入口：同一组输入只重算一次。 */
 function usePositions(
   turns: TrajectoryTurn[],
   compaction: TrajectoryCompaction | undefined,
   mode: 'time' | 'seq'
 ): Map<string, Positioned> {
-  return useMemo(() => {
-    const items: { id: string; at: number; dur: number }[] = []
-    for (const t of turns) {
-      for (const r of t.records) {
-        items.push({ id: r.id, at: trajectoryTimeToSeconds(r.at), dur: (r.durationMs ?? 0) / 1000 })
-      }
-    }
-    if (compaction) {
-      items.push({
-        id: compaction.id,
-        at: trajectoryTimeToSeconds(compaction.at),
-        dur: compaction.durationMs / 1000,
-      })
-    }
-    items.sort((a, b) => a.at - b.at)
+  return useMemo(() => computePositions(turns, compaction, mode), [turns, compaction, mode])
+}
 
-    const pos = new Map<string, Positioned>()
-    if (items.length === 0) return pos
-    if (mode === 'seq') {
-      const n = items.length
-      items.forEach((it, i) => pos.set(it.id, { id: it.id, left: (i / n) * 100, width: 100 / n }))
-    } else {
-      const GAP_EQ = 2.5
-      const THRESH = 2
-      let x = 0
-      let prevEnd = items[0]?.at ?? 0
-      for (const it of items) {
-        const g = it.at - prevEnd
-        x += g > THRESH ? GAP_EQ : Math.max(g, 0)
-        pos.set(it.id, { id: it.id, left: x, width: it.dur })
-        x += it.dur
-        prevEnd = Math.max(prevEnd, it.at + it.dur)
-      }
-      const total = x || 1
-      for (const p of pos.values()) {
-        p.left = (p.left / total) * 100
-        p.width = Math.max((p.width / total) * 100, 0.9)
-      }
-    }
-    /* 请求子记录继承所属步骤位置 */
-    for (const t of turns) {
-      for (const r of t.records) {
-        const p = pos.get(r.id)
-        if (!p) continue
-        for (const q of r.attempts ?? []) pos.set(q.id, p)
-      }
-    }
-    return pos
-  }, [turns, compaction, mode])
+/** 把区间聚焦结果通告给消费方：没有回调或没有区间时通告 null。 */
+function publishRangeFocus(
+  positions: Map<string, Positioned>,
+  rangeSel: { l: number; r: number } | null,
+  onRangeFocus: ((idsInRange: ReadonlySet<string> | null) => void) | undefined
+): void {
+  if (!onRangeFocus) return
+  if (!rangeSel) {
+    onRangeFocus(null)
+    return
+  }
+  const ids = new Set<string>()
+  for (const p of positions.values()) {
+    const l = p.left
+    const r = p.left + p.width
+    if (r >= rangeSel.l && l <= rangeSel.r) ids.add(p.id)
+  }
+  onRangeFocus(ids)
+}
+
+/** 绑定 Esc 复位选区；返回解绑函数。 */
+function bindEscapeReset(clearRange: () => void): () => void {
+  function handleEscapeKey(event: KeyboardEvent): void {
+    if (event.key === 'Escape') clearRange()
+  }
+  window.addEventListener('keydown', handleEscapeKey)
+  return () => window.removeEventListener('keydown', handleEscapeKey)
+}
+
+/** 把单条泳道轨道的水平缩放原点对齐到指针位置。 */
+function alignTrackOrigin(track: Element, originPct: number): void {
+  if (!(track instanceof HTMLElement)) return
+  track.style.transformOrigin = `${originPct}% center`
+}
+
+/**
+ * 绑定 Ctrl/⌘+滚轮缩放（必须 non-passive 监听才能 preventDefault）；
+ * 宿主尚未挂载时不绑定，返回解绑函数。
+ */
+function bindWheelZoom(
+  host: HTMLDivElement | null,
+  applyZoom: (updater: (previous: number) => number) => void
+): (() => void) | undefined {
+  if (!host) return undefined
+  /* 取别名而非直接用参数：TS 的窄化不会进入下面两个闭包，参数在这里仍视为可空。 */
+  const laneHost = host
+  function handleWheelZoom(event: WheelEvent): void {
+    if (!event.ctrlKey && !event.metaKey) return
+    event.preventDefault()
+    const track = laneHost.querySelector('.trajectory-lane-track')
+    const rect = track?.getBoundingClientRect()
+    const originPct = rect ? ((event.clientX - rect.left) / rect.width) * 100 : 50
+    applyZoom((z) => Math.min(8, Math.max(1, z * (event.deltaY < 0 ? 1.15 : 0.87))))
+    laneHost
+      .querySelectorAll('.trajectory-lane-track')
+      .forEach((lane) => alignTrackOrigin(lane, originPct))
+  }
+  laneHost.addEventListener('wheel', handleWheelZoom, { passive: false })
+  return () => laneHost.removeEventListener('wheel', handleWheelZoom)
 }
 
 function segClass(r: TrajectoryRecord): string {
@@ -144,55 +212,112 @@ export function TrajectoryTimeline({
   const dragRef = useRef<number | null>(null)
 
   /* 区间变化时向消费方通告区间内记录集合 */
-  useEffect(() => {
-    if (!onRangeFocus) return
-    if (!rangeSel) {
-      onRangeFocus(null)
-      return
-    }
-    const ids = new Set<string>()
-    for (const p of positions.values()) {
-      const l = p.left
-      const r = p.left + p.width
-      if (r >= rangeSel.l && l <= rangeSel.r) ids.add(p.id)
-    }
-    onRangeFocus(ids)
-  }, [rangeSel, positions, onRangeFocus])
+  useEffect(
+    () => publishRangeFocus(positions, rangeSel, onRangeFocus),
+    [rangeSel, positions, onRangeFocus]
+  )
 
   /* Esc 复位选区 */
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setRangeSel(null)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  useEffect(() => bindEscapeReset(() => setRangeSel(null)), [])
 
   /* Ctrl/⌘+滚轮缩放需要 non-passive 监听才能 preventDefault */
-  useEffect(() => {
-    const host = lanesRef.current
-    if (!host) return
-    const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return
-      e.preventDefault()
-      const track = host.querySelector('.trajectory-lane-track')
-      const rect = track?.getBoundingClientRect()
-      const originPct = rect ? ((e.clientX - rect.left) / rect.width) * 100 : 50
-      setZoom((z) => Math.min(8, Math.max(1, z * (e.deltaY < 0 ? 1.15 : 0.87))))
-      host.querySelectorAll('.trajectory-lane-track').forEach((t) => {
-        if (!(t instanceof HTMLElement)) return
-        t.style.transformOrigin = `${originPct}% center`
-      })
-    }
-    host.addEventListener('wheel', onWheel, { passive: false })
-    return () => host.removeEventListener('wheel', onWheel)
-  }, [])
+  useEffect(() => bindWheelZoom(lanesRef.current, setZoom), [])
 
-  const pctOfClientX = (clientX: number): number => {
+  /** 把客户端 x 坐标换算成轨道内的百分比（0–100）。 */
+  function pctOfClientX(clientX: number): number {
     const track = lanesRef.current?.querySelector('.trajectory-lane-track')
     const rect = track?.getBoundingClientRect()
     if (!rect) return 0
     return Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100))
+  }
+
+  /** 左键在轨道上按下：起点即拖选区间。 */
+  function handleMouseDown(event: MouseEvent<HTMLDivElement>): void {
+    if (event.button !== 0) return
+    if (!(event.target instanceof HTMLElement)) return
+    if (event.target.closest('button')) return
+    const x = pctOfClientX(event.clientX)
+    dragRef.current = x
+    setRangeSel({ l: x, r: x })
+    event.preventDefault()
+  }
+
+  /** 拖拽中：让选区的右端跟随指针。 */
+  function handleMouseMove(event: MouseEvent<HTMLDivElement>): void {
+    if (dragRef.current === null) return
+    const x = pctOfClientX(event.clientX)
+    setRangeSel({ l: Math.min(dragRef.current, x), r: Math.max(dragRef.current, x) })
+  }
+
+  /** 松开鼠标结束拖选。 */
+  function handleMouseUp(): void {
+    /* 宽度不足 0.5% 视为单击，不成选区 */
+    setRangeSel((cur) => (cur && cur.r - cur.l < 0.5 ? null : cur))
+    dragRef.current = null
+  }
+
+  /** 右键：有选区时阻止默认菜单并清空选区。 */
+  function handleContextMenu(event: MouseEvent<HTMLDivElement>): void {
+    if (rangeSel) {
+      event.preventDefault()
+      setRangeSel(null)
+    }
+  }
+
+  /** 渲染压缩泳道的标记段；没有压缩事件或其位置缺失时不渲染。 */
+  function renderCompactionMarker(): ReactElement | null {
+    if (!compaction) return null
+    const p = positions.get(compaction.id)
+    if (!p) return null
+    return (
+      <button
+        type="button"
+        aria-label="上下文压缩"
+        onClick={() => onSelect?.(compaction.id)}
+        style={{
+          left: `${Math.min(p.left, 100 - p.width)}%`,
+          width: `${p.width}%`,
+        }}
+        className={cn(
+          'absolute top-1/2 h-2 min-w-1 -translate-y-1/2 rounded-full border border-dashed border-cat-cmp-indicator bg-cat-cmp-soft transition-transform hover:scale-y-150',
+          selectedId === compaction.id &&
+            'outline outline-2 outline-offset-1 outline-brand-indicator',
+          rangeSel && !isInRange(positions.get(compaction.id), rangeSel) && 'opacity-25'
+        )}
+        title={`上下文压缩 · ${compaction.at}\n${compaction.beforeTokens.toLocaleString('en-US')} → ${compaction.afterTokens.toLocaleString('en-US')} tok · ${formatTrajectoryDuration(compaction.durationMs)}`}
+      />
+    )
+  }
+
+  /** 渲染一条记录在泳道里的段；位置缺失时不渲染。 */
+  function renderSegment(r: TrajectoryRecord): ReactElement | null {
+    const p = positions.get(r.id)
+    if (!p) return null
+    const isUser = r.kind === 'user'
+    return (
+      <button
+        key={r.id}
+        type="button"
+        aria-label={`${segLabel(r)} ${r.summary}`}
+        onClick={() => onSelect?.(r.id)}
+        style={
+          isUser
+            ? { left: `${Math.min(p.left, 99)}%`, width: 3 }
+            : {
+                left: `calc(${Math.min(p.left, 100 - p.width)}% + 1px)`,
+                width: `calc(${p.width}% - 2px)`,
+              }
+        }
+        className={cn(
+          'absolute top-1/2 h-2 min-w-1 -translate-y-1/2 rounded-full transition-transform hover:scale-y-150',
+          isUser && 'h-2.5',
+          segClass(r),
+          selectedId === r.id && 'outline outline-2 outline-offset-1 outline-brand-indicator',
+          rangeSel && !isInRange(p, rangeSel) && 'opacity-25'
+        )}
+        title={`${segLabel(r)} · ${r.name ?? r.summary}\n${r.at} · ${formatTrajectoryDuration(r.durationMs)}`}
+      />
+    )
   }
 
   const first = turns[0]
@@ -251,31 +376,10 @@ export function TrajectoryTimeline({
       <div
         ref={lanesRef}
         className="relative grid select-none gap-y-1.5"
-        onMouseDown={(e) => {
-          if (e.button !== 0) return
-          if (!(e.target instanceof HTMLElement)) return
-          if (e.target.closest('button')) return
-          const x = pctOfClientX(e.clientX)
-          dragRef.current = x
-          setRangeSel({ l: x, r: x })
-          e.preventDefault()
-        }}
-        onMouseMove={(e) => {
-          if (dragRef.current === null) return
-          const x = pctOfClientX(e.clientX)
-          setRangeSel({ l: Math.min(dragRef.current, x), r: Math.max(dragRef.current, x) })
-        }}
-        onMouseUp={() => {
-          /* 宽度不足 0.5% 视为单击，不成选区 */
-          setRangeSel((cur) => (cur && cur.r - cur.l < 0.5 ? null : cur))
-          dragRef.current = null
-        }}
-        onContextMenu={(e) => {
-          if (rangeSel) {
-            e.preventDefault()
-            setRangeSel(null)
-          }
-        }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onContextMenu={handleContextMenu}
       >
         {rangeSel && (
           <span
@@ -297,66 +401,12 @@ export function TrajectoryTimeline({
                 aria-hidden="true"
                 className="absolute inset-x-0 top-1/2 h-px bg-border opacity-50"
               />
-              {lane.key === 'cmp' && compaction
-                ? (() => {
-                    const p = positions.get(compaction.id)
-                    if (!p) return null
-                    return (
-                      <button
-                        type="button"
-                        aria-label="上下文压缩"
-                        onClick={() => onSelect?.(compaction.id)}
-                        style={{
-                          left: `${Math.min(p.left, 100 - p.width)}%`,
-                          width: `${p.width}%`,
-                        }}
-                        className={cn(
-                          'absolute top-1/2 h-2 min-w-1 -translate-y-1/2 rounded-full border border-dashed border-cat-cmp-indicator bg-cat-cmp-soft transition-transform hover:scale-y-150',
-                          selectedId === compaction.id &&
-                            'outline outline-2 outline-offset-1 outline-brand-indicator',
-                          rangeSel &&
-                            !isInRange(positions.get(compaction.id), rangeSel) &&
-                            'opacity-25'
-                        )}
-                        title={`上下文压缩 · ${compaction.at}\n${compaction.beforeTokens.toLocaleString('en-US')} → ${compaction.afterTokens.toLocaleString('en-US')} tok · ${formatTrajectoryDuration(compaction.durationMs)}`}
-                      />
-                    )
-                  })()
-                : null}
+              {lane.key === 'cmp' ? renderCompactionMarker() : null}
               {lane.key !== 'cmp'
                 ? turns
                     .flatMap((t) => t.records)
                     .filter(lane.match)
-                    .map((r) => {
-                      const p = positions.get(r.id)
-                      if (!p) return null
-                      const isUser = r.kind === 'user'
-                      return (
-                        <button
-                          key={r.id}
-                          type="button"
-                          aria-label={`${segLabel(r)} ${r.summary}`}
-                          onClick={() => onSelect?.(r.id)}
-                          style={
-                            isUser
-                              ? { left: `${Math.min(p.left, 99)}%`, width: 3 }
-                              : {
-                                  left: `calc(${Math.min(p.left, 100 - p.width)}% + 1px)`,
-                                  width: `calc(${p.width}% - 2px)`,
-                                }
-                          }
-                          className={cn(
-                            'absolute top-1/2 h-2 min-w-1 -translate-y-1/2 rounded-full transition-transform hover:scale-y-150',
-                            isUser && 'h-2.5',
-                            segClass(r),
-                            selectedId === r.id &&
-                              'outline outline-2 outline-offset-1 outline-brand-indicator',
-                            rangeSel && !isInRange(p, rangeSel) && 'opacity-25'
-                          )}
-                          title={`${segLabel(r)} · ${r.name ?? r.summary}\n${r.at} · ${formatTrajectoryDuration(r.durationMs)}`}
-                        />
-                      )
-                    })
+                    .map(renderSegment)
                 : null}
             </div>
           </div>
