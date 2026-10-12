@@ -21,7 +21,16 @@ import type {
 import type { AgentMessage } from '../../model/agent-message.js'
 import type { AgentRuntimeEvent } from '../../run/model/agent-runtime-event.js'
 
-/** 后台运行的统一事件观察器，同时维护崩溃恢复消息与持久展示投影。 */
+/**
+ * 后台运行的统一事件观察器，同时维护崩溃恢复消息与持久展示投影。
+ *
+ * 这是后台执行**唯一**的落盘点：先把消息写进恢复缓冲，再决定要不要投影到展示层。
+ * 顺序不能反——缓冲是崩溃恢复的事实来源，投影只是给人看的视图；
+ * 写缓冲失败时整个 `observe` 抛出，本轮不产生展示消息，宁可少一条展示也不要一份对不上的恢复记录。
+ *
+ * 只有 assistant 且有正文的消息进展示层：user 消息是入参（调用方本来就有），
+ * 工具轮次的空正文没有展示价值。
+ */
 class BackgroundRunObserver implements AgentExecutionEventSink, AgentExecutionMessageObserver {
   readonly #recoveryKey: string
   readonly #sections: SectionCollector
@@ -58,6 +67,13 @@ class BackgroundRunObserver implements AgentExecutionEventSink, AgentExecutionMe
 }
 
 /** Agent Module 的默认后台执行实现；SDK 类型和配置选择不会扩散到 Task Module。 */
+/**
+ * Agent Module 的默认后台执行实现；SDK 类型和配置选择不会扩散到 Task Module。
+ *
+ * 与聊天主路径的两处差异来自「没有在线消费者」这个前提：
+ * - 工具清单可以被**按名排除**（`excludedToolNames`），因为定时任务不该拥有交互式工具；
+ * - 系统提示词可以**追加**一段，用来告诉 Agent 当前是无人值守的后台执行。
+ */
 export class DefaultBackgroundAgentExecutionService implements BackgroundAgentExecutionPort {
   readonly #loader: AgentLoader
   readonly #executor: AgentExecutionPort
@@ -130,6 +146,11 @@ export class DefaultBackgroundAgentExecutionService implements BackgroundAgentEx
     }
   }
 
+  /**
+   * 清空恢复缓冲。先 `flush` 再 `clear` 而不是直接 `clear`：
+   * 凭 `flush` 的「读取并删除」语义确认残留内容确实被取走并丢弃，
+   * 随后 `clear` 兜底处理两步之间新写入的消息。两次调用都是幂等的。
+   */
   public async clearRecovery(recoveryKey: string, signal: AbortSignal): Promise<void> {
     await this.#buffer.flush(recoveryKey, signal)
     await this.#buffer.clear(recoveryKey, signal)

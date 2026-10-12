@@ -38,7 +38,13 @@ export class RunFactModelObserver implements AgentModelAdapter {
     return this.#watch(iterable)
   }
 
-  /** 逐 chunk 观察流：首个 usage 计入本 attempt（与 SDK 计数口径一致），错误块只记首个。 */
+  /**
+   * 逐 chunk 观察流：首个 usage 计入本 attempt（与 SDK 计数口径一致），错误块只记首个。
+   *
+   * 装饰器必须**完全透明**：`yield chunk` 原样透传，不合并、不改造、不吞异常。
+   * 一旦这里改了流的内容或时序，主流程收到的就不再是 adapter 的原始输出，
+   * 而观察者本应只是旁观者。
+   */
   async *#watch(iterable: AsyncIterable<AgentModelChunk>): AsyncGenerator<AgentModelChunk> {
     try {
       for await (const chunk of iterable) {

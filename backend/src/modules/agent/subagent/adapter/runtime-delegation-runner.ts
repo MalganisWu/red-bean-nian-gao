@@ -55,7 +55,14 @@ export interface RuntimeChildRunnerOptions {
   readonly stream?: ChildStreamFactory | undefined
 }
 
-/** 运行 Runtime 子 Agent 的产品 adapter，业务生命周期只接收业务自有 DTO。 */
+/**
+ * 运行 Runtime 子 Agent 的产品 adapter，业务生命周期只接收业务自有 DTO。
+ *
+ * 与主运行共用同一个 `AgentExecutionPort`——子 Agent 不是另一条执行链路，
+ * 只是「换一份定义、换一个 run 身份」再跑一次同样的执行流程。
+ * 子执行的 runId 就是它的 `executionId`，父请求 ID 降级为 `parentRunId` 保留在事实里
+ * （见 `childRunIdentity`），这样子执行的事实能独立成篇，又能被父运行关联到。
+ */
 export class RuntimeChildRunner implements AgentChildRunner {
   readonly #options: RuntimeChildRunnerOptions
 
@@ -63,11 +70,19 @@ export class RuntimeChildRunner implements AgentChildRunner {
     this.#options = options
   }
 
+  /**
+   * 跑一次子运行。三段结构与主运行一致：装载持久状态 → 执行 → 在 `finally` 中保存。
+   *
+   * 保存放在 `finally` 是必要的：子运行失败或挂起时同样要留下执行记录，
+   * 否则父 Agent 拿到的 `executionId` 指向一条不存在的记录，无法续跑也无从排障。
+   * 保存用独立的 30s 超时信号——父运行的取消不该让这条记录丢失。
+   */
   public async runChild(
     request: AgentChildRunRequest,
     signal: AbortSignal
   ): Promise<AgentChildRunResult> {
     const executionId = this.executionId(request)
+    // 恢复要求两者同时具备：知道「续哪次执行」以及「回答哪个中断」。只给一个都是调用方搞错了。
     const isResume = request.executionId !== '' && request.resume !== undefined
     const messages: readonly AgentMessage[] = isResume
       ? []
@@ -126,9 +141,11 @@ export class RuntimeChildRunner implements AgentChildRunner {
           : { eventSink: observer }),
         ...(this.#options.onMessage === undefined ? {} : { messageObserver: observer }),
       }
+      // 子执行的租约丢失同样表现为取消：另一实例已接管这个子执行，继续跑只会写一份被覆盖的状态。
       const executionSignal =
         persisted?.lease === undefined ? signal : AbortSignal.any([signal, persisted.lease.signal])
       outcome = await this.#options.executor.execute(executionCommand, executionSignal)
+      // 把失败转成异常，让下面统一的 catch 处理；否则每条状态分支都要重复一遍错误逻辑。
       if (outcome.error !== undefined) throw outcome.error
     } catch (cause: unknown) {
       executionError = normalizeError(cause)
@@ -275,6 +292,7 @@ function delegationFailureReason(status: ChildRunStatus): string {
   }
 }
 
+/** 取最后一条有正文的 assistant 消息；末条可能是工具轮次（content 为 null）或工具结果。 */
 function lastAssistantContent(messages: readonly AgentMessage[]): string {
   for (const message of messages.toReversed()) {
     if (message.role === 'assistant' && message.content !== null && message.content !== '') {

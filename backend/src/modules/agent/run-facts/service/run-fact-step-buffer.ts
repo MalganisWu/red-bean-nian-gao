@@ -133,6 +133,11 @@ export class RunFactStepBuffer {
     return snapshot
   }
 
+  /**
+   * 组装快照。**usage 取倒数第一个带用量的 attempt**，也就是产出最终内容的那一次——
+   * 空响应重试会留下多个 attempt，把前面几次的用量也算进来会虚增 token。
+   * 从后往前找而不是取 `attempts.at(-1)`：最后一次 attempt 可能因为流被中断而没有 usage 块。
+   */
   #snapshot(content: string): StepSnapshot {
     let usage: RunFactUsage | null = null
     for (const attempt of this.#attempts.toReversed()) {
@@ -197,6 +202,12 @@ export function toolFact(input: {
   }
 }
 
+/**
+ * 固化为不可变的 attempt 记录。
+ * `endedAt` 缺失时回退为 `startedAt`（时长为 0）而不是留空：
+ * 事实日志是 append-only 的审计视图，一条「开始过但没结束」的尝试也必须能表达出结束时间，
+ * 让下游的时长聚合不必到处判空。
+ */
 function freezeAttempt(attempt: MutableAttempt): RunFactAttempt {
   return {
     attempt: attempt.attempt,
