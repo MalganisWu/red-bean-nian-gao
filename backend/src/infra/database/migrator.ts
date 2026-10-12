@@ -492,11 +492,18 @@ export class PostgresMigrator implements MigrationRunnerPort {
 
   public async up(signal: AbortSignal): Promise<MigrationGroup> {
     await this.initialize(signal)
+    /*
+     * 整个过程在一个事务里，且**先取 advisory lock 再读历史**——顺序不能反。
+     * 先读后锁的话，两个实例可能读到同一份历史，各自算出同一批 pending，然后双双执行。
+     * 锁在整个事务结束时自动释放（pg_advisory_xact_lock 的语义）。
+     */
     return this.#database.transaction(signal, async (transaction): Promise<MigrationGroup> => {
       await acquireMigrationLock(transaction, signal)
       const applied = await this.#loadApplied(transaction, signal)
+      // 已应用的是冻结目录的前缀（validateHistory 保证），所以「剩下没跑的」就是后缀切片。
       const pending = this.#migrations.slice(applied.length)
       if (pending.length === 0) return { groupId: 0, migrationNames: [] }
+      // 分组号取「历史里最大的 + 1」，因此一次 up 是一个可以整体回滚的单位。
       const groupId =
         applied.reduce((highest, item): number => Math.max(highest, item.groupId), 0) + 1
       for (const migration of pending) {
@@ -512,6 +519,11 @@ export class PostgresMigrator implements MigrationRunnerPort {
     })
   }
 
+  /**
+   * 回滚**最近一个分组**，且按定义顺序的逆序执行。
+   * 逆序是必须的：后面的 migration 可能依赖前面建的表/列，正序回滚会先删掉依赖方。
+   * `toReversed()` 不改原数组——冻结目录必须保持原样。
+   */
   public async down(signal: AbortSignal): Promise<MigrationGroup> {
     await this.initialize(signal)
     return this.#database.transaction(signal, async (transaction): Promise<MigrationGroup> => {
@@ -519,6 +531,8 @@ export class PostgresMigrator implements MigrationRunnerPort {
       const applied = await this.#loadApplied(transaction, signal)
       if (applied.length === 0) return { groupId: 0, migrationNames: [] }
       const groupId = applied.reduce((highest, item): number => Math.max(highest, item.groupId), 0)
+      // 用 Set 存名字再过滤冻结目录，是为了让回滚顺序由**目录定义顺序**决定，
+      // 而不是由历史表的行序决定；两者一致，但前者才是权威。
       const names = new Set(
         applied.filter((item): boolean => item.groupId === groupId).map((item): string => item.name)
       )
@@ -535,6 +549,7 @@ export class PostgresMigrator implements MigrationRunnerPort {
     })
   }
 
+  /** 按写入顺序（`id ASC`）读出历史；顺序本身就是信息，`validateHistory` 依赖它。 */
   async #loadApplied(
     executor: SqlExecutor,
     signal: AbortSignal
@@ -565,6 +580,11 @@ function migration(
   return Object.freeze({ name, comment, up: Object.freeze(up), down: Object.freeze(down) })
 }
 
+/**
+ * 启动时校验冻结目录自身的自洽性：14 位时间戳命名、不重复、严格升序、up/down 都非空。
+ * 这些错误在编译期看不出来（目录是字面量数组），但一旦成立，后续每一次迁移都会带着它跑，
+ * 所以宁可让进程起不来。
+ */
 function validateCatalog(migrations: readonly Migration[]): readonly Migration[] {
   const names = new Set<string>()
   let previous = ''
@@ -592,6 +612,12 @@ function parseHistoryRow(row: unknown): AppliedMigration {
   }
 }
 
+/**
+ * 校验历史必须是冻结目录的**严格前缀**：逐位比对名字、不允许多、不允乱序。
+ *
+ * 这条约束是「不修改已执行的 migration」这条纪律的执行者。只要有人回头改了历史中某条
+ * migration 的名字或顺序，这里就会在启动时炸掉，而不是让不同环境的 schema 悄悄分叉。
+ */
 function validateHistory(
   applied: readonly AppliedMigration[],
   migrations: readonly Migration[]

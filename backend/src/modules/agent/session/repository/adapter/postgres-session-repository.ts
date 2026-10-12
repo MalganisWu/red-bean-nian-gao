@@ -27,13 +27,32 @@ const SESSION_COLUMNS = `
   updated_at
 `
 
-/** 面向现有 sessions 表并实现 CAS/fencing 契约的 PostgreSQL adapter。 */
+/**
+ * 面向现有 sessions 表并实现 CAS/fencing 契约的 PostgreSQL adapter。
+ *
+ * 三条贯穿全文件的约定：
+ * - **所有查询都带 `user_id`**：越权与不存在返回同一个 `NOT_FOUND`，
+ *   调用方无法靠错误码探出「这个 session 存在，只是不属于我」。
+ * - **CAS 与 fencing 写进同一条 UPDATE 的 WHERE**：`revision = $3 AND fencing_token = $4`。
+ *   分成两步检查就会有窗口，而这里靠数据库的原子性一次判定。
+ * - **每次失败的写入都要给出可区分的错误**：见 `#throwSaveConflict`。
+ */
 export class PostgresSessionRepository implements FencedSessionRepository {
   readonly #database: SqlExecutor
   public constructor(database: SqlExecutor) {
     this.#database = database
   }
 
+  /**
+   * 取得会话，不存在则创建。
+   *
+   * `ON CONFLICT DO NOTHING` 处理的是并发创建：两个实例同时发现会话不存在并同时 INSERT，
+   * 只有一个会成功，另一个 `rowCount === 0`。此时**必须重新读一次**而不是直接返回自己构造的空会话——
+   * 否则会拿着一个 revision 0 的假状态去写，把对方的创建覆盖掉。
+   *
+   * 另一个分支：会话已存在但不属于这个 userId 时抛 `NOT_FOUND` 而不是「已存在」，
+   * 避免把别人的会话 ID 变成可探测的信息。
+   */
   public async getOrCreate(
     sessionId: string,
     userId: string,
@@ -70,6 +89,11 @@ export class PostgresSessionRepository implements FencedSessionRepository {
     return session
   }
 
+  /**
+   * CAS 保存。`RETURNING revision` 让成功路径不必再查一次就能把新版本写回调用方持有的对象。
+   * 写入 0 行时交给 `#throwSaveConflict` 判定到底是哪一种冲突——区分它们对调用方很重要：
+   * 版本冲突可以重读后重试，fencing 陈旧则说明锁已被别人接管，重试没有意义。
+   */
   public async save(session: Session, signal: AbortSignal): Promise<void> {
     let result: Awaited<ReturnType<SqlExecutor['query']>>
     try {
@@ -101,6 +125,13 @@ export class PostgresSessionRepository implements FencedSessionRepository {
     await this.#throwSaveConflict(session, signal)
   }
 
+  /**
+   * 键集分页（keyset pagination），游标是上一页最后一条的 `updated_at`。
+   *
+   * `ORDER BY updated_at DESC, session_id DESC` 里的第二个字段不能省：
+   * 同一毫秒内更新的多条会话仅按时间排序，顺序在两次查询之间可能不同，
+   * 翻页就会漏掉或重复记录。加上唯一列做兜底排序才能得到稳定顺序。
+   */
   public async listByUser(
     userId: string,
     cursor: string,
@@ -130,6 +161,13 @@ export class PostgresSessionRepository implements FencedSessionRepository {
     return result.rows.map((row: unknown): SessionSummary => parseSessionSummary(row))
   }
 
+  /**
+   * 把会话的 fencing 高水位推到 `token`。
+   *
+   * `fencing_token <= $1` 让「不倒退」由 SQL 保证，无需先读后写：
+   * 传一个更小的 token 匹配不到任何行，于是走下面的失败分支报 `STALE_FENCE`。
+   * `token === 0n` 直接返回：0 的语义是「未启用 fencing」，不该被当成一次推进。
+   */
   public async advanceFence(
     sessionId: string,
     userId: string,
@@ -205,6 +243,14 @@ export class PostgresSessionRepository implements FencedSessionRepository {
     return parseSessionOwner(result.rows[0])
   }
 
+  /**
+   * UPDATE 写入 0 行时判定冲突类型，按**从「更根本」到「更琐碎」**的顺序排查：
+   * 1. 行不存在或不属于本用户 → `NOT_FOUND`（连能不能写都不成立）。
+   * 2. `fencing_token` 与传入不符 → `STALE_FENCE`（锁已被接管，调用方应当放弃而不是重试）。
+   * 3. 其余情况 → `REVISION_CONFLICT`（并发写，重读最新版本后可以重试）。
+   *
+   * 顺序不能调换：fencing 陈旧时若先报版本冲突，调用方会去重试一个它已经无权执行的操作。
+   */
   async #throwSaveConflict(session: Session, signal: AbortSignal): Promise<never> {
     const current = await this.#owner(session.id, signal)
     if (current === undefined || current.user_id !== session.userId) throw sessionNotFound()

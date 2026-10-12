@@ -58,7 +58,13 @@ export interface DbMainAgentLoaderOptions {
   readonly subAgentToolFactory: RuntimeSubAgentToolFactory
 }
 
-/** 从产品数据表加载一次运行所需的不可变配置快照。 */
+/**
+ * 从产品数据表加载一次运行所需的不可变配置快照。
+ *
+ * 「快照」是关键词：`load` 把 agent 行、LLM 配置、凭据、子 Agent 定义和工具目录一次性读出来，
+ * 组装成一个自洽的 `AgentBuildConfig` 交给 Runtime。运行期间不再回查数据库，
+ * 因此在流式运行中途改配置不会影响正在跑的这一次——这正是产品所说的「能力图在启动期定死」。
+ */
 export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
   readonly #options: DbMainAgentLoaderOptions
 
@@ -66,6 +72,11 @@ export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
     this.#options = options
   }
 
+  /**
+   * 返回一个**新的** loader，只把子运行装饰器换掉。
+   * 不可变而非就地改写：同一个 loader 实例可能被并发用于多次加载，
+   * 就地改 `subAgentToolFactory` 会让先启动的运行也被后来者的装饰器影响。
+   */
   public withChildRuntimeDecorator(decorator: ChildRuntimeDecorator): AgentLoader {
     return new DbMainAgentLoader({
       ...this.#options,
@@ -73,6 +84,11 @@ export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
     })
   }
 
+  /**
+   * 组装一次运行的完整配置。步骤按依赖方向串行，每一步都可能是「配置不存在」或「数据不合法」的失败点：
+   * agent 行 → LLM 配置 → 凭据 → Adapter → 参数 → 子 Agent 定义 → 工具工厂 → 工具目录。
+   * `is_active` 的检查放在最前：一个被禁用的 agent 不该走到读凭据那一步。
+   */
   public async load(
     agentId: string,
     signal: AbortSignal,
@@ -162,6 +178,17 @@ export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
     return parseRow(credentialRowSchema, row, 'api_credentials')
   }
 
+  /**
+   * 批量读取可委派的子 Agent 定义。
+   *
+   * 两个刻意的行为：
+   * - **按 `agentIds` 的顺序重建结果**，而不是用查询返回的顺序。Map 的插入顺序来自数据库，
+   *   不保证与配置里 `available_agent_ids` 的书写顺序一致，而这个顺序决定了工具清单的排列，
+   *   会影响提示词前缀的稳定性（进而影响缓存命中）。
+   * - 查不到的 agent **静默跳过**而不是报错。`is_active = true` 的过滤意味着被禁用的子 Agent
+   *   会直接消失；父 Agent 因此少一个可委派对象，但它自己仍然能跑——
+   *   这与「主 agent 被禁用就直接失败」是有意区分的两种强度。
+   */
   async #loadChildDefinitions(
     agentIds: readonly string[],
     signal: AbortSignal
@@ -205,6 +232,12 @@ function parseModelParams(value: Readonly<Record<string, unknown>>): AgentModelP
   }
 }
 
+/**
+ * 把 `metadata` JSON 解析成运行参数；压缩只有显式 `compression_enabled: true` 才启用。
+ *
+ * 默认关闭是刻意的：压缩会改写上下文并产生额外的模型调用，是一项有代价的优化，
+ * 不该因为某个字段缺失就被悄悄打开。启用时才构造 restorer——不启用就完全不引入这依赖。
+ */
 function parseRuntimeConfig(value: Readonly<Record<string, unknown>>): AgentRuntimeConfig {
   const config: AgentRuntimeConfig = {
     ...integerProperty(
@@ -293,6 +326,11 @@ function booleanProperty(
   return { thinking: candidate }
 }
 
+/**
+ * 数据库行进入领域层的唯一入口：逐字段 Zod 校验，失败即抛。
+ * 解析失败会把完整的 Zod 报错带进消息——被拒的是不可信数据，排障时需要知道具体哪个字段、
+ * 期望什么类型，而不是一句「数据无效」。
+ */
 function parseRow<TValue>(schema: z.ZodType<TValue>, row: unknown, table: string): TValue {
   const parsed = schema.safeParse(row)
   if (!parsed.success) throw new Error(`${table} 数据无效: ${z.prettifyError(parsed.error)}`)

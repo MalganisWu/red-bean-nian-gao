@@ -12,7 +12,13 @@ import type {
   MessageBufferGeneration,
 } from '../../message-buffer/port/message-buffer.port.js'
 
-/** 测试使用的内存消息缓冲实现；复制输入输出，避免调用方共享可变数组所有权。 */
+/**
+ * 测试使用的内存消息缓冲实现；复制输入输出，避免调用方共享可变数组所有权。
+ *
+ * 进出都 `structuredClone`：写入时复制，读出时也复制。只做前者的话，
+ * 调用方拿到的数组仍与内部状态同一份，一次就地 `push` 就能绕过 `append` 直接改缓冲区，
+ * 测试也就测不出真实实现里的隔离问题。
+ */
 export class MemoryMessageBuffer implements MessageBuffer {
   readonly #messages = new Map<string, AgentMessage[]>()
 
@@ -76,10 +82,19 @@ function generationKey(sessionId: string, generation: MessageBufferGeneration): 
   return `${sessionId}:${generation.revision.toString()}`
 }
 
-/** 测试使用的内存 Session 仓储；模拟生产实现的用户隔离、revision CAS 与 fencing 语义。 */
+/**
+ * 测试使用的内存 Session 仓储；模拟生产实现的用户隔离、revision CAS 与 fencing 语义。
+ *
+ * 与 Postgres 版本的两处**刻意不同**，改测试时别把它们当成 bug：
+ * - **分页游标是 session id，不是时间戳**。内存实现按 `#order` 的插入序维护，
+ *   没有可比较的时间轴，用 id 定位更直接。生产实现见 `PostgresSessionRepository`。
+ * - `#order` 在每次 `save` 时把该 id 移到末尾，`listByUser` 再 `toReversed()`，
+ *   于是「最近更新的排最前」这件事完全不依赖时钟——测试可以注入固定的 `now`。
+ */
 export class MemorySessionStore implements FencedSessionRepository {
   readonly #sessions = new Map<string, Session>()
   readonly #updated = new Map<string, Date>()
+  /** 更新顺序（最早 → 最新）；读取时反转即为列表顺序。 */
   #order: string[] = []
   readonly #now: () => Date
 
@@ -87,6 +102,7 @@ export class MemorySessionStore implements FencedSessionRepository {
     this.#now = now
   }
 
+  /** 已存在但不属于该用户 → `NOT_FOUND`（不是「已存在」），与生产实现的所有权隐藏一致。 */
   public getOrCreate(sessionId: string, userId: string, signal: AbortSignal): Promise<Session> {
     const aborted = abortFailure(signal)
     if (aborted !== undefined) return Promise.reject(aborted)
@@ -119,6 +135,16 @@ export class MemorySessionStore implements FencedSessionRepository {
     return Promise.resolve(cloneSession(session))
   }
 
+  /**
+   * CAS + fencing 保存。三道校验只在「已存在」时进行；不存在则视为创建，直接写入。
+   *
+   * 校验顺序与生产实现一致（越权 → revision → fencing），但这里**先判 revision 再判 fencing**：
+   * 内存实现里两者不可能同时不符（都是同一个调用方带来的快照），顺序无实际影响；
+   * Postgres 版本因为写进同一条 WHERE，需要事后区分，那里顺序才有意义。
+   *
+   * 注意 `session.revision` 是**就地自增**的：调用方手上的对象会随之更新，
+   * 于是同一次会话里的连续保存可以复用同一个对象。
+   */
   public save(session: Session, signal: AbortSignal): Promise<void> {
     const aborted = abortFailure(signal)
     if (aborted !== undefined) return Promise.reject(aborted)
@@ -141,10 +167,12 @@ export class MemorySessionStore implements FencedSessionRepository {
     session.revision += 1n
     this.#sessions.set(session.id, cloneSession(session))
     this.#updated.set(session.id, this.#now())
+    // 移到末尾 = 最近更新；`listByUser` 反转后即为「最新在前」。
     this.#order = [...this.#order.filter((id): boolean => id !== session.id), session.id]
     return Promise.resolve()
   }
 
+  /** 高水位只前进：`token < current` 报 `STALE_FENCE`，相等与更大都直接写入。`0n` 为无操作。 */
   public advanceFence(
     sessionId: string,
     userId: string,
@@ -198,6 +226,11 @@ function cloneSession(session: Session): Session {
   return structuredClone(session)
 }
 
+/**
+ * 取第一条有正文的用户消息作为标题，超过 30 个字符则截断加省略号。
+ * 用 `Array.from` 而不是 `slice`：后者按 UTF-16 码元切，会把 emoji 或星形平面的汉字劈成半个。
+ * 一条用户消息都没有时返回空串，由展示层决定占位文案。
+ */
 function extractTitle(messages: readonly DisplayMessage[]): string {
   for (const message of messages) {
     if (message.role !== 'user' || message.content === undefined) continue
