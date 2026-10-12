@@ -65,10 +65,17 @@ interface RateLimitDecision {
   readonly retryAfterSeconds: number
 }
 
+/*
+ * 请求级状态挂在 WeakMap 上，而不是塞进 request 对象或某个全局 Map。
+ * WeakMap 的键是请求对象本身：请求结束、没有别的引用之后条目自动消失，
+ * 既不需要在 onResponse 里逐个清理（下面那些 delete 只是为了及时释放大对象），
+ * 也不会让并发请求之间串状态。
+ */
 const requestTraceIds = new WeakMap<FastifyRequest, string>()
 const requestSpans = new WeakMap<FastifyRequest, TraceSpan>()
 const requestErrors = new WeakMap<FastifyRequest, Error>()
 const requestAbortControllers = new WeakMap<FastifyRequest, AbortController>()
+/** 没有 AbortController 时的兜底信号：永不会中止，避免调用方到处判空。 */
 const NEVER_ABORTED_SIGNAL = new AbortController().signal
 
 /**
@@ -104,6 +111,12 @@ export function createHttpServer(options: HttpServerOptions): FastifyInstance {
   void server.register(multipart)
 
   server.addHook('onRequest', async (request, reply): Promise<void> => {
+    /*
+     * 两种断连必须都覆盖，只监听一个会漏掉一半的取消来源：
+     * - `aborted`：请求还没读完客户端就断了。
+     * - `close` + `writableFinished === false`：响应还没写完连接就关了（SSE 场景里这是最常见的）。
+     *   加 `writableFinished` 判断是因为正常结束也会触发 `close`，不加就会把每次正常请求都当成取消。
+     */
     const controller = new AbortController()
     if (request.raw.aborted) controller.abort(new Error('HTTP request aborted'))
     else {
@@ -165,6 +178,12 @@ export function createHttpServer(options: HttpServerOptions): FastifyInstance {
     }
     const span = tracer.start({ name: 'http.request', attributes })
     requestSpans.set(request, span)
+    /*
+     * 用 `span.within` 包住 `done()` 而不是直接调用：`within` 会把该 span 设为异步上下文里的活跃 span，
+     * 后续 handler 里新建的 span（LLM、工具、DB）才能自动挂到它下面。
+     * 这也解释了为什么必须用 `void ... .catch`：`within` 返回 Promise，而 Fastify 的 done 回调风格
+     * 要求同步返回，只能把异步失败转回 `done(error)`。
+     */
     void span
       .within((): Promise<void> => {
         done()
@@ -196,6 +215,12 @@ export function createHttpServer(options: HttpServerOptions): FastifyInstance {
     done()
   })
 
+  /**
+   * 统一错误出口。**日志级别按「这是不是我们预期的错误」分层**：
+   * 有 `cause` 或非 `AppError` 的走 error（同一条错误反复出现说明有故障），
+   * 而 `AppError` 是业务主动抛的（404、限流、校验失败），走 debug——
+   * 把用户输错参数记成 error 会让真正的故障淹没在噪声里。
+   */
   server.setErrorHandler((error, request, reply): void => {
     const safeError = normalizeHttpError(error, jsonBodyLimit)
     if (safeError.cause !== undefined) {
@@ -254,6 +279,11 @@ export class FixedWindowRateLimiter {
   }
 
   private allow(key: string, now: number): RateLimitDecision {
+    /*
+     * 惰性清理而不是定时器：只在「距上次清理超过一个窗口」时才扫一遍，
+     * 把 O(条目数) 的成本摊到多次请求上。定时器会在服务空闲时也持续唤醒事件循环，
+     * 而且需要在关闭时显式清掉，这里没必要引入那份复杂度。
+     */
     if (now - this.#lastCleanup >= this.#windowMilliseconds) {
       for (const [entryKey, entry] of this.#entries.entries()) {
         if (now - entry.windowStartedAt >= this.#windowMilliseconds) {

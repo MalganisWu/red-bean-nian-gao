@@ -3,9 +3,19 @@ import { lookupBuiltinTool } from 'red-bean-qing-tuan/tools'
 
 import type { ToolProviderPlugin } from '../registry/tool-registry.js'
 
+/**
+ * 来自 Runtime 内置目录的三个工具。
+ * 选它们而不是别的，是因为 `lookupBuiltinTool` 只认这三个——目录工具的判据是「无副作用且可随时新建实例」，
+ * 像文件读写那类需要注入账本与路径策略的，不在目录里，只能由宿主显式构造（见 `createHostTools`）。
+ */
 const CATALOG_TOOL_IDS = Object.freeze(['sys_get_time', 'sys_http_request', 'sys_fetch_url'])
 
-/** 注册 Runtime 内置目录工具以及宿主明确授权的 Runtime 工具。 */
+/**
+ * 注册 Runtime 内置目录工具以及宿主明确授权的 Runtime 工具。
+ *
+ * 目录工具缺失时**直接抛错**而不是跳过：这只可能发生在产品依赖的 SDK 版本被换掉时，
+ * 静默跳过会让 agent 少一个工具却毫无提示，而这类版本错配恰恰是必须立刻发现的那种问题。
+ */
 export function runtimeBuiltinProvider(hostTools: readonly Tool[] = []): ToolProviderPlugin {
   const selectedHostTools = [...hostTools]
   return {
