@@ -61,6 +61,21 @@ export class ServerApplication {
     )
   }
 
+  /**
+   * 启动并驻留，直到服务自己退出或收到中止信号；退出前完成一次优雅关闭。
+   *
+   * 关闭顺序里三处是刻意的：
+   * - **先 `setDraining(true)`** 再关服务：让 readiness 探针立即开始拒绝，
+   *   负载均衡先把流量摘走，正在处理的请求才有机会跑完（顺序反了就是直接掐断）。
+   * - **HTTP 停止接收与业务排空并行**：串行的话两者会互相等待，
+   *   总时长等于两者之和，很容易撞上关闭超时。
+   * - **超时后强制 `close()`**：优雅关闭失败不能变成关不掉，进程必须能退。
+   *
+   * 后台任务跑在独立的 controller 上，不随中止信号立刻停——它们在 `finally` 里被统一收束，
+   * 因为中途丢弃它们会留下未提交的定时任务状态。
+   * 所有阶段的错误都收集起来，最后聚合成一个 `AggregateError`：关闭期同时坏掉好几处是常态，
+   * 只报第一个会让其余问题永远看不见。
+   */
   public async run(signal: AbortSignal): Promise<void> {
     const errors: Error[] = []
     const backgroundController = new AbortController()
@@ -125,6 +140,12 @@ export class ServerApplication {
   }
 }
 
+/**
+ * 在受管生命周期内执行构建：构建中途失败时，把已经登记的资源关掉再抛。
+ *
+ * 这是「半启动进程」的防线——构建链走到第五步失败却留着前三步建好的连接池与后台定时器，
+ * 会让进程既不能正常工作也不退出。关闭失败会与构建失败一起抛出，保住原始根因。
+ */
 export async function buildManaged<T>(
   build: (lifecycle: Lifecycle) => T | Promise<T>,
   closeTimeoutMilliseconds = DEFAULT_CLOSE_TIMEOUT_MILLISECONDS
@@ -150,6 +171,12 @@ function settle(operation: Promise<void>): Promise<ServerOutcome> {
   )
 }
 
+/**
+ * 把中止信号变成一个可等待的 Promise，并返回解绑函数。
+ * 已经中止的信号直接返回已完成的 Promise：`addEventListener('abort')` 对已中止的信号不会再触发，
+ * 不加这个短路就会永远等下去。
+ * `dispose` 由调用方在 finally 中执行，避免往长生命周期的信号上累积监听器。
+ */
 function waitForAbort(signal: AbortSignal): AbortWait {
   if (signal.aborted) {
     return { promise: Promise.resolve(), dispose(): void {} }
