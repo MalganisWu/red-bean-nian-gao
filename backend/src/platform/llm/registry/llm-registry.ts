@@ -82,6 +82,13 @@ export class LlmProviderRegistry {
     }
   }
 
+  /**
+   * 返回给 Runtime SDK 的中性工厂。SDK 只认这个签名，不知道 provider 是怎么查出来的。
+   *
+   * 三处严格：provider 名归一化后为空即报错；查不到就抛「unsupported」；
+   * 工厂返回 `null`/`undefined` 也当作失败——这是 provider 插件表达「这个配置我造不出来」的方式，
+   * 静默放过会让 Runtime 拿到一个不是 adapter 的东西，报错位置离根因很远。
+   */
   public adapterFactory(): LlmAdapterFactory {
     return (
       rawProvider: string,
