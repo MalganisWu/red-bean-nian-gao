@@ -106,6 +106,16 @@ export async function loadConfig(options: LoadConfigOptions = {}): Promise<AppCo
   return parseConfig(record(base), environment)
 }
 
+/**
+ * 合并两个来源并按优先级取值：**环境变量 > config.yaml > 内置默认值**。
+ *
+ * 每个字段都显式写出四个参数（YAML 段、YAML 键、环境变量名、默认值），
+ * 看起来啰嗦，但它让「这个配置项叫什么、能被哪个环境变量覆盖」成为类型层面可见的事实——
+ * 隐式的命名约定会让部署时该设哪个变量变成要靠猜的事。
+ *
+ * 空字符串一律视为「未设置」而不是有效取值：环境文件里留空的项应当落到下一个来源，
+ * 而不是把一个空串当成配置。真正的必填校验在后面的 `validate*` 里做。
+ */
 export function parseConfig(raw: unknown, environment: Environment): AppConfig {
   const root = record(raw)
   const server = section(root, 'server')
@@ -241,6 +251,16 @@ export function parseConfig(raw: unknown, environment: Environment): AppConfig {
   return config
 }
 
+/**
+ * 解析 duration 字面量（`5m`、`1h30m`、`250ms`）为毫秒。
+ *
+ * `match.index !== position` 这个判断是这里的要点：它要求各段**首尾相接、没有空隙**，
+ * 因此 `1h junk 30m` 会被拒绝而不是被静默解析成 `1h30m`。
+ * 正则的 `matchAll` 本身会跳过不匹配的片段，不检查位置就等于放任拼写错误。
+ *
+ * 末尾拒绝 `<= 0`：这些值最终都用作间隔或超时，0 与负数在这里没有合理语义，
+ * 与其让它们在下游变成「永不触发」或「立刻超时」，不如在配置层挡住。
+ */
 export function parseDurationMilliseconds(value: string): number {
   const normalized = value.trim()
   const sign = normalized.startsWith('-') ? -1 : 1
@@ -270,6 +290,15 @@ export function parseDurationMilliseconds(value: string): number {
   return milliseconds
 }
 
+/**
+ * 启动即校验，分三档：
+ * 1. **必填**：缺了就起不来（数据库/Redis/JWT/MinIO 的连接参数）。
+ * 2. **示例值拦截**：模板里的 `CHANGE_ME` 没被替换掉，等价于没配置。
+ * 3. **仅生产环境的加严**：`auto_migrate` 必须关（多副本并发 DDL 会互相踩），
+ *    `jwt.secret` 至少 32 字节（弱密钥可被离线爆破）。本地开发不受这两条限制。
+ *
+ * 这个分层刻意如此——测试与本地要的是「能起来」，生产要的是「起不来也别起错」。
+ */
 function validateConfig(config: AppConfig): void {
   requireConfigured('database.url', config.database.url)
   requireConfigured('redis.url', config.redis.url)
@@ -310,6 +339,11 @@ function requireConfigured(name: string, value: string): void {
   if (containsPlaceholder(value)) throw new Error(`${name} 仍为示例值`)
 }
 
+/**
+ * 识别模板占位符。这条防线针对的失败模式很具体：`config.yaml` 里写着 `CHANGE_ME`，
+ * 部署时忘了替换，服务照常启动、连接失败时报出一个毫无线索的错误。
+ * 在这里拦住，错误信息就直接指向「你还是示例值」。
+ */
 function containsPlaceholder(value: string): boolean {
   const normalized = value.trim().toUpperCase()
   return normalized.includes('CHANGE_ME') || normalized === 'CHANGE-ME-TO-A-LONG-RANDOM-STRING'
@@ -334,6 +368,10 @@ function validateDuration(name: string, value: string): void {
   }
 }
 
+/**
+ * 用 `Intl` 试构造一次来校验时区名，而不是维护一张时区清单——
+ * 后者会随 tzdata 更新而过期，前者永远与运行时的实际能力一致。
+ */
 function validateTimezone(value: string): void {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: value }).format()
