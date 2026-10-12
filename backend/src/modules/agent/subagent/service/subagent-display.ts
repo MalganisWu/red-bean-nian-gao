@@ -27,22 +27,27 @@ export interface SubAgentSectionData {
   readonly resultSummary?: string | undefined
 }
 
+/** 给子 Agent 事件套上父调用标识；`event` 既可能是 Runtime 事件，也可能是产品内部的展示交接事件。 */
 export interface SubAgentEnvelope {
   readonly parentCallId: string
   readonly event: AgentRuntimeEvent | SubAgentDisplayReadyEvent
 }
 
+/** 产品 pipeline 中流动的事件全集：Runtime 事件，或带父调用标识的信封。 */
 export type ProductPipelineEvent = AgentRuntimeEvent | SubAgentEnvelope
 
+/** pipeline 节点共享的上下文；`eventSink` 可变，因为节点会把它包一层再往下传（见 `SectionBuildNode.execute`）。 */
 export interface ProductPipelineContext {
   readonly metadata: Map<string, unknown>
   eventSink: ((event: ProductPipelineEvent) => void) | undefined
 }
 
+/** 归集本节点看到的事件，产出展示 section。 */
 export interface SectionEventCollector {
   collect(event: ProductPipelineEvent): void
 }
 
+/** 每次执行新建一个收集器，避免上一次运行的 section 泄漏到下一次。 */
 export type SectionEventCollectorFactory = () => SectionEventCollector
 
 /** 按发起委派的父调用保存相互独立的 JSON 快照。 */
@@ -92,10 +97,12 @@ export class SectionBuildNode {
   }
 }
 
+/** 造一个展示交接事件；载荷先过 `toAgentJsonValue` 归一，保证它可被序列化与克隆。 */
 export function subAgentDisplayReadyEvent(data: unknown): SubAgentDisplayReadyEvent {
   return { type: 'sub_agent_display_ready', data: toAgentJsonValue(data) }
 }
 
+/** 把 section 载荷转成落库用的 snake_case JSON；空串与 `undefined` 同等对待，都不写入该字段。 */
 export function serializeSubAgentSectionData(data: SubAgentSectionData): AgentJsonObject {
   const payload: Record<string, AgentJsonValue> = {
     agent_id: data.agentId,

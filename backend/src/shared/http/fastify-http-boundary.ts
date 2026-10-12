@@ -27,6 +27,7 @@ const DEFAULT_RATE_LIMIT_WINDOW_MILLISECONDS = 60_000
 const REQUEST_ID_HEADER = 'x-request-id'
 const TRACE_ID_HEADER = 'x-trace-id'
 
+/** 从入站 header 抽出的 trace 上下文；字段名与 W3C traceparent 对齐。 */
 export interface ExtractedTraceContext {
   readonly traceId: string
   readonly parentSpanId: string
@@ -39,6 +40,7 @@ export interface TraceContextExtractorPort {
   extract(headers: IncomingHttpHeaders): ExtractedTraceContext | undefined
 }
 
+/** 建 server 的选项；除 `idGenerator` 外全可注入，测试因此能替换 tracer、trace 提取器与 CORS 白名单。 */
 export interface HttpServerOptions {
   readonly idGenerator: IdGenerator
   readonly corsOrigins?: string | undefined
@@ -54,6 +56,7 @@ interface FixedWindowEntry {
   windowStartedAt: number
 }
 
+/** 限流参数；`now` 可注入，测试因此不必真的等满一个窗口。 */
 export interface FixedWindowRateLimiterOptions {
   readonly limit: number
   readonly windowMilliseconds: number
@@ -243,10 +246,12 @@ export function createHttpServer(options: HttpServerOptions): FastifyInstance {
   return server
 }
 
+/** 取本次请求的 trace ID；请求没走到 trace hook 时返回空串。 */
 export function requestTraceId(request: FastifyRequest): string {
   return requestTraceIds.get(request) ?? ''
 }
 
+/** 取本次请求的取消信号；无控制器时返回永不中止的兜底信号，调用方因此不必判空。 */
 export function requestAbortSignal(request: FastifyRequest): AbortSignal {
   return requestAbortControllers.get(request)?.signal ?? NEVER_ABORTED_SIGNAL
 }
