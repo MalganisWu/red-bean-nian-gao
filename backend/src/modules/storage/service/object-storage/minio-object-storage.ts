@@ -6,15 +6,27 @@ import type { ObjectDownload, ObjectInfo } from '../application/model/object-res
 import { bindDownloadStreamToAbort } from './download-stream-lifecycle.js'
 import { optionalField } from '../../../../shared/object/optional-field.js'
 
+/**
+ * 对象自定义元数据的形状校验：一个字符串键到任意值的记录。
+ *
+ * MinIO 返回的 `metaData` 类型是 `unknown` 且可能缺省；放宽为记录是为了只做「可安全取键」的
+ * 收窄，不限制具体字段 —— 元数据里只有 `content-type` 会被读取，且读取处仍再判一次类型。
+ */
 const metadataSchema = z.record(z.string(), z.unknown())
 
 /** MinIO 连接配置；由 `config.minio` 段映射而来，字段与配置层一一对应。 */
 export interface MinioStorageConfig {
+  /** 服务地址，仅允许主机名与可选端口；含路径或查询串会被构造器拒绝。 */
   readonly endpoint: string
+  /** 访问凭证的 Access Key；敏感字段，不落日志。 */
   readonly accessKey: string
+  /** 访问凭证的 Secret Key；敏感字段，不落日志。 */
   readonly secretKey: string
+  /** 目标 bucket 名；不得为空，由构造器校验。 */
   readonly bucket: string
+  /** 是否使用 HTTPS 连接；决定 `clientOptions` 拼出的协议。 */
   readonly useSsl: boolean
+  /** 区域；空串表示不显式指定，交由客户端或服务端默认处理。 */
   readonly region: string
 }
 
@@ -23,8 +35,11 @@ export interface MinioStorageConfig {
  * 调用失败保留 cause 向上交给应用错误边界；下载流与请求取消的资源释放由本 Adapter 负责。
  */
 export class MinioObjectStorage implements ObjectStorage {
+  /** MinIO 客户端，构造时按配置创建；其生命周期由本适配器持有，不向外转移。 */
   readonly #client: Client
+  /** 目标 bucket 名，构造时校验非空；所有操作都以它为作用域。 */
   readonly #bucket: string
+  /** 区域配置，构造时留存；只在创建 bucket 时决定是否带上 region。 */
   readonly #region: string
 
   public constructor(config: MinioStorageConfig) {
@@ -204,6 +219,16 @@ export class MinioObjectStorage implements ObjectStorage {
   }
 }
 
+/**
+ * 把配置映射成 MinIO 客户端的连接选项，并在此拒绝形态不合法的 endpoint。
+ *
+ * 借 `URL` 解析而非手工拆分，顺带校验 endpoint 只含主机与端口：带路径、查询串或片段一律报错，
+ * 避免把 `host/path` 这类错误配置静默当成主机名。端口缺失时整体省略该键，让客户端用协议默认值；
+ * region 为空串同样省略，不传递空区域给服务端。
+ *
+ * @param config - MinIO 连接配置
+ * @returns 可直接交给客户端构造器的选项对象
+ */
 function clientOptions(config: MinioStorageConfig): ClientOptions {
   const endpoint = new URL(`${config.useSsl ? 'https' : 'http'}://${config.endpoint}`)
   if (endpoint.pathname !== '/' || endpoint.search !== '' || endpoint.hash !== '') {
@@ -223,6 +248,17 @@ function clientOptions(config: MinioStorageConfig): ClientOptions {
   }
 }
 
+/**
+ * 把 MinIO 的 stat 结果映射为应用层稳定的 `ObjectInfo`。
+ *
+ * 内容类型优先取自定义元数据里的 `content-type`（大小写两种键都试），取不到或类型不符时回退为
+ * `application/octet-stream` —— 该字段要回填进 HTTP 响应头，必须保证是合法值。元数据本身不可信，
+ * 因此经 Schema 收窄后才取键。
+ *
+ * @param key - 对象 key；由调用方提供，stat 结果里不含，需原样带回
+ * @param stat - MinIO 返回的对象状态，含大小、ETag、最后修改时间与元数据
+ * @returns 应用层使用的对象元信息
+ */
 function objectInfo(key: string, stat: BucketItemStat): ObjectInfo {
   const metadata = metadataSchema.safeParse(stat.metaData)
   const contentTypeValue = metadata.success
@@ -238,10 +274,29 @@ function objectInfo(key: string, stat: BucketItemStat): ObjectInfo {
   }
 }
 
+/**
+ * 判断未知异常是否带有指定的 `code`，用于识别 MinIO 客户端抛出的错误码。
+ *
+ * 客户端错误带 `code` 但未被导出为可 `instanceof` 的类型，因此只按码匹配；非 Error 或缺失 `code`
+ * 的情形一律返回 `false`，保证「不存在」的判定不会被无关异常误命中。
+ *
+ * @param value - 捕获到的未知异常
+ * @param expected - 期望匹配的错误码，如 `NoSuchKey`
+ * @returns 带该错误码时为 `true`
+ */
 function hasErrorCode(value: unknown, expected: string): boolean {
   return value instanceof Error && 'code' in value && value.code === expected
 }
 
+/**
+ * 从未知抛出值取一段可读的文本，用于拼接包装错误的信息。
+ *
+ * 抛出的不一定是 Error（MinIO 客户端在某些路径上抛字符串或对象），因此非 Error 一律 `String`
+ * 化，保证错误信息里始终有内容。
+ *
+ * @param value - 捕获到的未知抛出值
+ * @returns Error 的 message，或该值的字符串表示
+ */
 function message(value: unknown): string {
   return value instanceof Error ? value.message : String(value)
 }

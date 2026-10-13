@@ -7,6 +7,7 @@ import { EXECUTION_COLUMNS } from './../task-sql.js'
 
 /** PostgreSQL Task Execution 仓储；独占执行记录和投递确认。 */
 export class PostgresTaskExecutionRepository implements TaskExecutionRepository {
+  /** 支持事务的 SQL 执行器；投递确认与未投递扫描都经它查询。 */
   readonly #database: TransactionalSqlExecutor
   public constructor(database: TransactionalSqlExecutor) {
     this.#database = database

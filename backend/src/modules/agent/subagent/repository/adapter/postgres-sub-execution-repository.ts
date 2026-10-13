@@ -16,6 +16,7 @@ import {
 
 /** PostgreSQL 子执行仓储；负责 SQL、row 校验和基础设施错误上下文。 */
 export class PostgresSubExecutionRepository implements SubExecutionRepository {
+  /** 注入的 SQL 执行器；全部读写经它下发，中止信号一并透传。 */
   readonly #database: SqlExecutor
 
   public constructor(database: SqlExecutor) {
@@ -265,6 +266,16 @@ export class PostgresSubExecutionRepository implements SubExecutionRepository {
     )
   }
 
+  /**
+   * 以 revision CAS 整体更新记录；多个写路径共用的底层实现。
+   * 未命中任何行时不抛错而是返回 false，由调用方决定抛哪种冲突码。
+   *
+   * @param record - 待写回的记录；其 revision 进 WHERE 做 CAS，成功后就地增量。
+   * @param statusClause - 追加到 WHERE 的状态限制片段，空串表示不限状态。
+   * @param extraParameters - statusClause 里占位符对应的参数，按顺序追加到 SQL 参数尾部。
+   * @param signal - SQL 中止信号。
+   * @returns 写入并成功取回新 revision 时为 true；未命中行为 false。
+   */
   async #conditionalUpdate(
     record: SubExecutionRecord,
     statusClause: string,
@@ -327,6 +338,14 @@ export class PostgresSubExecutionRepository implements SubExecutionRepository {
   }
 }
 
+/**
+ * 统一包装仓储错误：保留中文上下文前缀，并把原始错误挂在 `cause` 上。
+ * 不丢 cause 是硬要求——只取 message 重抛会让日志与观测断链，排障时定位不到根因。
+ *
+ * @param context - 中文上下文前缀，说明是哪一步操作失败。
+ * @param cause - 原始错误；不是 Error 时按其字符串形式保留 message。
+ * @returns 带 cause 链的新错误。
+ */
 function contextualError(context: string, cause: unknown): Error {
   const error = cause instanceof Error ? cause : new Error(String(cause))
   return new Error(`${context}: ${error.message}`, { cause })

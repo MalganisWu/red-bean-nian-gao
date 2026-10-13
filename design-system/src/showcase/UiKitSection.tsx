@@ -4,8 +4,11 @@
  */
 import type { ReactNode } from 'react'
 
+/** 分区容器 Props：一段标题加其下的全部示例。 */
 interface UiKitSectionProps {
+  /** 分区标题文字，渲染为分区顶部的 `h3`。 */
   title: string
+  /** 分区内容；通常是一组 `UiKitRow`。 */
   children: ReactNode
 }
 
@@ -24,9 +27,11 @@ export function UiKitSection(props: UiKitSectionProps) {
   )
 }
 
+/** 示例行 Props：同一行内并排展示的一组示例。 */
 interface UiKitRowProps {
   /** 内容类组件纵向全宽堆叠，展开不换行重排 */
   stack?: boolean
+  /** 行内示例；通常是若干 `UiKitItem`。 */
   children: ReactNode
 }
 
@@ -42,10 +47,13 @@ export function UiKitRow(props: UiKitRowProps) {
   )
 }
 
+/** 单个示例单元 Props：一个组件示例加其下方标签。 */
 interface UiKitItemProps {
+  /** 单元下方的说明标签；缺省时不渲染标签，仅留示例本身。 */
   label?: string
   /** 配合 UiKitRow stack：item 拉伸到 row 全宽，label 左对齐 */
   block?: boolean
+  /** 被展示的组件示例内容。 */
   children: ReactNode
 }
 

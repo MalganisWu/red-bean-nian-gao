@@ -15,7 +15,12 @@ export interface RoundNavItem {
   toolCount?: number
 }
 
-/** assistant 消息的最终回答文本：最后一个 content section；无 sections 回退 content 字段 */
+/**
+ * assistant 消息的最终回答文本：最后一个 content section；无 sections 回退 content 字段
+ *
+ * @param m - 待取回答的展示消息；通常是紧随 user 的那条 assistant。
+ * @returns 最终回答文本；既无非空 content section 又无 content 时返回 undefined。
+ */
 function finalAnswerOf(m: DisplayMessage): string | undefined {
   const sections = m.sections
   if (!sections || sections.length === 0) return m.content || undefined
@@ -27,7 +32,12 @@ function finalAnswerOf(m: DisplayMessage): string | undefined {
   return m.content || undefined
 }
 
-/** 该轮工具调用数：tool_group.tools + reason 内嵌 tool items（sub_agent 的委派调用已含在 tool_group 内） */
+/**
+ * 该轮工具调用数：tool_group.tools + reason 内嵌 tool items（sub_agent 的委派调用已含在 tool_group 内）
+ *
+ * @param sections - 该轮 assistant 消息的分区列表；只统计 tool_group 与 reason 两类。
+ * @returns 工具调用总数；为 0 表示该轮没有任何工具调用。
+ */
 function toolCountOf(sections: MessageSection[]): number {
   let n = 0
   for (const s of sections) {

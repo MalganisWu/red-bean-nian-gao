@@ -7,7 +7,9 @@ import { notAuthorizedError } from './../task-sql.js'
 
 /** PostgreSQL 用户执行阅读状态仓储；所有写入都同时校验 Task 所有权。 */
 export class PostgresExecutionViewStateRepository implements ExecutionViewStateRepository {
+  /** 支持事务的 SQL 执行器；读与 upsert 都经它查询。 */
   readonly #database: TransactionalSqlExecutor
+  /** 时钟注入点；已读时间与更新时间统一取它，保证同一 upsert 内时间一致。 */
   readonly #now: () => Date
 
   public constructor(database: TransactionalSqlExecutor, now: () => Date = (): Date => new Date()) {

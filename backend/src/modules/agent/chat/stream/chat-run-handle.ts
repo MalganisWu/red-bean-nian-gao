@@ -14,13 +14,27 @@ export type ChatRunResult =
  * 一次 Chat 运行的资源句柄。事件消费、后台完成和主动关闭是三个独立生命周期。
  */
 export interface ChatRunHandle extends AsyncIterable<ProductStreamEvent> {
+  /** 本次运行标识，同时也是取消注册表里的 requestId。 */
   readonly runId: string
+  /** 该运行归属的会话标识，用于把事件与恢复缓冲写回同一会话。 */
   readonly sessionId: string
+  /** 事件消费入口；与 `close`/完成配合，队列 drained 后再发的事件会被静默丢弃。 */
   readonly events: AsyncIterable<ProductStreamEvent>
+  /** 运行结局；由生产者在收尾动作全部落地后结算，`close()` 会等待它。 */
   readonly completion: Promise<ChatRunResult>
+  /**
+   * 主动关闭运行并等待其收尾落地；重复关闭只记首个原因。
+   *
+   * @param reason - 首个关闭原因；后续重复关闭不会覆盖它。
+   */
   close(reason: ChatRunCloseReason): Promise<void>
 }
 
+/**
+ * 事件队列默认容量（512）。
+ * 取这个量级是为了在生产者比消费者快时吸收正常抖动，又不让积压无限增长；
+ * 溢出会被当作故障信号转为整次运行失败，而非静默丢帧。
+ */
 const DEFAULT_EVENT_CAPACITY = 512
 
 /** Agent Run Service 使用的默认句柄；Controller 只依赖上面的公开接口。 */
@@ -36,10 +50,15 @@ export class ManagedChatRunHandle implements ChatRunHandle {
   /** 运行取消信号；合并了父信号与内部控制器，任一侧中止都会触发。 */
   public readonly signal: AbortSignal
 
+  /** 底层事件队列；`events` 直接暴露它的异步迭代能力。 */
   readonly #queue: RunEventQueue<ProductStreamEvent>
+  /** 内部中止控制器；与父信号合并成运行取消信号。 */
   readonly #controller = new AbortController()
+  /** 结算 `completion` 的回调；由生产者收尾时调用。 */
   readonly #resolveCompletion: (result: ChatRunResult) => void
+  /** 是否已结算；置真后 publish/complete/fail/close 都变为安全空操作。 */
   #settled = false
+  /** 首个关闭原因；决定最终结局是否报告为 cancelled。 */
   #closeReason: ChatRunCloseReason | undefined
 
   public constructor(

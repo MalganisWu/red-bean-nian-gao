@@ -55,6 +55,11 @@ export function fromRuntimeMessages(messages: readonly RawMessage[]): AgentMessa
   return messages.map(fromRuntimeMessage)
 }
 
+/**
+ * 单条工具调用入站映射：把产品域 call 转成 SDK 形状，逐字段重建，结果不与入参共享引用。
+ * @param call 产品域工具调用
+ * @returns SDK 侧的工具调用对象
+ */
 function toRuntimeToolCall(call: AgentToolCall): NonNullable<RawMessage['toolCalls']>[number] {
   return {
     ...optionalField('index', call.index),
@@ -64,6 +69,11 @@ function toRuntimeToolCall(call: AgentToolCall): NonNullable<RawMessage['toolCal
   }
 }
 
+/**
+ * 单条工具调用出站映射：把 SDK 形状转回产品域 call，逐字段重建，结果不与 SDK 侧共享引用。
+ * @param call SDK 侧工具调用对象
+ * @returns 产品域工具调用
+ */
 function fromRuntimeToolCall(call: NonNullable<RawMessage['toolCalls']>[number]): AgentToolCall {
   return {
     ...optionalField('index', call.index),

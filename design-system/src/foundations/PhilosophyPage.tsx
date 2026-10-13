@@ -1,6 +1,12 @@
 import { downloadDesignPhilosophyMarkdown } from './philosophyMarkdown'
 import './PhilosophyPage.css'
 
+/**
+ * 四条设计原则：`{ title, body }`，按优先级排序。
+ *
+ * 内容先于界面、灰阶负责层级、颜色只说一件事、过程连续且可验证；后续章节的图例与可下载文档
+ * 都由这几条派生，出现分歧时以本数组为准。
+ */
 const PRINCIPLES = [
   {
     title: '内容先于界面',
@@ -20,6 +26,12 @@ const PRINCIPLES = [
   },
 ] as const
 
+/**
+ * 短提示式的唯一口径表：`[标签, 规则]`。
+ *
+ * 覆盖 Theme / Type / Color / Surface / Process / Approval 六个维度，每条给一句可执行约束，
+ * 供设计与实现快速对齐；它不是穷举规范，只承担「不跑偏」的最小共识。
+ */
 const RULES = [
   ['Theme', 'Light 默认；用户切换后持久化。Dark 与 Light 只替换语义 token。'],
   ['Type', '无衬线正体为默认；等宽只给工具名、命令、路径、参数与结果；字重仅 400 / 500 / 600。'],

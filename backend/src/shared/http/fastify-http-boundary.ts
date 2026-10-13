@@ -24,56 +24,88 @@ import {
   rateLimitError,
 } from './error-mapper.js'
 
+/** JSON 请求体的默认大小上限（1 MiB）；超限由解析器在进入业务前直接拒绝为 413。 */
 const DEFAULT_JSON_BODY_LIMIT = 1 << 20
+/** 固定窗口限流的默认窗口长度，毫秒。 */
 const DEFAULT_RATE_LIMIT_WINDOW_MILLISECONDS = 60_000
+/** 请求 ID 的 header 名；Fastify 用它读写 request id。 */
 const REQUEST_ID_HEADER = 'x-request-id'
+/** trace ID 的回写 header 名，取值与 `requestTraceId` 一致。 */
 const TRACE_ID_HEADER = 'x-trace-id'
 
 /** 从入站 header 抽出的 trace 上下文；字段名与 W3C traceparent 对齐。 */
 export interface ExtractedTraceContext {
+  /** 本次请求的 trace ID；为空串时由服务端另生成。 */
   readonly traceId: string
+  /** 上游 span ID；缺省表示没有上游。 */
   readonly parentSpanId: string
+  /** W3C trace-flags 位；缺省表示上游未提供。 */
   readonly traceFlags?: number | undefined
+  /** W3C tracestate 透传串；缺省表示上游未提供。 */
   readonly traceState?: string | undefined
 }
 
 /** 外部 trace header 的解析端口；默认实现为 `W3CTraceContextExtractor`。 */
 export interface TraceContextExtractorPort {
+  /**
+   * 从入站 header 解析 trace 上下文；只负责读取，不生成、不写入。
+   * @param headers - 入站请求头。
+   * @returns 解析出的 trace 上下文；header 中没有可识别信息时为 undefined。
+   */
   extract(headers: IncomingHttpHeaders): ExtractedTraceContext | undefined
 }
 
 /** 建 server 的选项；除 `idGenerator` 外全可注入，测试因此能替换 tracer、trace 提取器与 CORS 白名单。 */
 export interface HttpServerOptions {
+  /** 请求 ID 生成器；必有，用作 Fastify 的 `genReqId`。 */
   readonly idGenerator: IdGenerator
+  /** CORS 白名单，逗号分隔；缺省不放行任何跨域来源，`*` 表示全放行。 */
   readonly corsOrigins?: string | undefined
+  /** JSON 请求体大小上限（字节）；缺省取 `DEFAULT_JSON_BODY_LIMIT`。 */
   readonly jsonBodyLimit?: number | undefined
+  /** Fastify 日志选项；缺省关闭日志。 */
   readonly logger?: FastifyServerOptions['logger'] | undefined
+  /** 观测实现；缺省用 `NoopTracer`，业务代码因此不必判空。 */
   readonly tracer?: TracerPort | undefined
+  /** trace ID 生成函数；缺省用随机 16 字节 hex。 */
   readonly traceIdGenerator?: (() => string) | undefined
+  /** 外部 trace header 解析器；缺省不从 header 继承 trace 上下文。 */
   readonly traceContextExtractor?: TraceContextExtractorPort | undefined
 }
 
+/** 单个限流键在窗口内的计数与窗口起点。 */
 interface FixedWindowEntry {
+  /** 当前窗口内已累计的请求数。 */
   count: number
+  /** 当前窗口的起始时刻，epoch 毫秒。 */
   windowStartedAt: number
 }
 
 /** 限流参数；`now` 可注入，测试因此不必真的等满一个窗口。 */
 export interface FixedWindowRateLimiterOptions {
+  /** 单个窗口内允许的最大请求数。 */
   readonly limit: number
+  /** 窗口长度，毫秒。 */
   readonly windowMilliseconds: number
+  /** 当前时刻来源；可注入，测试因此不必真的等满一个窗口。 */
   readonly now?: (() => number) | undefined
 }
 
+/** 一次限流判定的结果。 */
 interface RateLimitDecision {
+  /** 是否放行本次请求。 */
   readonly allowed: boolean
+  /** 被拒时建议客户端等待的秒数；放行时为 0。 */
   readonly retryAfterSeconds: number
 }
 
 /** trace 钩子依赖；由 `createHttpServer` 从选项解析后一次性预构建，避免在注册处现场组装。 */
 interface TraceHookDependencies {
+  /** 外部 trace 上下文解析器；缺省表示不继承上游 trace 上下文。 */
   readonly extractor: TraceContextExtractorPort | undefined
+  /** 生成新 trace ID 的函数；header 里没有可用 trace ID 时使用。 */
   readonly generateTraceId: () => string
+  /** 观测实现；恒有实例，业务代码不必判空。 */
   readonly tracer: TracerPort
 }
 
@@ -83,9 +115,13 @@ interface TraceHookDependencies {
  * 既不需要在 onResponse 里逐个清理（下面那些 delete 只是为了及时释放大对象），
  * 也不会让并发请求之间串状态。
  */
+/** 请求 → trace ID；请求结束、无其它引用后条目自动回收。 */
 const requestTraceIds = new WeakMap<FastifyRequest, string>()
+/** 请求 → `http.request` span；onResponse 收尾时需要用它。 */
 const requestSpans = new WeakMap<FastifyRequest, TraceSpan>()
+/** 请求 → onError 暂存的错误，供 onResponse 收尾 span 时取用。 */
 const requestErrors = new WeakMap<FastifyRequest, Error>()
+/** 请求 → 取消控制器；断连或客户端取消时据此中止全链路。 */
 const requestAbortControllers = new WeakMap<FastifyRequest, AbortController>()
 /** 没有 AbortController 时的兜底信号：永不会中止，避免调用方到处判空。 */
 const NEVER_ABORTED_SIGNAL = new AbortController().signal
@@ -165,6 +201,10 @@ export function createHttpServer(options: HttpServerOptions): FastifyInstance {
 /**
  * onRequest 钩子 #1：建立请求级取消信号（断连 → 全链路取消）、写入 request id，
  * 并按 CORS 白名单放行或短路 OPTIONS。
+ * @param request - 当前 Fastify 请求。
+ * @param reply - 当前 Fastify 响应；取消信号绑定在它上面，CORS 头与 204 短路由它写出。
+ * @param allowedOrigins - 允许跨域的来源白名单；空数组表示不放行任何跨域来源。
+ * @param allowAllOrigins - 是否为「全放行」模式（白名单恰为 `*`）。
  */
 async function beginRequestContext(
   request: FastifyRequest,
@@ -213,7 +253,13 @@ async function beginRequestContext(
   if (request.method === 'OPTIONS') await reply.status(204).send()
 }
 
-/** onRequest 钩子 #2：提取或生成 trace ID，起 `http.request` span，并在其异步上下文里放行后续处理。 */
+/**
+ * onRequest 钩子 #2：提取或生成 trace ID，起 `http.request` span，并在其异步上下文里放行后续处理。
+ * @param request - 当前 Fastify 请求。
+ * @param reply - 当前 Fastify 响应；trace ID 会回写到响应头。
+ * @param done - Fastify 的钩子完成回调；在 span 上下文里被调用。
+ * @param dependencies - 预构建的 trace 钩子依赖（提取器、trace ID 生成器与 tracer）。
+ */
 function attachTraceContext(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -265,7 +311,12 @@ function attachTraceContext(
   })
 }
 
-/** onError 钩子：暂存本次请求的错误，供 onResponse 收尾 span 时取用。 */
+/**
+ * onError 钩子：暂存本次请求的错误，供 onResponse 收尾 span 时取用。
+ * @param request - 当前 Fastify 请求；错误会按它暂存。
+ * @param error - 本次请求抛出的错误。
+ * @param done - Fastify 的钩子完成回调。
+ */
 function recordRequestError(
   request: FastifyRequest,
   error: Error,
@@ -275,7 +326,12 @@ function recordRequestError(
   done()
 }
 
-/** onResponse 钩子：收尾 `http.request` span（补 route 与状态码）并释放请求级引用。 */
+/**
+ * onResponse 钩子：收尾 `http.request` span（补 route 与状态码）并释放请求级引用。
+ * @param request - 当前 Fastify 请求。
+ * @param reply - 当前 Fastify 响应；从中取状态码写入 span 属性。
+ * @param done - Fastify 的钩子完成回调。
+ */
 function finishRequestSpan(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -296,7 +352,13 @@ function finishRequestSpan(
   done()
 }
 
-/** setErrorHandler 处理器：把任意错误归一化为错误信封，并按「是否预期」分层记录日志。 */
+/**
+ * setErrorHandler 处理器：把任意错误归一化为错误信封，并按「是否预期」分层记录日志。
+ * @param error - 任意抛出的错误；未知错误一律降级为通用 500，不外泄内部细节。
+ * @param request - 当前 Fastify 请求；日志按它记录路径。
+ * @param reply - 当前 Fastify 响应；错误信封由它写出。
+ * @param jsonBodyLimit - JSON 请求体上限（字节），用于 body 超限时的提示文案。
+ */
 function handleRequestError(
   error: unknown,
   request: FastifyRequest,
@@ -338,10 +400,15 @@ export function requestAbortSignal(request: FastifyRequest): AbortSignal {
 
 /** 单实例固定窗口限流器；需要全局配额时由网关或 Redis adapter 替代。 */
 export class FixedWindowRateLimiter {
+  /** 键（客户端 IP）→ 窗口计数；过期条目在判定时惰性清理。 */
   readonly #entries = new Map<string, FixedWindowEntry>()
+  /** 单个窗口内允许的最大请求数。 */
   readonly #limit: number
+  /** 窗口长度，毫秒。 */
   readonly #windowMilliseconds: number
+  /** 当前时刻来源；可注入以便测试不必真的等满窗口。 */
   readonly #now: () => number
+  /** 上次惰性清理的时刻，epoch 毫秒。 */
   #lastCleanup: number
 
   public constructor(options: FixedWindowRateLimiterOptions) {
@@ -369,6 +436,12 @@ export class FixedWindowRateLimiter {
     return rateLimitGuard
   }
 
+  /**
+   * 判定某键在本窗口内是否放行，并按需惰性清理过期条目。
+   * @param key - 限流键，当前实现传客户端 IP。
+   * @param now - 当前时刻，epoch 毫秒；由调用方传入以便测试。
+   * @returns 本次判定结果：是否放行，以及被拒时建议客户端等待的秒数。
+   */
   private allow(key: string, now: number): RateLimitDecision {
     /*
      * 惰性清理而不是定时器：只在「距上次清理超过一个窗口」时才扫一遍，
@@ -401,6 +474,12 @@ export class FixedWindowRateLimiter {
   }
 }
 
+/**
+ * 覆写 Fastify 的 JSON 解析器：改用以字符串读取并强制 bodyLimit 的解析器，使超限在进入业务前
+ * 就被拒（413）；同时接管 `application/*+json` 这类子类型，避免它们绕过大小限制。
+ * @param server - 目标 Fastify 实例。
+ * @param bodyLimit - JSON 请求体大小上限（字节）。
+ */
 function configureContentTypes(server: FastifyInstance, bodyLimit: number): void {
   const parser = server.getDefaultJsonParser('error', 'error')
   server.removeContentTypeParser('application/json')
@@ -412,6 +491,13 @@ function configureContentTypes(server: FastifyInstance, bodyLimit: number): void
   )
 }
 
+/**
+ * 把任意错误归一化为可对外返回的 `AppError`：`AppError` 原样透传，body 超限映射为 413，
+ * 其余未知错误一律经 `loggedInternalError` 降级为通用 500 —— 未知错误的信息不外泄。
+ * @param error - 任意抛出的错误。
+ * @param jsonBodyLimit - 用于生成超限提示文案的字节上限。
+ * @returns 可安全对外返回的 `AppError`。
+ */
 function normalizeHttpError(error: unknown, jsonBodyLimit: number): AppError {
   if (error instanceof AppError) return error
   if (hasErrorCode(error, 'FST_ERR_CTP_BODY_TOO_LARGE')) {
@@ -420,10 +506,21 @@ function normalizeHttpError(error: unknown, jsonBodyLimit: number): AppError {
   return loggedInternalError('unhandled error', error)
 }
 
+/**
+ * 判断错误对象是否带有指定 code；用于识别 Fastify 的框架错误（如 body 超限）。
+ * @param error - 待检查的错误。
+ * @param expected - 期望的 code 值。
+ * @returns 错误是 `Error` 且其 `code` 与期望一致时为 true，否则 false。
+ */
 function hasErrorCode(error: unknown, expected: string): boolean {
   return error instanceof Error && 'code' in error && error.code === expected
 }
 
+/**
+ * 解析逗号分隔的 CORS 白名单，剔除空项与首尾空白。
+ * @param value - 逗号分隔的来源串；空串得到空数组。
+ * @returns 去空后的来源列表；空数组表示不放行任何跨域来源。
+ */
 function parseOrigins(value: string): readonly string[] {
   return value
     .split(',')
@@ -431,14 +528,29 @@ function parseOrigins(value: string): readonly string[] {
     .filter((origin): boolean => origin !== '')
 }
 
+/**
+ * 取 header 的首个值；同名 header 出现多次时 Fastify 给的是数组，这里统一取第一个。
+ * @param value - header 的原始值，可能是字符串、字符串数组或 undefined。
+ * @returns 首个字符串值；缺失时为 undefined。
+ */
 function firstHeader(value: string | readonly string[] | undefined): string | undefined {
   return typeof value === 'string' ? value : value?.[0]
 }
 
+/**
+ * 取正整数，否则回落到默认值；用于把外部传入的限额参数收窄为安全值。
+ * @param value - 候选值；非安全整数或非正数都算无效。
+ * @param fallback - 无效时使用的默认值。
+ * @returns 有效的正安全整数，或 `fallback`。
+ */
 function positiveInteger(value: number | undefined, fallback: number): number {
   return value !== undefined && Number.isSafeInteger(value) && value > 0 ? value : fallback
 }
 
+/**
+ * 生成一个 trace ID：16 字节随机数的 hex 串。
+ * @returns 新的 trace ID 字符串。
+ */
 function generateTraceId(): string {
   return randomBytes(16).toString('hex')
 }

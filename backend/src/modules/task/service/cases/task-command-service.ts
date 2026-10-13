@@ -15,8 +15,11 @@ import {
 
 /** 命令用例依赖；`queryRepository` 只收窄到所有权校验真正用到的两个方法。 */
 export interface TaskCommandServiceDependencies {
+  /** 写路径仓储：启停、软删除、租约内的执行落库都走它。 */
   readonly commandRepository: TaskCommandRepository
+  /** 只读校验用仓储；刻意收窄到所有权与存在性校验真正调用的两个方法。 */
   readonly queryRepository: Pick<TaskQueryRepository, 'getTask' | 'getExecutionById'>
+  /** 已读/折叠偏好仓储；仅在 updateViewState 落库时使用。 */
   readonly viewStateRepository: ExecutionViewStateRepository
 }
 
@@ -26,6 +29,7 @@ export interface TaskCommandServiceDependencies {
  * 仓储层异常一律翻译为基础设施失败（infrastructureFailure），不向外泄漏 SQL 细节。
  */
 export class TaskCommandService {
+  /** 命令用例依赖；由构造器注入，服务本身不创建仓储。 */
   readonly #dependencies: TaskCommandServiceDependencies
 
   public constructor(dependencies: TaskCommandServiceDependencies) {
@@ -121,7 +125,14 @@ export class TaskCommandService {
     }
   }
 
-  /** 读取任务并校验归属：查不到 → NOT_FOUND；查到但非本人 → FORBIDDEN。 */
+  /**
+   * 读取任务并校验归属：查不到 → NOT_FOUND；查到但非本人 → FORBIDDEN。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param taskId - 目标任务标识。
+   * @param signal - 取消信号，透传到仓储查询。
+   * @returns 归属校验通过的任务定义。
+   */
   private async ownedTask(
     userId: string,
     taskId: string,
@@ -140,6 +151,14 @@ export class TaskCommandService {
   }
 }
 
+/**
+ * 把仓储层异常翻译为应用层错误：已知错误码分别映射为 NOT_FOUND / FORBIDDEN，
+ * 其余（含任意底层异常）统一收敛为基础设施失败，不向外泄漏 SQL 细节。
+ *
+ * @param cause - 被捕获的未知异常，通常来自仓储写入。
+ * @param message - 收敛为基础设施失败时使用的操作文案。
+ * @returns 已翻译的应用层错误。
+ */
 function mapRepositoryFailure(cause: unknown, message: string): TaskApplicationError {
   if (cause instanceof TaskRepositoryError) {
     if (cause.code === TASK_REPOSITORY_ERROR_CODES.NOT_FOUND) {

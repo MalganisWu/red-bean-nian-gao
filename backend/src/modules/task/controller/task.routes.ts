@@ -101,7 +101,13 @@ export function registerTaskRoutes(
   })
 }
 
-/** GET /api/tasks：游标分页列出当前用户的任务。 */
+/**
+ * GET /api/tasks：游标分页列出当前用户的任务。
+ *
+ * @param controller - 任务用例控制器，返回已投影的列表 DTO。
+ * @param request - Fastify 请求；用户取自认证 Principal，query 交由 parser 校验。
+ * @param reply - Fastify 响应；成功信封在此写入。
+ */
 async function listTasks(
   controller: TaskController,
   request: FastifyRequest,
@@ -121,7 +127,13 @@ async function listTasks(
   )
 }
 
-/** GET /api/task-execution-view-states：按 execution_ids 批量取当前用户的视图状态。 */
+/**
+ * GET /api/task-execution-view-states：按 execution_ids 批量取当前用户的视图状态。
+ *
+ * @param controller - 任务用例控制器，按执行 ID 批量返回视图状态。
+ * @param request - Fastify 请求；execution_ids 由 parser 去重并限流，用户取自认证 Principal。
+ * @param reply - Fastify 响应；成功信封在此写入。
+ */
 async function listExecutionViewStates(
   controller: TaskController,
   request: FastifyRequest,
@@ -139,7 +151,13 @@ async function listExecutionViewStates(
   )
 }
 
-/** GET /api/tasks/:id：读取当前用户单个任务的详情。 */
+/**
+ * GET /api/tasks/:id：读取当前用户单个任务的详情。
+ *
+ * @param controller - 任务用例控制器，越权与不存在都映射为同一条 404。
+ * @param request - Fastify 请求；路径参数由 parser 校验，用户取自认证 Principal。
+ * @param reply - Fastify 响应；成功信封在此写入。
+ */
 async function getTaskDetail(
   controller: TaskController,
   request: FastifyRequest,
@@ -157,7 +175,13 @@ async function getTaskDetail(
   )
 }
 
-/** PUT /api/tasks/:id：按 DTO 更新当前用户的单个任务。 */
+/**
+ * PUT /api/tasks/:id：按 DTO 更新当前用户的单个任务。
+ *
+ * @param controller - 任务用例控制器，写前校验任务所有权。
+ * @param request - Fastify 请求；路径参数与 body 分别由 parser 校验，用户取自认证 Principal。
+ * @param reply - Fastify 响应；成功信封在此写入。
+ */
 async function updateTask(
   controller: TaskController,
   request: FastifyRequest,
@@ -176,7 +200,13 @@ async function updateTask(
   )
 }
 
-/** DELETE /api/tasks/:id：软删除当前用户的单个任务。 */
+/**
+ * DELETE /api/tasks/:id：软删除当前用户的单个任务。
+ *
+ * @param controller - 任务用例控制器，只置停用标记、不物理删除。
+ * @param request - Fastify 请求；路径参数由 parser 校验，用户取自认证 Principal。
+ * @param reply - Fastify 响应；成功信封在此写入。
+ */
 async function deleteTask(
   controller: TaskController,
   request: FastifyRequest,
@@ -194,7 +224,13 @@ async function deleteTask(
   )
 }
 
-/** GET /api/tasks/:id/executions：游标分页列出该任务的执行记录。 */
+/**
+ * GET /api/tasks/:id/executions：游标分页列出该任务的执行记录。
+ *
+ * @param controller - 任务用例控制器，先校验任务归属再分页取执行历史。
+ * @param request - Fastify 请求；路径参数与分页 query 由 parser 校验，用户取自认证 Principal。
+ * @param reply - Fastify 响应；成功信封在此写入。
+ */
 async function listTaskExecutions(
   controller: TaskController,
   request: FastifyRequest,
@@ -215,7 +251,13 @@ async function listTaskExecutions(
   )
 }
 
-/** GET /api/tasks/:id/executions/:eid：读取单条执行记录的详情。 */
+/**
+ * GET /api/tasks/:id/executions/:eid：读取单条执行记录的详情。
+ *
+ * @param controller - 任务用例控制器，任务/执行不存在与越权都收敛到 404。
+ * @param request - Fastify 请求；组合路径参数由 parser 校验，用户取自认证 Principal。
+ * @param reply - Fastify 响应；成功信封在此写入。
+ */
 async function getExecutionDetail(
   controller: TaskController,
   request: FastifyRequest,
@@ -235,7 +277,13 @@ async function getExecutionDetail(
   )
 }
 
-/** PUT /api/tasks/:id/executions/:eid/view-state：更新单条执行记录的视图状态。 */
+/**
+ * PUT /api/tasks/:id/executions/:eid/view-state：更新单条执行记录的视图状态。
+ *
+ * @param controller - 任务用例控制器，按所有权 → 执行存在性 → upsert 顺序校验。
+ * @param request - Fastify 请求；路径参数与 PATCH body 由 parser 校验，用户取自认证 Principal。
+ * @param reply - Fastify 响应；成功信封在此写入。
+ */
 async function updateExecutionViewState(
   controller: TaskController,
   request: FastifyRequest,
@@ -256,7 +304,13 @@ async function updateExecutionViewState(
   )
 }
 
-/** GET /api/sessions/:id/tasks：列出某个会话下的全部任务。 */
+/**
+ * GET /api/sessions/:id/tasks：列出某个会话下的全部任务。
+ *
+ * @param controller - 任务用例控制器，结果同时按用户过滤，越权会话返回空列表。
+ * @param request - Fastify 请求；会话 ID 由 parser 校验，用户取自认证 Principal。
+ * @param reply - Fastify 响应；成功信封在此写入。
+ */
 async function listSessionTasks(
   controller: TaskController,
   request: FastifyRequest,

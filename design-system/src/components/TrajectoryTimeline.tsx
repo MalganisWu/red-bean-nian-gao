@@ -40,9 +40,13 @@ export interface TrajectoryTimelineProps {
   onRangeFocus?: ((idsInRange: ReadonlySet<string> | null) => void) | undefined
 }
 
+/** 泳道段的定位结果（百分比域），四条泳道共享同一坐标系。 */
 interface Positioned {
+  /** 记录 id；与选中态、区域聚焦集合比对用。 */
   id: string
+  /** 段左边界占轨道的百分比（0–100）。 */
   left: number
+  /** 段宽度占轨道的百分比；最小 0.9，保证极短事件仍可点。 */
   width: number
 }
 
@@ -50,6 +54,11 @@ interface Positioned {
  * 计算全局位置表：时序模式下活动段宽度 ∝ 真实耗时、超过 2s 的空档折叠为 2.5s 等效窄缝；
  * 序列模式下全部记录等宽按序。四条泳道共享同一 x 轴，同一列 ≈ 同一时刻附近。
  * 请求子记录不占泳道，但继承所属步骤的位置（供区域选择的淡隐判断）。
+ *
+ * @param turns - 会话的轮次数据，逐条记录提供时刻与耗时。
+ * @param compaction - 会话级压缩事件；缺省时压缩段不计入位置表。
+ * @param mode - 投影模式，`time` 按时长、`seq` 等宽按序。
+ * @returns 记录 id（含尝试 id）到段位置的映射。
  */
 function computePositions(
   turns: TrajectoryTurn[],
@@ -105,7 +114,14 @@ function computePositions(
   return pos
 }
 
-/** 位置表的记忆化入口：同一组输入只重算一次。 */
+/**
+ * 位置表的记忆化入口：同一组输入只重算一次。
+ *
+ * @param turns - 会话的轮次数据。
+ * @param compaction - 会话级压缩事件；缺省时不参与投影。
+ * @param mode - 投影模式，`time` 按时长、`seq` 等宽按序。
+ * @returns 记录 id 到段位置的映射（与 computePositions 同构）。
+ */
 function usePositions(
   turns: TrajectoryTurn[],
   compaction: TrajectoryCompaction | undefined,
@@ -114,7 +130,13 @@ function usePositions(
   return useMemo(() => computePositions(turns, compaction, mode), [turns, compaction, mode])
 }
 
-/** 把区间聚焦结果通告给消费方：没有回调或没有区间时通告 null。 */
+/**
+ * 把区间聚焦结果通告给消费方：没有回调或没有区间时通告 null。
+ *
+ * @param positions - 位置表；用于与选区求交。
+ * @param rangeSel - 当前拖选区间（百分比域）；null 表示无选区。
+ * @param onRangeFocus - 消费方回调；缺省时不通告（消费方未启用聚焦）。
+ */
 function publishRangeFocus(
   positions: Map<string, Positioned>,
   rangeSel: { l: number; r: number } | null,
@@ -134,7 +156,12 @@ function publishRangeFocus(
   onRangeFocus(ids)
 }
 
-/** 绑定 Esc 复位选区；返回解绑函数。 */
+/**
+ * 绑定 Esc 复位选区；返回解绑函数。
+ *
+ * @param clearRange - 按下 Esc 时执行的复位回调。
+ * @returns 解绑监听器的函数，供 effect 卸载时调用。
+ */
 function bindEscapeReset(clearRange: () => void): () => void {
   function handleEscapeKey(event: KeyboardEvent): void {
     if (event.key === 'Escape') clearRange()
@@ -143,7 +170,12 @@ function bindEscapeReset(clearRange: () => void): () => void {
   return () => window.removeEventListener('keydown', handleEscapeKey)
 }
 
-/** 把单条泳道轨道的水平缩放原点对齐到指针位置。 */
+/**
+ * 把单条泳道轨道的水平缩放原点对齐到指针位置。
+ *
+ * @param track - 目标泳道轨道元素；非 HTMLElement 时静默跳过。
+ * @param originPct - 缩放原点在轨道内的百分比（0–100）。
+ */
 function alignTrackOrigin(track: Element, originPct: number): void {
   if (!(track instanceof HTMLElement)) return
   track.style.transformOrigin = `${originPct}% center`
@@ -152,6 +184,10 @@ function alignTrackOrigin(track: Element, originPct: number): void {
 /**
  * 绑定 Ctrl/⌘+滚轮缩放（必须 non-passive 监听才能 preventDefault）；
  * 宿主尚未挂载时不绑定，返回解绑函数。
+ *
+ * @param host - 泳道容器；null 表示宿主尚未挂载，此时不绑定。
+ * @param applyZoom - 更新缩放倍率的 setter（函数式更新，避免闭包读到旧值）。
+ * @returns 解绑监听器的函数；宿主缺省时返回 undefined。
  */
 function bindWheelZoom(
   host: HTMLDivElement | null,
@@ -175,6 +211,13 @@ function bindWheelZoom(
   return () => laneHost.removeEventListener('wheel', handleWheelZoom)
 }
 
+/**
+ * 泳道段的填色：身份由色相承担（用户品牌色、调用中性、工具分类色、子 Agent 软底描边），
+ * 失败统一覆盖为危险色，两套主题下都取语义 token，不写死色值。
+ *
+ * @param r - 待渲染的记录。
+ * @returns 表达身份的 Tailwind 类名。
+ */
 function segClass(r: TrajectoryRecord): string {
   if (r.kind === 'user') return 'bg-brand-indicator'
   if (r.kind === 'call') return 'bg-foreground-faint'
@@ -183,6 +226,12 @@ function segClass(r: TrajectoryRecord): string {
   return 'bg-cat-tool-indicator'
 }
 
+/**
+ * 泳道段的可读标签：供 aria-label 与 title 使用，颜色之外再给一层身份线索（可达性）。
+ *
+ * @param r - 待渲染的记录。
+ * @returns 面向用户的中文标签，失败段带「· 失败」后缀。
+ */
 function segLabel(r: TrajectoryRecord): string {
   if (r.kind === 'user') return '用户'
   if (r.kind === 'call') return 'LLM 调用'
@@ -440,7 +489,13 @@ export function TrajectoryTimeline(props: TrajectoryTimelineProps) {
   )
 }
 
-/** 区间相交判断（位置表百分比域）。 */
+/**
+ * 区间相交判断（位置表百分比域）。
+ *
+ * @param p - 段的位置；undefined 表示该记录未投影到位置表，判为不在区间内。
+ * @param sel - 拖选区间（百分比域）。
+ * @returns 段与选区有重叠时为 true。
+ */
 function isInRange(p: Positioned | undefined, sel: { l: number; r: number }): boolean {
   if (!p) return false
   return p.left + p.width >= sel.l && p.left <= sel.r

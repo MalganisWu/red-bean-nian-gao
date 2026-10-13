@@ -32,6 +32,9 @@ import type {
 } from '../port/session-run-service.port.js'
 import { optionalField } from '../../../../../shared/object/optional-field.js'
 
+/**
+ * 提问工具名；恢复时据此识别「上次中断留下的悬挂提问调用」，必须与 `AskUserTool.name` 保持一致。
+ */
 const ASK_USER_TOOL_NAME = 'sys_ask_user'
 
 /**
@@ -44,8 +47,11 @@ const ASK_USER_TOOL_NAME = 'sys_ask_user'
  * 运行中断时 generation 保留，作为下次加载的恢复来源。
  */
 export class SessionLifecycle implements SessionRunServicePort {
+  /** 会话仓储；负责所有权校验、revision CAS 与 fencing 推进。 */
   readonly #repository: SessionRepository
+  /** 恢复缓冲；承载运行中断后仍可续上的增量消息。 */
   readonly #buffer: MessageBuffer
+  /** 会话锁注册表；缺省表示单实例或测试环境，加载时不做跨实例互斥。 */
   readonly #locks: SessionLockRegistry | undefined
 
   public constructor(
@@ -165,7 +171,13 @@ export class SessionLifecycle implements SessionRunServicePort {
     }
   }
 
-  /** 获取 session 锁：LOCK_CONFLICT 翻译为"他人处理中"的用户可读错误，其余失败按基础设施错误上抛。 */
+  /**
+   * 获取 session 锁：LOCK_CONFLICT 翻译为"他人处理中"的用户可读错误，其余失败按基础设施错误上抛。
+   *
+   * @param request - 本次运行的入参，取其会话与请求标识用于抢锁。
+   * @param signal - 取消信号，透传到抢锁调用。
+   * @returns 拿到的租约；未配置锁时返回 undefined，加载流程照常继续。
+   */
   async #acquire(
     request: SessionLoadRequest,
     signal: AbortSignal
@@ -187,6 +199,10 @@ export class SessionLifecycle implements SessionRunServicePort {
    * 完成路径：展示消息按"是否回答卡片"合并，runtimeState 覆盖保存；
    * repository.save 以 revision CAS 守卫（冲突即失败），成功后才清除 buffer generation——
    * 崩溃在 save 之前的话，增量消息仍留在 buffer 里可恢复。
+   *
+   * @param state - `load` 产出的运行状态，带 checkpoint 基准 revision 与 fencing 令牌。
+   * @param outcome - 本次执行结果，含要落库的运行时状态与展示消息。
+   * @param signal - 取消信号，透传到仓储保存与缓冲清理。
    */
   async #saveCompleted(
     state: SessionRunState,
@@ -218,6 +234,10 @@ export class SessionLifecycle implements SessionRunServicePort {
   /**
    * 恢复路径（执行失败/中断）：buffer 无增量且无 answer 时无可恢复内容，清空即返回；
    * 否则保存部分进展（runtimeState + 用户输入），失败消息仍以 buffer generation 保留。
+   *
+   * @param state - `load` 产出的运行状态，带 checkpoint 基准 revision 与 fencing 令牌。
+   * @param outcome - 本次执行结果，含要落库的部分运行时状态与展示消息。
+   * @param signal - 取消信号，透传到仓储保存与缓冲清理。
    */
   async #saveRecovery(
     state: SessionRunState,
@@ -253,16 +273,37 @@ export class SessionLifecycle implements SessionRunServicePort {
   }
 }
 
-/** generation = revision + 锁的 writeProof：writeProof 区分同一 revision 下不同持有者的写入域。 */
+/**
+ * generation = revision + 锁的 writeProof：writeProof 区分同一 revision 下不同持有者的写入域。
+ * 加载与保存必须用同一份 generation，否则恢复时读不到上次运行留下的增量消息。
+ *
+ * @param revision - 进入本次加载时的会话 revision，作为 buffer generation 与保存 CAS 的基准。
+ * @param writeProof - 锁持有者标识；无锁（如内存仓库）时为 undefined。
+ * @returns 本轮的 buffer generation。
+ */
 function sessionGeneration(revision: bigint, writeProof?: string): MessageBufferGeneration {
   return { revision, ...optionalField('writeProof', writeProof) }
 }
 
+/**
+ * 由运行状态还原本轮的 buffer generation，供保存路径清除 generation 时使用。
+ * 必须与 `load` 写入时的 generation 同源，否则清除会落空、增量消息残留在 buffer 里。
+ *
+ * @param state - `load` 产出的运行状态。
+ * @returns 与加载阶段一致的 buffer generation。
+ */
 function stateGeneration(state: SessionRunState): MessageBufferGeneration {
   return sessionGeneration(state.checkpointRevision, state.bufferWriteProof)
 }
 
-/** 恢复用户输入：优先用本次已收集的用户消息，否则回退到请求原始输入（避免刷新后空会话）。 */
+/**
+ * 恢复用户输入：优先用本次已收集的用户消息，否则回退到请求原始输入。
+ * 首轮被取消时 Runtime 可能尚未来得及回调用户消息，此时回退能避免刷新后只留下一个空会话。
+ *
+ * @param state - `load` 产出的运行状态，携请求原始输入作为兜底来源。
+ * @param collected - 本次执行已收集到的展示消息。
+ * @returns 用于持久化的用户消息；两者都为空时返回空数组。
+ */
 function recoveryUserMessages(
   state: SessionRunState,
   collected: readonly DisplayMessage[]
@@ -277,7 +318,14 @@ function recoveryUserMessages(
   )
 }
 
-/** 找上次运行中断留下的 ask_user 调用：有 tool call 无对应 tool result 的调用即悬挂。 */
+/**
+ * 找上次运行中断留下的 ask_user 调用：有 tool call 无对应 tool result 的调用即悬挂。
+ * 从后往前取第一个未闭合的调用，供恢复时按卡片语义校验与修补。
+ *
+ * @param messages - 上次运行残留在 buffer 里的消息。
+ * @param toolName - 目标工具名，通常是提问工具。
+ * @returns 悬挂调用的 call id；没有悬挂调用时返回空串。
+ */
 function danglingToolCallId(messages: readonly AgentMessage[], toolName: string): string {
   const completed = new Set(
     messages
@@ -298,11 +346,21 @@ function danglingToolCallId(messages: readonly AgentMessage[], toolName: string)
  * 内存实现天然没有 `advanceFence`，而生产实现有；让调用方在这里显式分流，
  * 比逼所有实现都提供一个「我不支持」的空方法要干净。
  * 判据是「方法存在且可调用」，而不是单纯 `in`：属性存在但为 undefined 同样不可用。
+ *
+ * @param repository - 待探测的会话仓储。
+ * @returns 支持 fencing 时为 true，并把类型收窄为 `FencedSessionRepository`。
  */
 function isFencedRepository(repository: SessionRepository): repository is FencedSessionRepository {
   return 'advanceFence' in repository && typeof repository.advanceFence === 'function'
 }
 
+/**
+ * 构造「交互不存在或已处理」的领域错误；重复应答或卡片丢失时用它显式失败，
+ * 而不是让请求静默通过、覆盖用户已经作出的选择。
+ *
+ * @param interactionId - 找不到或已处理完的交互 id。
+ * @returns 带稳定错误码的会话存储错误。
+ */
 function interactionConflict(interactionId: string): SessionStoreError {
   return new SessionStoreError(
     SESSION_STORE_ERROR_CODES.INTERACTION_CONFLICT,
@@ -310,12 +368,25 @@ function interactionConflict(interactionId: string): SessionStoreError {
   )
 }
 
-/** 等 lease 丢失信号"已定局"：race 一个立即 resolve 的 undefined，避免永久等待。 */
+/**
+ * 等 lease 丢失信号「已定局」：race 一个立即 resolve 的 undefined，避免永久等待。
+ * 只有 lease 确实已丢失时才返回错误；仍在持有或本就没丢时为 undefined，保存流程照常继续。
+ *
+ * @param lost - lease 丢失后兑现的错误 Promise；无锁或锁没有丢失能力时为 undefined。
+ * @returns 已定局且确实丢失时的错误；否则 undefined。
+ */
 async function settledLeaseError(lost: Promise<Error> | undefined): Promise<Error | undefined> {
   if (lost === undefined) return undefined
   return Promise.race([lost, Promise.resolve(undefined)])
 }
 
+/**
+ * 尽力释放锁，失败只吞掉、不抛出。
+ * 释放是收尾动作：它的失败绝不能覆盖本次运行的主要结果或主要错误，
+ * 否则一次锁释放抖动就会把成功的保存或真实的失败原因盖掉。
+ *
+ * @param lock - 待释放的锁句柄；为 undefined 时什么都不做。
+ */
 async function releaseQuietly(lock: SessionLease | undefined): Promise<void> {
   if (lock === undefined) return
   try {

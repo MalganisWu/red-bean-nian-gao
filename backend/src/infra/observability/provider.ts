@@ -6,26 +6,36 @@ import type { TracerPort } from '../../shared/observability/tracer.js'
 import { OTelTracer, PreferredTraceIdGenerator } from './otel-tracer.js'
 import { StructuredLogTracer, type StructuredLogSink } from './structured-log-tracer.js'
 
+/** OTel instrumentation scope 名；标识 span 来源，取自产品标识而非某个服务名。 */
 const INSTRUMENTATION_NAME = 'red-bean-nian-gao'
 
 /** 观测后端配置；来自 `config.observability`，`exporter` 只认 structured 与 otlp。 */
 export interface ObservabilityProviderOptions {
+  /** 导出器名；归一化后只认 `structured` 与 `otlp`，其余值在构造时抛错。 */
   readonly exporter: string
+  /** 服务名；写入 `service.name`，为空视为配置错误直接抛错。 */
   readonly serviceName: string
+  /** 部署环境名；非空时写入 `deployment.environment.name`，用于区分同名服务。 */
   readonly environment: string
+  /** 根 span 采样率；必须落在 (0, 1]，越界抛错。 */
   readonly sampleRatio: number
 }
 
 /** 构造依赖；两处均可注入，测试因此不建真实 exporter、也不去抓 stdout。 */
 export interface ObservabilityProviderDependencies {
+  /** span 导出器工厂；注入后测试无需建真实 exporter，缺省用默认 OTLP 导出器。 */
   readonly exporterFactory?: (() => tracing.SpanExporter) | undefined
+  /** 结构化日志去向；注入后测试无需捕获 stdout，缺省由 sink 自行决定。 */
   readonly logSink?: StructuredLogSink | undefined
 }
 
 /** 观测后端的持有者：业务只见 `TracerPort`，Provider 关闭时负责把在途 span 刷出去。 */
 export class ObservabilityProvider {
+  /** 对业务暴露的中性 tracer；构造后固定，运行中途不更换。 */
   readonly #tracer: TracerPort
+  /** 关闭动作；仅在 otlp 模式下存在，负责把在途 span 刷出去。 */
   readonly #shutdown: (() => Promise<void>) | undefined
+  /** 首次关闭的 Promise；`shutdown` 靠它实现幂等，并发调用共享同一次收尾。 */
   #shutdownPromise: Promise<void> | undefined
 
   public constructor(tracer: TracerPort, shutdown?: () => Promise<void>) {

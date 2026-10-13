@@ -32,7 +32,9 @@ import {
  * 内部 1:1 实现类（无独立 Port），由 `task.module.ts` 组装；展示字段由 Task 内部 Presenter 进行纯映射。
  */
 export interface TaskControllerDependencies {
+  /** 查询用例服务；只读路径（列表、详情）走它。 */
   readonly queries: TaskQueryService
+  /** 命令用例服务；写路径（启停、删除、视图状态）走它。 */
   readonly commands: TaskCommandService
 }
 
@@ -41,6 +43,7 @@ export interface TaskControllerDependencies {
  * 请求解包、Principal 传递与成功信封输出由 `task.routes.ts` 承担。
  */
 export class TaskController {
+  /** 用例服务依赖；由构造器注入，控制器不自行创建。 */
   readonly #dependencies: TaskControllerDependencies
 
   public constructor(dependencies: TaskControllerDependencies) {
@@ -258,6 +261,13 @@ export class TaskController {
     }
   }
 
+  /**
+   * 执行一次用例调用并把仓储/应用异常统一映射成 HTTP 错误：成功原样透传结果，失败一律经
+   * mapTaskFailure 收敛，避免各方法各写一套 catch。
+   *
+   * @param operation - 待执行的用例调用，返回结果或抛出领域异常。
+   * @returns operation 的返回值；失败时抛已映射的 HTTP 错误。
+   */
   async #mapFailure<TResult>(operation: () => Promise<TResult>): Promise<TResult> {
     try {
       return await operation()
@@ -267,6 +277,14 @@ export class TaskController {
   }
 }
 
+/**
+ * 把用例层抛出的异常映射成面向 HTTP 的错误：已知的应用错误按错误码给出稳定语义（404/403），
+ * 其余一律收敛为内部错误，只把原始异常记入日志、不外泄细节。
+ *
+ * @param cause - 被捕获的未知异常，可能是应用错误也可能是任意底层错误。
+ * @param logMessage - 归入内部错误时写入日志的文案，指明是哪次操作失败。
+ * @returns 已映射的 Error，交由路由层投影为响应。
+ */
 function mapTaskFailure(cause: unknown, logMessage = '任务用例执行失败'): Error {
   if (cause instanceof TaskApplicationError) {
     if (cause.code === TASK_APPLICATION_ERROR_CODES.NOT_FOUND) return notFoundError('任务不存在')

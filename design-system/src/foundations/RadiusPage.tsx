@@ -1,5 +1,12 @@
 import './RadiusPage.css'
 
+/**
+ * 圆角刻度档位表：`[取值, token, 用途]`。
+ *
+ * 四档依次递进表达「离文档流有多远」——0 贴平（Final / Process / Tool 等文档流内元素）、
+ * 6px 适配紧凑列表、8px 统一控件几何、12px 留给真正脱离文档流的浮层；档位少而语义明确，
+ * 避免给每块内容都套一层卡片圆角。
+ */
 const RADII = [
   ['0', '--radius-xs', 'Final 内容、表格、Process 与 Tool'],
   ['6px', '--radius-sm', '菜单项、小型图标控件'],
@@ -7,6 +14,12 @@ const RADII = [
   ['12px', '--radius-lg', 'Dialog、Popover 等真正浮层'],
 ] as const
 
+/**
+ * 组件到圆角档位的映射：`[组件, 取值, 说明]`。
+ *
+ * 逐条回答「哪类元素用哪一档、为什么」——把抽象刻度落到具体组件，防止实现时随手挑一个数值；
+ * 越靠文档流的组分圆角越小，只有 Dialog / Popover 这类真正浮层才用最大档。
+ */
 const MAP = [
   ['Final / Process / Tool', '0', '它们是文档流，不是卡片。'],
   ['Fenced code block', '8px', '语义独立的机器内容，带语言标签与复制动作。'],

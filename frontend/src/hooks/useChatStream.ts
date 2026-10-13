@@ -29,26 +29,43 @@ import type { QuestionCardAnswer } from '@/components/retroui/QuestionCard'
 import { API_ROUTES } from '@red-bean/api-contract'
 import { DEFAULT_AGENT_ID } from '@/lib/constants'
 
+/** 询问卡片的作答载荷：提交答案映射，或声明拒绝作答，二者由调用方按需择一。 */
 interface AnswerPayload {
+  /** 用户提交的答案（按题目 id 索引）；拒绝作答时缺省。 */
   answers?: Record<string, QuestionCardAnswer> | undefined
+  /** 是否拒绝作答；为 true 时后端按拒绝处理，answers 应为空。 */
   refused?: boolean | undefined
 }
 
 /** 对话流 hook 的对外契约：实时状态 + 发送 / 取消 / 作答 / 重试四个动作。 */
 export interface ChatStreamControls {
+  /** 已定稿的消息列表（透传自 chat-store）。 */
   messages: DisplayMessage[]
+  /** 是否正处于流式接收中。 */
   isStreaming: boolean
+  /** 本轮流式开始时刻（毫秒）；0 表示无进行中的流。 */
   streamingStartedAt: number
+  /** 前端发出本轮请求的时刻，流式总耗时的真实起点。 */
   sentAt: number
+  /** 本轮请求 id；用于取消，非流式时为 null。 */
   requestId: string | null
+  /** store 中的当前会话 id；新会话在 START 前可能为 null。 */
   sessionId: string | null
+  /** 最近一次流式错误；非空时界面展示可重试错误态。 */
   error: ErrorEvent | null
+  /** 流式在途分段（思考、工具、卡片等）。 */
   pendingSections: MessageSection[]
+  /** 当前卡片的提交进行态；null 表示无待提交卡片。 */
   cardSubmission: CardSubmissionState | null
+  /** 发送一轮用户消息：乐观追加用户气泡后发起 SSE 流。 */
   send: (messages: ChatMessage[], sessionId?: string) => void
+  /** 取消当前流：先失效连接回调再 abort，随后通知服务端取消。 */
   cancel: () => Promise<void>
+  /** 提交询问卡片答案/拒绝，随后续跑 SSE。 */
   answer: (interactionId: string, payload: AnswerPayload) => void
+  /** 原样重发最近一次请求；已收到 START 的流不允许重放，此时返回 false。 */
   retry: () => boolean
+  /** 当前是否允许重试；仅对尚未收到 START 的连接级失败为 true。 */
   canRetry: () => boolean
 }
 

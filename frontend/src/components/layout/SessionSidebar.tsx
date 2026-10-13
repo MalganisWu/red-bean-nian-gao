@@ -13,17 +13,30 @@ import { cn } from '@/lib/utils'
 import type { SessionSummary } from '@/services/api/session'
 import { useChatStore } from '@/stores/chat-store'
 
+/** 会话侧栏属性：可选的导航后回调，供窄屏抽屉在选中会话或跳转后关闭自身。 */
 interface SessionSidebarProps {
+  /** 导航后回调；窄屏抽屉据此在选中会话或跳转后关闭自身。 */
   onNavigate?: () => void
 }
 
+/** 按时间归组的会话集合：分组标题与落入该组的会话列表。 */
 interface SessionGroup {
+  /** 分组标题，按会话更新时间归入三档之一。 */
   label: '今天' | '最近 7 天' | '更早'
+  /** 落入该分组的会话列表；空分组不会渲染。 */
   sessions: SessionSummary[]
 }
 
+/** 一天的毫秒数；分组时用「今天零点」与「更新日零点」之差换算相隔天数。 */
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 
+/**
+ * 把会话按 `updated_at` 归入「今天 / 最近 7 天 / 更早」三组；空组会被剔除。
+ *
+ * @param sessions - 待分组的会话列表；组内顺序原样保留。
+ * @param now - 计算「今天」基准的时刻，默认当前时间；可注入以便测试固定基准。
+ * @returns 仅含非空分组的会话分组，按「今天 → 最近 7 天 → 更早」排列。
+ */
 function groupSessionsByUpdatedAt(sessions: SessionSummary[], now = new Date()): SessionGroup[] {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   const today: SessionGroup = { label: '今天', sessions: [] }

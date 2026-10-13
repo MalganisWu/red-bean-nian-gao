@@ -7,15 +7,21 @@ import {
 
 /** 更新自己资料的命令；只有显式出现的字段会被写入，缺省即保持原值。 */
 export interface UpdateSelfCommand {
+  /** 写入目标用户 ID；只应来自鉴权后的 Principal，不接受请求体改写。 */
   readonly userId: string
+  /** 新展示名；缺省表示不改，与显式传入空串语义不同。 */
   readonly displayName?: string | undefined
+  /** 新头像地址；缺省表示不改，传入即整体覆盖原值。 */
   readonly avatar?: string | undefined
+  /** 新邮箱；缺省表示不改，传入时由仓储层面承担唯一性约束。 */
   readonly email?: string | undefined
 }
 
 /** 服务依赖；`now` 可注入，测试因此不依赖真实时钟。 */
 export interface IdentityProfileServiceOptions {
+  /** 用户仓储；读写都经它，本服务不持有连接池。 */
   readonly users: UserRepository
+  /** 产生 `updatedAt` 的时钟；缺省用系统时钟，测试注入固定值以获得确定性。 */
   readonly now?: (() => Date) | undefined
 }
 
@@ -24,7 +30,9 @@ export interface IdentityProfileServiceOptions {
  * Controller 直接依赖本类。查询与更新流程可在各公开方法内一次读完。
  */
 export class IdentityProfileService {
+  /** 用户仓储，构造时注入，读写都经它并透传取消信号。 */
   readonly #users: UserRepository
+  /** 产生时间戳的时钟，构造时确定；默认取系统时钟，测试可注入固定实现。 */
   readonly #now: () => Date
 
   public constructor(options: IdentityProfileServiceOptions) {
@@ -91,7 +99,16 @@ export class IdentityProfileService {
     return this.#users.list(offset, limit, signal)
   }
 
-  /** 用户不存在时抛出稳定 NOT_FOUND 错误，Controller 据此映射 HTTP 404。 */
+  /**
+   * 读取用户并在缺失时抛出稳定 NOT_FOUND 错误，Controller 据此映射 HTTP 404。
+   *
+   * 作为 `getSelf` 与 `getPublicUser` 的共同读取路径，保证两种视图的失败语义一致：
+   * 视图差异只在投影，不存在时都是 404 而非空对象或 500。
+   *
+   * @param userId - 要读取的用户 ID；本方法只负责取用，归属校验由调用方保证
+   * @param signal - 请求生命周期绑定的取消信号，透传给仓储查询
+   * @returns 找到的领域用户实体；不存在时抛出而非返回 `undefined`
+   */
   async #requireUser(userId: string, signal: AbortSignal): Promise<User> {
     const user = await this.#users.getById(userId, signal)
     if (user === undefined) {

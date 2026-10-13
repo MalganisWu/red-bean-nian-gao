@@ -23,8 +23,11 @@ import type { RunFactRecorder } from './run-fact-recorder.js'
  * 记录是尽力语义：`RunFactRecorder` 内部串行队列已保证失败只上报诊断、不影响主流程。
  */
 export class ApprovalFactToolDispatcher implements AgentToolDispatcher {
+  /** 被装饰的 dispatcher（通常是 Runtime 观测包装后的实现）。 */
   readonly #next: AgentToolDispatcher
+  /** 本次运行的事实写入器；只写挂起事实，不参与其余采集。 */
   readonly #recorder: RunFactRecorder
+  /** 可替换时钟；测试注入固定时刻。 */
   readonly #now: () => number
 
   /**
@@ -75,6 +78,8 @@ export class ApprovalFactToolDispatcher implements AgentToolDispatcher {
 /**
  * 工具参数是 wire 上的 JSON 字符串；此处只用于展示投影，解析失败按「无参数」处理，
  * 绝不因为参数格式问题影响工具调用本身。
+ * @param raw 工具调用携带的参数 JSON 字符串；空串或非法 JSON 都按无参数处理
+ * @returns 解析出的参数对象；空串、非法 JSON 或解析结果不是对象时返回 null
  */
 function parseToolArguments(raw: string): AgentJsonObject | null {
   if (raw.trim() === '') return null
@@ -86,6 +91,11 @@ function parseToolArguments(raw: string): AgentJsonObject | null {
   }
 }
 
+/**
+ * 判定解析结果是否为非数组对象；把 unknown 窄化到 AgentJsonObject 以便按键访问。
+ * @param value 待判定的未知值
+ * @returns 是非数组对象时为 true
+ */
 function isJsonObject(value: unknown): value is AgentJsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

@@ -17,6 +17,12 @@ import { SpecPageHeader } from './SpecPageHeader'
 
 /* ===== 定稿演示数据（与 docs/design/session/session-trajectory.md 同口径） ===== */
 
+/**
+ * 上下文压缩夹具：发生在第 2 轮之后，token 由 42300 降到 8100、压缩 26 条消息。
+ *
+ * 它演示「压缩」作为泳道与记录表上的一个独立节点（有耗时、有前后 token），
+ * 而不是一条普通轮次记录。
+ */
 const COMPACTION: TrajectoryCompaction = {
   id: 'c1',
   afterTurn: 2,
@@ -29,6 +35,13 @@ const COMPACTION: TrajectoryCompaction = {
   status: 'success',
 }
 
+/**
+ * 主演示数据：三轮完整对话，覆盖用户/模型调用/工具/子代理四类记录。
+ *
+ * 第 1 轮「调研并建文档」、第 2 轮「建定时任务（含子代理）」、第 3 轮
+ * 「分享文档并遇到权限失败后降级」，用来在同一张记录表里同时展示成功、
+ * 重试（第 3 轮 1/2 与 2/2 两次尝试）与工具失败降级。
+ */
 const TURNS: TrajectoryTurn[] = [
   {
     turn: 1,
@@ -309,11 +322,20 @@ const TURNS: TrajectoryTurn[] = [
   },
 ]
 
+/** 会话级终态夹具：记录表末尾的「会话结束 · 完成」行，独立于轮次的 `endState`。 */
 const SESSION_END: TrajectorySessionEnd = { at: '14:09:11', state: 'completed' }
 
 /* 进行中轮次演示：末个已终结轮次（带「轮次 N 结束 · 完成」行）与紧随其后、endState 缺省的
    进行中轮次并列，直观对比「已终结」与「仍在流式输出」。endState 缺省 = 前端实时投影尚未
    收到轮次终态，此轮「时长」只是已确认活动区间的下界，且末条工具记录仍在执行。 */
+
+/**
+ * 进行中轮次演示：已终结的第 3 轮，紧跟一个 `endState` 缺省的第 4 轮。
+ *
+ * 第 4 轮缺 `endState` 表示前端实时投影尚未收到轮次终态——标题行显示「进行中」、
+ * 末条 `lark_doc_write` 仍在 `running`、时长只代表已确认区间的下界，
+ * 与第 3 轮带终态结束行的形态形成对照。
+ */
 const IN_PROGRESS_TURNS: TrajectoryTurn[] = [
   ...TURNS.filter((t) => t.turn === 3),
   {
@@ -374,7 +396,22 @@ const IN_PROGRESS_TURNS: TrajectoryTurn[] = [
 ]
 
 /* 加载期一次性分配全局稳定序号 #N（展示顺序即序号顺序） */
+
+/**
+ * 展示序号的单调计数器，只在本模块加载期使用。
+ *
+ * 它记的是「第几次被分配」，因此分配顺序即展示顺序；加载完成后不再变化。
+ */
 let SEQ = 0
+
+/**
+ * 给一条演示记录就地分配稳定展示序号。
+ *
+ * 序号在模块加载期按记录出现顺序一次性分配并写入记录自身，之后不再重排，
+ * 视图滚动或过滤都不会让行号跳动。
+ *
+ * @param o - 待编号的记录；函数直接写入它的 `seq` 字段。
+ */
 const assignSeq = (o: { seq?: number }) => {
   o.seq = ++SEQ
 }
@@ -391,6 +428,15 @@ assignSeq(SESSION_END)
 /* 审批与打断演示：审批行（LLM 发起挂起 → 等待用户）、被打断的工具（用户主动取消 → 未闭合）、
    以及两种终态（interrupt = 等待用户、crashed = 进程遗留）。
    审批在存储层是同一 callId 的两条 append-only 记录，投影重建为**一行**并给出 waitMs。 */
+
+/**
+ * 审批与打断演示数据：第 5 轮是审批（等待用户），第 6 轮是被用户取消。
+ *
+ * 第 5 轮的 `ask_user` 以同一 callId 的两条 append-only 记录存储、投影重建为
+ * **一行**并给出 `waitMs`，用来展示「等待用户」（wire 值 `interrupt`）终态；
+ * 第 6 轮的 `export_all` 被用户取消后收成 `incomplete`，说明「被用户打断」
+ * 与「工具失败」是两件事。
+ */
 const APPROVAL_TURNS: TrajectoryTurn[] = [
   {
     turn: 5,
@@ -495,9 +541,15 @@ for (const t of APPROVAL_TURNS) {
   if (t.endState) assignSeq(t.endState)
 }
 
+/** 空态夹具：无任何轮次，用来渲染「该会话暂无可回放的轨迹」时的泳道概览。 */
 const EMPTY_TURNS: TrajectoryTurn[] = []
 
-/** 在演示数据中按 id 查一条记录，子调用也算记录。 */
+/**
+ * 在演示数据中按 id 查一条记录，子调用也算记录。
+ *
+ * @param id - 记录 id；缺省时直接返回 `undefined`，不遍历数据。
+ * @returns 匹配到的记录或子记录；查不到时为 `undefined`。
+ */
 function findRecord(id: string | undefined): TrajectoryRecord | undefined {
   if (!id) return undefined
   for (const t of TURNS) {
@@ -509,7 +561,12 @@ function findRecord(id: string | undefined): TrajectoryRecord | undefined {
   return undefined
 }
 
-/** 在演示数据中按 id 查一次尝试明细。 */
+/**
+ * 在演示数据中按 id 查一次尝试明细。
+ *
+ * @param id - 尝试明细的 id；缺省时直接返回 `undefined`。
+ * @returns 匹配到的尝试明细；查不到时为 `undefined`。
+ */
 function findAttempt(id: string | undefined): TrajectoryAttempt | undefined {
   if (!id) return undefined
   for (const t of TURNS) {
@@ -520,7 +577,12 @@ function findAttempt(id: string | undefined): TrajectoryAttempt | undefined {
   return undefined
 }
 
-/** 按 id 反查它所属轮次的标签，供检查器标题使用。 */
+/**
+ * 按 id 反查它所属轮次的标签，供检查器标题使用。
+ *
+ * @param id - 记录或尝试明细的 id；命中子记录或尝试时也归属其所在轮次。
+ * @returns 形如「轮次 N」的标签；id 缺省或不属于任何轮次时为 `undefined`。
+ */
 function turnLabelOf(id: string | undefined): string | undefined {
   for (const t of TURNS) {
     if (t.records.some((r) => r.id === id || (r.children ?? []).some((c) => c.id === id)))

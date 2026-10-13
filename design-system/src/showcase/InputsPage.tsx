@@ -5,13 +5,26 @@ import { Input } from '@/components/Input'
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
+/** 字段样例 Props：标签、可选提示与控件本体。 */
 interface FieldExampleProps {
+  /** 字段名，渲染为控件上方的标签文字。 */
   label: string
+  /** 校验或补充提示；缺省时不渲染提示行。 */
   hint?: string
+  /** 被展示的输入控件。 */
   children: ReactNode
 }
 
-function FieldExample({ label, hint, children }: FieldExampleProps): React.ReactElement {
+/**
+ * 单个输入字段样例：标签、控件与可选提示竖直排列。
+ *
+ * 提示使用失败红，与其配对的控件错误态同色；两套主题下均由语义色令牌取值。
+ *
+ * @param props - 组件属性；字段语义见 `FieldExampleProps`。
+ * @returns 该字段样例渲染出的元素。
+ */
+function FieldExample(props: FieldExampleProps): React.ReactElement {
+  const { label, hint, children } = props
   return (
     <label className="grid gap-1.5 font-sans text-xs text-foreground-muted">
       <span>{label}</span>

@@ -2,7 +2,9 @@ import { randomBytes } from 'node:crypto'
 
 import type { IdGenerator } from '../shared/id/id-generator.js'
 
+/** 后缀字符表：仅小写字母与数字，共 36 个字符；不含分隔符以避免与 `_` 混淆。 */
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789'
+/** 随机后缀的字符数；固定 8 位，是同一毫秒内多个 ID 不重复的唯一来源。 */
 const SUFFIX_LENGTH = 8
 
 /** 毫秒时钟；可注入，生成的 ID 因此能在测试里确定。 */
@@ -12,7 +14,9 @@ export type RandomByteSource = (size: number) => Uint8Array
 
 /** 生成与既有产品 wire 格式一致的不透明 ID。 */
 export class TimestampIdGenerator implements IdGenerator {
+  /** 毫秒时钟；构造时注入，使生成结果在测试中可复现。 */
   readonly #clock: MillisecondClock
+  /** 随机字节源；构造时注入，测试可据其构造确定的随机后缀。 */
   readonly #randomBytes: RandomByteSource
 
   public constructor(

@@ -3,24 +3,40 @@ import type { StateCreator } from 'zustand'
 import type { User } from '@/types/api'
 import { TOKEN_KEY } from '@/lib/constants'
 
+/** 认证状态字段：持久化 token、当前用户与派生的已认证标志。 */
 interface AuthState {
+  /** 当前访问令牌；取自 localStorage，null 表示未登录。 */
   token: string | null
+  /** 当前登录用户；登录后由接口回填，刷新时先为 null 直到重新拉取。 */
   user: User | null
+  /** 是否已认证的派生标志；由 token 的存在性推导，供路由守卫直接读取。 */
   isAuthenticated: boolean
 }
 
+/** 认证状态的可写动作：登录写入、退出清空，以及只更新 token 或 user 的局部动作。 */
 interface AuthActions {
+  /** 登录成功后写入 token 与用户，并把 token 持久化到 localStorage，标记为已认证。 */
   setAuth: (token: string, user: User) => void
+  /** 退出登录：清除持久化的 token 与内存中的用户和认证状态。 */
   clearAuth: () => void
+  /** 只更新 token（如刷新后回填），同步持久化并标记为已认证，不改动 user。 */
   setToken: (token: string) => void
+  /** 只更新内存中的用户信息，不改动 token 与持久化状态。 */
   setUser: (user: User) => void
 }
 
+/** 认证 store 的完整形状：状态字段与动作的合成类型。 */
 type AuthStore = AuthState & AuthActions
 
 /** 认证状态 store；token 持久化在 localStorage，`isAuthenticated` 初值即由它的存在性推导。 */
 export const useAuthStore = create<AuthStore>()(createAuthStore)
 
+/**
+ * 构造认证 store 的初始状态与动作；token 从 localStorage 回填，使刷新后仍保持登录。
+ *
+ * @param set - Zustand 提供的局部状态写入函数；动作据此合并 token、user 与 isAuthenticated。
+ * @returns 含初始状态与 setAuth / clearAuth / setToken / setUser 动作的认证 store。
+ */
 function createAuthStore(set: Parameters<StateCreator<AuthStore>>[0]): AuthStore {
   /** 登录成功后写入 token 与用户，并把 token 持久化到 localStorage。 */
   function setAuth(token: string, user: User): void {

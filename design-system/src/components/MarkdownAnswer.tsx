@@ -3,7 +3,9 @@ import { MarkdownRenderer } from './MarkdownRenderer'
 
 /** 最终回答容器的 Props；`className` 追加在裸排容器之后。 */
 export interface MarkdownAnswerProps {
+  /** 回答正文，按 GitHub-Flavored Markdown 解释；纯文本会原样显示。 */
   content: string
+  /** 追加在最外层容器之后的类名；用于收紧外边距等场景，不用于改写内部排版层级。 */
   className?: string
 }
 

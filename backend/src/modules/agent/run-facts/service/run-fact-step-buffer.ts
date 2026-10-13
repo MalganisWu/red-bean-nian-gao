@@ -10,20 +10,31 @@ import {
 } from '../model/run-fact.js'
 import { optionalField } from '../../../../shared/object/optional-field.js'
 
+/** attempt 的可变累积态；endedAt 在未闭合时为空，由 freezeAttempt 固化时才补齐。 */
 interface MutableAttempt {
+  /** 重试序号，从 1 起在步骤内递增。 */
   attempt: number
+  /** 本次 attempt 的开始时刻（epoch 毫秒）。 */
   startedAt: number
+  /** 本次 attempt 的结束时刻（epoch 毫秒）；未闭合时为 undefined，由 freezeAttempt 固化补齐。 */
   endedAt: number | undefined
+  /** 本次 attempt 观察到的用量；未观察到时为 null。 */
   usage: RunFactUsage | null
+  /** 本次 attempt 的错误信息；正常结束或尚未得知时为 undefined。 */
   error: string | undefined
 }
 
 /** 一次 LLM 步骤的终态快照（组装 assistant 事实的全部输入）。 */
 export interface StepSnapshot {
+  /** 步骤起点（首次 attempt 的开始时刻）；缓冲无内容时为 undefined，时长按 0 处理。 */
   readonly startedAt: number | undefined
+  /** 步骤内累计的思考增量。 */
   readonly thinking: string
+  /** 步骤的权威正文：提交消息内容，或终态补记时的增量兜底。 */
   readonly content: string
+  /** 步骤内全部 attempt 的冻结序列。 */
   readonly attempts: readonly RunFactAttempt[]
+  /** 步骤的用量归属；无带用量的 attempt 时为 null。 */
   readonly usage: RunFactUsage | null
 }
 
@@ -34,10 +45,15 @@ export interface StepSnapshot {
  * attempt 追认为失败，保证 attempts 完整可回放。
  */
 export class RunFactStepBuffer {
+  /** 步骤起点（首次 attempt 的开始时刻）；缓冲清空时复位为 undefined。 */
   #startedAt: number | undefined
+  /** 步骤内累计的思考增量。 */
   #thinking = ''
+  /** 步骤内累计的正文增量，仅作终态补记的兜底内容。 */
   #content = ''
+  /** 已闭合、归档的 attempt 序列。 */
   #attempts: MutableAttempt[] = []
+  /** 当前悬挂未闭合的 attempt；无进行中 attempt 时为 undefined。 */
   #open: MutableAttempt | undefined
 
   /**
@@ -181,6 +197,8 @@ export class RunFactStepBuffer {
    * 组装快照。**usage 取倒数第一个带用量的 attempt**，也就是产出最终内容的那一次——
    * 空响应重试会留下多个 attempt，把前面几次的用量也算进来会虚增 token。
    * 从后往前找而不是取 `attempts.at(-1)`：最后一次 attempt 可能因为流被中断而没有 usage 块。
+   * @param content - 作为快照权威正文的文本（提交消息内容或增量兜底）
+   * @returns 步骤终态快照；attempt 已冻结为不可变记录
    */
   #snapshot(content: string): StepSnapshot {
     let usage: RunFactUsage | null = null
@@ -199,6 +217,7 @@ export class RunFactStepBuffer {
     }
   }
 
+  /** 清空缓冲的全部累积态，为下一次 LLM 步骤复位。 */
   #reset(): void {
     this.#startedAt = undefined
     this.#thinking = ''
@@ -262,6 +281,8 @@ export function toolFact(input: {
  * `endedAt` 缺失时回退为 `startedAt`（时长为 0）而不是留空：
  * 事实日志是 append-only 的审计视图，一条「开始过但没结束」的尝试也必须能表达出结束时间，
  * 让下游的时长聚合不必到处判空。
+ * @param attempt 缓冲里的一次 attempt 可变态
+ * @returns 可写入事实日志的不可变 attempt
  */
 function freezeAttempt(attempt: MutableAttempt): RunFactAttempt {
   return {

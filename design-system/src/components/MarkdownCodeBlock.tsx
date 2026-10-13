@@ -9,17 +9,24 @@ import { Check, Copy } from 'lucide-react'
 
 import { cn } from '../lib/utils'
 
+/** 代码块容器的 Props；`children` 是 fenced code block 渲染出的 code 元素。 */
 interface MarkdownCodeBlockProps {
+  /** 上一个渲染层传入的节点，正常情形是 `<pre>` 里的 `code` 元素；缺失时按纯文本处理。 */
   children?: ReactNode
 }
 
+/** 从 children 里取 code 元素时用的宽松属性视图；只读 `className` 与 `children` 两项。 */
 interface CodeElementProps {
+  /** code 元素上的类名，其中的 `language-*` 片段用来推断语言标签。 */
   className?: string
+  /** code 元素的子节点，累积成待复制的源码文本。 */
   children?: ReactNode
 }
 
+/** 复制动作的瞬时状态；`copied` / `failed` 只做短暂反馈，随后自动回到 `idle`。 */
 type CopyState = 'idle' | 'copied' | 'failed'
 
+/** 语言标识到展示名的映射；命中不了时退回原始标识，纯文本类的各种别名统一显示为「纯文本」。 */
 const LANGUAGE_LABELS: Record<string, string> = {
   text: '纯文本',
   plaintext: '纯文本',
@@ -48,6 +55,15 @@ const LANGUAGE_LABELS: Record<string, string> = {
   sql: 'SQL',
 }
 
+/**
+ * 递归取出 React 节点里的纯文本，用于拼出待复制的源码。
+ *
+ * 只认字符串、数字与元素节点，其余（函数、`null` 等）一律贡献空串——把
+ * `[object Object]` 复制进剪贴板比复制失败更糟，所以宁可少取也不乱取。
+ *
+ * @param node - 任意 React 节点，通常是 code 元素的 children。
+ * @returns 节点里累积出的纯文本。
+ */
 function textContent(node: ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node)
   if (Array.isArray(node)) return node.map(textContent).join('')
@@ -55,6 +71,14 @@ function textContent(node: ReactNode): string {
   return ''
 }
 
+/**
+ * 剪贴板 API 不可用时的兜底复制：借一个屏幕外的只读 textarea 走 `execCommand('copy')`。
+ *
+ * 这是旧环境（非安全上下文等）的最后手段，不保证成功，因此把命令结果原样返回给调用方决定反馈。
+ *
+ * @param content - 要写入剪贴板的源码文本。
+ * @returns 复制命令是否报告成功。
+ */
 function fallbackCopyText(content: string): boolean {
   const textarea = document.createElement('textarea')
   textarea.value = content
@@ -70,10 +94,24 @@ function fallbackCopyText(content: string): boolean {
   return copied
 }
 
+/**
+ * 从 children 里挑出第一个元素节点，作为承载源码与语言信息的 `code` 元素。
+ *
+ * @param children - 代码块容器的 children，可能混有空白文本节点。
+ */
 function codeElementOf(children: ReactNode) {
   return Children.toArray(children).find((child) => isValidElement<CodeElementProps>(child))
 }
 
+/**
+ * 从 code 元素的 `className` 里解析 `language-*` 片段，得出展示用的语言标签。
+ *
+ * 识别不出语言时按「纯文本」展示而非留空——留空会让头部标签位显得像渲染坏了；
+ * 反之若标识已知但没进映射表，则原样显示标识，方便对照补表。
+ *
+ * @param className - code 元素的完整类名，可能缺省或含多个类。
+ * @returns 展示用的语言标签，未识别时返回「纯文本」。
+ */
 function languageLabel(className?: string): string {
   const language = className?.match(/(?:^|\s)language-([^\s]+)/)?.[1]?.toLowerCase()
   if (!language) return '纯文本'

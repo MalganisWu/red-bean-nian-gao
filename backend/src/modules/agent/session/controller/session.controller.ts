@@ -10,6 +10,7 @@ import { toSessionDetailDto, toSessionSummaryDto } from './session-presenter.js'
  * 默认实现为 `DefaultSessionQueryService`（内部 1:1，无独立 Port），由 `agent.module.ts` 组装。
  */
 export interface SessionControllerDependencies {
+  /** 查询用例入口；控制器只用它读数据，不直接接触仓储。 */
   readonly queries: DefaultSessionQueryService
 }
 
@@ -18,6 +19,7 @@ export interface SessionControllerDependencies {
  * 请求解包与成功信封输出由 `session.routes.ts` 承担。
  */
 export class SessionController {
+  /** 注入的查询依赖；构造时固定，控制器自身无状态。 */
   readonly #dependencies: SessionControllerDependencies
 
   public constructor(dependencies: SessionControllerDependencies) {

@@ -3,8 +3,11 @@ export type CloseHandler = (signal: AbortSignal) => Promise<void>
 
 /** 统一持有进程资源，并保证按注册逆序且仅关闭一次。 */
 export class Lifecycle {
+  /** 已登记的关闭处理器，按登记顺序保存，关闭时逆序执行。 */
   readonly #handlers: CloseHandler[] = []
+  /** 是否已进入关闭流程；置位后拒绝新登记，避免留下永不执行的处理器。 */
   #closed = false
+  /** 仅在首次 close 时创建，供并发或重复调用复用同一次关闭。 */
   #closePromise: Promise<void> | undefined
 
   /**
@@ -36,6 +39,7 @@ export class Lifecycle {
    * **逆序**释放（后创建的先关闭），并且逐个收集失败后再一次性抛出。
    * 中途抛出会让后面的资源全部漏关，因此每个 handler 的异常都被吞下留待汇总——
    * 关不掉的资源本身就说明进程状态已经不干净，此时最要紧的是把剩下的也关掉。
+   * @param signal - 传给每个关闭处理器的中止信号，用于限制单个 handler 的关闭耗时
    */
   async #closeResources(signal: AbortSignal): Promise<void> {
     const errors: unknown[] = []

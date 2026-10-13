@@ -2,7 +2,9 @@ import type { InputHTMLAttributes } from 'react'
 
 import { cn } from '../lib/utils'
 
+/** 文本输入框的 Props；除 `className` 外全部继承原生 `input` 属性并原样透传。 */
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  /** 追加在内置样式之后的类名；用于按场景微调宽度或间距，不用于覆盖配色（配色走语义 token）。 */
   className?: string
 }
 

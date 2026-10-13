@@ -23,6 +23,16 @@ import {
 } from '@/components/chat/streamSections'
 import { normalizePersistedSections } from '@/components/chat/processSections'
 
+/**
+ * 子 Agent 内层事件的分派入口：把信封里的一条 event 折进该子 Agent 的 section 列表，
+ * 分派到 token/reason/tool_start/tool_result 的既有组装函数，与主流程保持同一语义。
+ * 事件类型未知或字段缺失时安全跳过——载荷来自后端 SSE，宁可忽略也不能渲染出异常结构。
+ *
+ * @param sections - 子 Agent 当前的 section 列表，作为折叠基准。
+ * @param eventType - 信封事件类型，决定分派到哪个组装函数。
+ * @param event - 后端下发的内层事件载荷，类型未经收窄，按类型守卫校验。
+ * @returns 折叠后的 section 列表；事件无法识别时原样返回入参。
+ */
 // applyInnerEvent：子 Agent 内层事件（信封 event_type + event）复用主流程组装语义。
 // 未知类型/缺字段安全忽略（SSE payload 来自后端，宁可跳过不可渲染异常）。
 function applyInnerEvent(
@@ -50,48 +60,83 @@ function applyInnerEvent(
   }
 }
 
+/** 对话主投影的只读状态切片：消息列表、流式进度、待处理 section、卡片提交态与会话侧栏列表。 */
 interface ChatState {
+  /** 已定稿的消息列表；流式进行中的内容先留在 pendingSections，定稿时才并入。 */
   messages: DisplayMessage[]
+  /** 服务端状态提示文案（如「思考中」）；无提示时为 null。 */
   status: string | null
+  /** 是否正处于流式接收中；驱动输入框的取消按钮与发送禁用态。 */
   isStreaming: boolean
+  /** 本轮流式的开始时刻（毫秒）；0 表示无进行中的流。 */
   streamingStartedAt: number
   /** 前端发起本轮请求的时刻（send/answer/retry 入口打点），流式总耗时的真实起点 */
   sentAt: number
+  /** 本轮请求 id；用于取消与竞态比对，非流式时为 null。 */
   requestId: string | null
+  /** 当前会话 id；新会话在 START 事件前可能为 null。 */
   sessionId: string | null
+  /** 最近一次流式错误事件；非空时界面展示可重试的错误态。 */
   error: ErrorEvent | null
+  /** 流式在途的分段（思考、工具、卡片等），定稿后并入 messages 并清空。 */
   pendingSections: MessageSection[]
+  /** 卡片提交的进行态；null 表示当前没有待提交的卡片。 */
   cardSubmission: CardSubmissionState | null
   /** 会话导航代次：新建/切换时递增，通知流控制器同步失效当前连接。 */
   streamNavigationEpoch: number
 
   // 会话侧栏列表状态
+  /** 侧栏的会话列表（分页累积）。 */
   sessions: SessionSummary[]
+  /** 会话列表下一页游标；空串表示已到末页。 */
   nextCursor: string
+  /** 会话列表是否正在加载（首屏或翻页）。 */
   sessionsLoading: boolean
+  /** 会话列表最近一次的失败消息；非空时侧栏展示错误。 */
   sessionsError: string | null
+  /** 当前激活（高亮）的会话 id；null 表示新会话尚未落定。 */
   activeSessionId: string | null
 }
 
+/** 对话主投影对外暴露的动作集合：流式写入、卡片提交、错误处理与会话侧栏加载，供组件回调调用。 */
 interface ChatActions {
+  /** 追加一条本地用户消息，id 与时间戳在本地生成。 */
   addUserMessage: (content: string) => void
+  /** 记录前端发出本轮请求的时刻，作为流式总耗时的真实起点。 */
   markSent: () => void
+  /** 开始一轮流式：记录请求/会话 id 与起点时刻，清空上一轮状态与错误。 */
   startStreaming: (requestId: string, sessionId: string) => void
+  /** 追加一段回答 token 到在途 section 的 content 段（末段）。 */
   appendToken: (content: string) => void
+  /** 把在途 section 定稿为一条消息（续跑则合并进卡片消息），并清空 pendingSections。 */
   finalizeStreamingText: (terminalStatus?: 'cancelled') => void
+  /** 设置或清除服务端状态提示文案（null 表示无提示）。 */
   setStatus: (content: string | null) => void
+  /** 记录流式错误并结束本轮请求生命周期（停止流式、清空起点）。 */
   setError: (error: ErrorEvent) => void
+  /** 清除错误态，不影响进行中的流式。 */
   clearError: () => void
+  /** 确保在途 section 里已有一个思考块，没有则新建空思考块。 */
   ensureThinkingBlock: () => void
+  /** 追加一步思考内容（序号 + 文本）到在途的 reason 段。 */
   appendReasonStep: (step: number, content: string) => void
+  /** 工具开始：追加一条 running 的 tool section（带参数时一并记录）。 */
   startToolCall: (callId: string, toolName: string, params?: Record<string, unknown>) => void
+  /** 工具成功落定，并把同 callId 的委派 section 收尾（剥掉续跑协议标记）。 */
   completeToolCall: (callId: string, result: string) => void
+  /** 工具失败落定，并把同 callId 的委派 section 收尾为失败。 */
   failToolCall: (callId: string, error: string) => void
+  /** 追加一张待回答卡片 section。 */
   setPendingCard: (card: CardSectionData) => void
+  /** 并入一条子 Agent 信封事件：按 parent_call_id 建或找 sub_agent section。 */
   appendSubAgentEvent: (env: SubAgentEnvelopePayload) => void
+  /** 把仍处于 running 的工具 section 收尾为中断态（用于流异常结束）。 */
   settleIncompleteTools: () => void
+  /** 把卡片标记为已回答，并写入用户提交的答案。 */
   markCardAnswered: (interactionId: string, answers: Record<string, QuestionCardAnswer>) => void
+  /** 把卡片标记为已拒绝（answers 置空）。 */
   markCardRefused: (interactionId: string) => void
+  /** 进入卡片提交态（submitting），记录本次提交的答案与拒绝标记。 */
   beginCardSubmission: (
     interactionId: string,
     payload: {
@@ -99,19 +144,29 @@ interface ChatActions {
       refused?: boolean | undefined
     }
   ) => void
+  /** 标记卡片提交已被服务端受理（submitting → accepted）。 */
   acceptCardSubmission: () => void
+  /** 提交收尾：按拒绝与否落定卡片，并清空提交态。 */
   completeCardSubmission: () => void
+  /** 提交失败：卡片转错误态，同时结束本轮流式与请求生命周期。 */
   failCardSubmission: (error: string) => void
+  /** 停止流式：先定稿在途文本，再清空流式状态。 */
   stopStreaming: (terminalStatus?: 'cancelled') => void
+  /** 复位会话级状态到初始基线，并递增导航代次以作废旧连接。 */
   reset: () => void
 
   // 会话侧栏 actions
+  /** 拉取会话列表首屏（覆盖式）。 */
   loadSessions: () => Promise<void>
+  /** 以当前游标追加下一页会话列表；无游标或正在加载时跳过。 */
   loadMoreSessions: () => Promise<void>
+  /** 切换会话：先清空并递增导航代次，再拉取目标会话（仅仍停留在目标时才落地）。 */
   switchSession: (sessionId: string) => Promise<void>
+  /** 开启新会话：按基线清空会话级状态。 */
   newSession: () => void
 }
 
+/** 全量初始状态：既是 store 首次创建的基线，也是 reset/clearChatState 复位的依据，改这里会同时影响两条路径。 */
 const initialState: ChatState = {
   messages: [],
   status: null,
@@ -131,7 +186,12 @@ const initialState: ChatState = {
   activeSessionId: null,
 }
 
-/** 确保在途 section 里已有一个思考块，没有则新建空思考块。 */
+/**
+ * 确保在途 section 里已有一个思考块，没有则新建空思考块。
+ *
+ * @param state - 当前 store 状态，仅在 pendingSections 为空时补一个空思考块。
+ * @returns 需要写入的部分状态；已有在途 section 时返回空对象表示无变化。
+ */
 function withThinkingBlock(state: ChatState): Partial<ChatState> {
   if (state.pendingSections.length === 0) {
     return { pendingSections: [{ type: 'reason', items: [], timestamp: Date.now() }] }
@@ -139,7 +199,14 @@ function withThinkingBlock(state: ChatState): Partial<ChatState> {
   return {}
 }
 
-/** 工具成功落定，并把同 callId 的委派 section 收尾（剥掉续跑协议标记）。 */
+/**
+ * 工具成功落定，并把同 callId 的委派 section 收尾（剥掉续跑协议标记）。
+ *
+ * @param state - 当前 store 状态，其 pendingSections 为落定基准。
+ * @param callId - 工具调用 id，用于定位并收尾同名的委派 section。
+ * @param result - 工具返回文本；尾部的续跑协议标记会在进 UI 前剥除。
+ * @returns 落定后的部分状态（pendingSections）。
+ */
 function withCompletedToolCall(
   state: ChatState,
   callId: string,
@@ -158,7 +225,14 @@ function withCompletedToolCall(
   }
 }
 
-/** 工具失败落定，并把同 callId 的委派 section 收尾为失败。 */
+/**
+ * 工具失败落定，并把同 callId 的委派 section 收尾为失败。
+ *
+ * @param state - 当前 store 状态，其 pendingSections 为落定基准。
+ * @param callId - 失败的工具调用 id，用于定位并收尾同名的委派 section。
+ * @param error - 失败原因文本，写入委派 section 的 result_summary。
+ * @returns 落定后的部分状态（pendingSections）。
+ */
 function withFailedToolCall(state: ChatState, callId: string, error: string): Partial<ChatState> {
   const settled = applyToolFail(state.pendingSections, callId, error)
   return {
@@ -170,7 +244,13 @@ function withFailedToolCall(state: ChatState, callId: string, error: string): Pa
   }
 }
 
-/** 并入一条子 Agent 信封事件：按 parent_call_id 建或找 sub_agent section。 */
+/**
+ * 并入一条子 Agent 信封事件：按 parent_call_id 建或找 sub_agent section。
+ *
+ * @param state - 当前 store 状态，其 pendingSections 为查找基准。
+ * @param env - 子 Agent 信封载荷，携带 agent/execution 标识与内层事件。
+ * @returns 并入后的部分状态（pendingSections）；定位不到 section 时返回空对象表示无变化。
+ */
 function withSubAgentEvent(state: ChatState, env: SubAgentEnvelopePayload): Partial<ChatState> {
   const idx = state.pendingSections.findIndex(
     (s) => s.type === 'sub_agent' && s.items.parent_call_id === env.parent_call_id
@@ -209,6 +289,10 @@ function withSubAgentEvent(state: ChatState, env: SubAgentEnvelopePayload): Part
  * 会话级状态复位：清空消息/流/卡片/错误并递增导航代次（通知流控制器作废旧连接）。
  * 保留会话侧栏列表状态（sessions/nextCursor/加载态），由 extra 按场景覆盖
  * （如 switchSession 的目标会话 id）。newSession / switchSession 共用同一基线。
+ *
+ * @param state - 当前 store 状态，用于在旧代次基础上递增导航代次。
+ * @param extra - 场景覆盖项，叠加在复位基线之上（如目标会话 id、侧栏错误）。
+ * @returns 复位后的部分状态。
  */
 function clearChatState(state: ChatState, extra?: Partial<ChatState>): Partial<ChatState> {
   return {
@@ -228,11 +312,20 @@ function clearChatState(state: ChatState, extra?: Partial<ChatState>): Partial<C
   }
 }
 
+/** 对话主投影 store 的完整类型：状态切片与其动作的交叉。 */
 type ChatStore = ChatState & ChatActions
 
 /** 对话主投影 store：消息列表、流式状态、待处理 section 与卡片提交态。 */
 export const useChatStore = create<ChatStore>()(createChatStore)
 
+/**
+ * 构造对话主投影 store：把 SSE 事件折叠为消息与 section，并管理卡片提交与会话侧栏列表。
+ * 独立成函数是为了让类型化的 `create<ChatStore>()` 能直接引用，避免在 create 调用处内联整块实现。
+ *
+ * @param set - zustand 的写入函数，提交部分状态或按前态计算新状态。
+ * @param get - zustand 的读取函数，动作间读取最新状态（定稿、判定当前会话等）。
+ * @returns 初始化完成的 store 对象，含全部状态与动作。
+ */
 function createChatStore(
   set: Parameters<StateCreator<ChatStore>>[0],
   get: Parameters<StateCreator<ChatStore>>[1]

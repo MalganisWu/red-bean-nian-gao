@@ -7,6 +7,7 @@ import { registerTaskRoutes as bindTaskRoutes } from './controller/task.routes.j
 
 /** Task HTTP 驱动适配器的组装依赖。 */
 export interface TaskRouteDependencies extends TaskControllerDependencies {
+  /** 认证服务 Port；用于构造请求级 Principal 边界，不在此处直接鉴权。 */
   readonly authService: AuthServicePort
 }
 

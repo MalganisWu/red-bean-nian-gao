@@ -36,6 +36,7 @@ import { optionalField } from '../../../../shared/object/optional-field.js'
  * 不丢弃它——映射为带 error 的宿主结果，让上层仍能持久化部分进展。
  */
 export class RuntimeAgentExecutor implements AgentExecutionPort {
+  /** 平台 Tracer；缺省时整段执行不产出 span，其余行为不变。 */
   readonly #tracer: TracerPort | undefined
 
   public constructor(tracer?: TracerPort) {
@@ -151,12 +152,20 @@ export class RuntimeAgentExecutor implements AgentExecutionPort {
  * 三类回调都走同一条路径，是因为宿主要做的是「把消息落库」，与角色无关。
  */
 class ObserverMessageHook implements MessageHook {
+  /** 宿主观察者；由构造期注入，已绑定它需要的运行身份。 */
   readonly #observer: AgentExecutionMessageObserver
 
   public constructor(observer: AgentExecutionMessageObserver) {
     this.#observer = observer
   }
 
+  /**
+   * 宿主侧用户消息回调：把 SDK 的 user 消息映射为产品消息后交给观察者落库。
+   * 三类回调共用同一条路径，因为宿主要做的只是「把消息落库」，与角色无关。
+   * @param _context SDK 运行上下文；此处刻意忽略——观察者在构造期已绑定运行身份，再传一次只会让两个来源有机会不一致
+   * @param message SDK 原始消息，经 fromRuntimeMessage 转为产品域消息
+   * @param signal 取消信号，透传给观察者；运行取消时应中断本次写入
+   */
   public onUserMessage(
     _context: RuntimeContext,
     message: RawMessage,
@@ -165,6 +174,13 @@ class ObserverMessageHook implements MessageHook {
     return this.#observer.observe(fromRuntimeMessage(message), signal)
   }
 
+  /**
+   * 宿主侧助手消息回调：把 SDK 的 assistant 消息映射为产品消息后交给观察者。
+   * 与用户/工具消息走同一次 observe，宿主的落库逻辑无需按角色分叉。
+   * @param _context SDK 运行上下文；刻意忽略，理由同 onUserMessage
+   * @param message SDK 原始消息，经 fromRuntimeMessage 转为产品域消息
+   * @param signal 取消信号，透传给观察者
+   */
   public onAssistantMessage(
     _context: RuntimeContext,
     message: RawMessage,
@@ -173,6 +189,13 @@ class ObserverMessageHook implements MessageHook {
     return this.#observer.observe(fromRuntimeMessage(message), signal)
   }
 
+  /**
+   * 宿主侧工具消息回调：把 SDK 的 tool 结果消息映射为产品消息后交给观察者。
+   * 工具调用可能耗时较长，写入依赖同一个 signal，取消时写入会一并停下。
+   * @param _context SDK 运行上下文；刻意忽略，理由同 onUserMessage
+   * @param message SDK 原始消息，经 fromRuntimeMessage 转为产品域消息
+   * @param signal 取消信号，透传给观察者
+   */
   public onToolMessage(
     _context: RuntimeContext,
     message: RawMessage,
@@ -182,8 +205,13 @@ class ObserverMessageHook implements MessageHook {
   }
 }
 
-/** 崩溃恢复去重：checkpoint 已含 base，增量 suffix 头部可能与 base 尾部重叠（消息已入库），
- * 按完整消息键找到最大重叠后缀后拼接，避免重复消息进入下一次运行。 */
+/**
+ * 崩溃恢复去重：checkpoint 已含 base，增量 suffix 头部可能与 base 尾部重叠（消息已入库），
+ * 按完整消息键找到最大重叠后缀后拼接，避免重复消息进入下一次运行。
+ * @param base 已有快照中的消息序列，作为拼接的左侧基准
+ * @param suffix 待并入的增量消息；其前缀可能已在 base 尾部出现
+ * @returns 去重拼接后的新数组；无重叠时等价于 base 直接接上 suffix
+ */
 function appendWithoutOverlap(
   base: readonly RawMessage[],
   suffix: readonly RawMessage[]
@@ -201,12 +229,23 @@ function appendWithoutOverlap(
   return [...base, ...suffix.slice(overlap)]
 }
 
+/**
+ * 把单条消息序列化为去重比较用的键。
+ * 用整体 JSON 而非某个 id 字段：RawMessage 没有稳定主键，工具调用等嵌套字段任一不同都应算作不同消息。
+ * @param message 待序列化的 SDK 消息
+ * @returns 可用于相等比较的 JSON 字符串
+ */
 function serializeMessageKey(message: RawMessage): string {
   return JSON.stringify(message)
 }
 
-/** 把 SDK 结果投影为宿主执行结果：checkpoint 序列化为 StoredRuntimeState，
- * 状态语义按 SDK status 分发（completed / suspended(中断) / cancelled / exhausted / failed）。 */
+/**
+ * 把 SDK 结果投影为宿主执行结果：checkpoint 序列化为 StoredRuntimeState，
+ * 状态语义按 SDK status 分发（completed / suspended(中断) / cancelled / exhausted / failed）。
+ * @param result SDK 返回的结果快照，携带状态、输出、消息与 checkpoint
+ * @param executionError SDK 抛出的原始错误，仅在失败分支作为 error 的 cause；缺省时按 finishReason 另行构造
+ * @returns 宿主可辨识联合结果；suspended 分支若缺 interrupt 会降级为 failed，避免上层拿到非法组合
+ */
 function outcome(
   result: {
     readonly status: AgentExecutionOutcome['status']

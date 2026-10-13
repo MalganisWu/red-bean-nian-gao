@@ -7,8 +7,14 @@ export type { BackgroundTask } from '../shared/lifecycle/background-task.js'
 
 /** HTTP 服务的生命周期端口；`shutdown` 是停止接收新连接并排空，`close` 是强制收尾。 */
 export interface HttpServer {
+  /** 启动服务并驻留到关闭为止；服务自身退出也应在此 Promise 上被观察到。 */
   listen(): Promise<void>
+  /**
+   * 优雅停止：在信号预算内停止接收新连接并排空存量请求。
+   * @param signal - 关闭的时间预算；到点即中止，由调用方决定是否转强制关闭
+   */
   shutdown(signal: AbortSignal): Promise<void>
+  /** 强制收尾：不等待存量请求排空，直接释放连接与资源。 */
   close(): Promise<void>
 }
 
@@ -17,35 +23,56 @@ export type ShutdownTask = (signal: AbortSignal) => Promise<void>
 
 /** 组装选项；后台任务与排空任务分开配置，因为二者的收束时机不同（见 `run` 的注释）。 */
 export interface ServerApplicationOptions {
+  /** HTTP 服务实现，承担监听与关闭语义。 */
   readonly server: HttpServer
+  /** 受管生命周期对象，用于在收尾阶段释放已登记资源。 */
   readonly lifecycle: Lifecycle
+  /** 可选的就绪状态端口；提供后会在排空前置为 draining，让探针先摘流量。 */
   readonly health?: Pick<HealthServicePort, 'setDraining'>
+  /** 与 HTTP 一起驻留的后台任务；收束发生在 `finally`，不随中止信号立刻停。 */
   readonly backgroundTasks?: readonly BackgroundTask[]
+  /** 排空期并行执行的任务，用于关队列消费者、等租约释放等。 */
   readonly shutdownTasks?: readonly ShutdownTask[]
+  /** 优雅排空的时间预算；非有限正数时退回默认值，超时后转强制关闭。 */
   readonly shutdownTimeoutMilliseconds?: number
+  /** 强制收尾的时间预算；非有限正数时退回默认值，用于关停生命周期的残留资源。 */
   readonly closeTimeoutMilliseconds?: number
 }
 
+/** 服务监听一相的结局：成功时无字段，失败时携带归一化错误。 */
 interface ServerOutcome {
+  /** 监听失败时的错误；成功结束时为 `undefined`。 */
   readonly error?: Error
 }
 
+/** 中止等待句柄：一个可等待的 Promise 加一个解绑函数。 */
 interface AbortWait {
+  /** 信号中止时兑现的 Promise。 */
   readonly promise: Promise<void>
+  /** 解绑信号监听器，避免往长生命周期的信号上累积监听。 */
   dispose(): void
 }
 
+/** 默认优雅关停预算（毫秒）：30 秒给负载均衡摘流量与存量请求收尾留出余量。 */
 const DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS = 30_000
+/** 默认强制关停预算（毫秒）：10 秒做强制收尾，再长只会拖慢进程退出。 */
 const DEFAULT_CLOSE_TIMEOUT_MILLISECONDS = 10_000
 
 /** 统一管理服务、后台任务、排空状态和资源释放。 */
 export class ServerApplication {
+  /** HTTP 服务实现，承担监听与关闭语义。 */
   readonly #server: HttpServer
+  /** 受管生命周期对象，收尾阶段由它释放已登记资源。 */
   readonly #lifecycle: Lifecycle
+  /** 可选的就绪状态端口；存在时在排空前置为 draining。 */
   readonly #health: Pick<HealthServicePort, 'setDraining'> | undefined
+  /** 与 HTTP 一起驻留的后台任务，在 `finally` 中统一收束。 */
   readonly #backgroundTasks: readonly BackgroundTask[]
+  /** 排空期并行执行的任务集合。 */
   readonly #shutdownTasks: readonly ShutdownTask[]
+  /** 已归一化的优雅排空预算（毫秒），保证为有限正数。 */
   readonly #shutdownTimeoutMilliseconds: number
+  /** 已归一化的强制收尾预算（毫秒），保证为有限正数。 */
   readonly #closeTimeoutMilliseconds: number
 
   public constructor(options: ServerApplicationOptions) {
@@ -173,6 +200,13 @@ export async function buildManaged<T>(
   }
 }
 
+/**
+ * 把可能失败的操作收敛成一个描述结局的对象。
+ * 用「成败都 resolve」代替直接 await，是为了让 `Promise.race` 能区分
+ * 「服务自己退出」与「收到中止信号」两条路径，而不把异常当作控制流抛出。
+ * @param operation - 要观察的服务监听操作
+ * @returns 成功时无 `error`，失败时携带归一化后的错误
+ */
 function settle(operation: Promise<void>): Promise<ServerOutcome> {
   return operation.then(
     (): ServerOutcome => ({}),
@@ -185,6 +219,8 @@ function settle(operation: Promise<void>): Promise<ServerOutcome> {
  * 已经中止的信号直接返回已完成的 Promise：`addEventListener('abort')` 对已中止的信号不会再触发，
  * 不加这个短路就会永远等下去。
  * `dispose` 由调用方在 finally 中执行，避免往长生命周期的信号上累积监听器。
+ * @param signal - 要等待中止的信号；已中止的信号直接返回已兑现的 Promise
+ * @returns 可等待的 Promise 与解绑函数
  */
 function waitForAbort(signal: AbortSignal): AbortWait {
   if (signal.aborted) {
@@ -204,6 +240,13 @@ function waitForAbort(signal: AbortSignal): AbortWait {
   }
 }
 
+/**
+ * 给操作套一个超时上限：到点即中止并拒绝，操作正常落定时清理定时器。
+ * 超时通过中止信号传给操作，让操作有机会自行收尾，而不是只让上层失去等待。
+ * @param operation - 接收中止信号的操作；超时时其信号被中止
+ * @param milliseconds - 超时的毫秒数
+ * @param message - 超时错误的文案，便于区分是哪个阶段超时
+ */
 async function withTimeout(
   operation: (signal: AbortSignal) => Promise<void>,
   milliseconds: number,
@@ -228,6 +271,14 @@ async function withTimeout(
   }
 }
 
+/**
+ * 取有限正数，否则退回默认值。
+ * 非法超时（`NaN`、无穷、零或负数）在此被视为「未配置」而不是抛错：超时预算是可选调优项，
+ * 缺失时用默认值比让进程起不来更合理；这与端口校验的「非法即抛错」是有意的区别。
+ * @param value - 调用方传入的超时值
+ * @param fallback - 非法或缺失时使用的默认值
+ * @returns 一个有限正数超时
+ */
 function positiveTimeout(value: number | undefined, fallback: number): number {
   return value === undefined || !Number.isFinite(value) || value <= 0 ? fallback : value
 }

@@ -33,7 +33,9 @@ export type {
 
 /** 解析后的 SSE 帧：事件名 + **尚未校验**的原始载荷（形状由调用方按 `eventType` 判）。 */
 export interface ParsedSSEEvent {
+  /** 事件名；已由解析层校验为契约中声明的事件类型。 */
   readonly eventType: SSEEventType
+  /** 原始载荷；形状尚未校验，由调用方按 eventType 收窄。 */
   readonly data: unknown
 }
 

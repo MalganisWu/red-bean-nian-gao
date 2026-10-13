@@ -3,6 +3,7 @@ import type { StorageHealthPort } from './port/storage-health.port.js'
 
 /** 通过 Module 私有 ObjectStorage 验证对象存储连通性。 */
 export class StorageHealthService implements StorageHealthPort {
+  /** 模块私有的对象存储适配器，构造时注入；探活只读它，不转移其所有权。 */
   readonly #storage: ObjectStorage
 
   public constructor(storage: ObjectStorage) {

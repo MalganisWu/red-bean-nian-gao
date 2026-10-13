@@ -49,6 +49,9 @@ export function parseStoredRuntimeState(state: StoredRuntimeState): Checkpoint {
 /**
  * 后端侧的 SDK 状态适配器。业务服务只传递状态信封，只有这一层理解
  * qing-tuan checkpoint 的内部结构。
+ * @param state 既有状态信封；undefined 表示本次运行尚无快照，此时造一个最小 Checkpoint
+ * @param messages 待追加的产品消息；为空数组时直接返回原 state，不做无谓的重新序列化
+ * @returns 追加后的新信封；无可追加消息时原样返回入参
  */
 function appendRuntimeMessages(
   state: StoredRuntimeState | undefined,
@@ -85,6 +88,12 @@ function appendRuntimeMessages(
   }
 }
 
+/**
+ * 按完整消息键求最大重叠后缀后拼接，消除恢复增量与主快照尾部的重复消息。
+ * @param base 已有快照中的消息序列
+ * @param suffix 待并入的增量消息序列
+ * @returns 去重拼接后的新数组；无重叠时等价于 base 直接接上 suffix
+ */
 function appendWithoutOverlap(
   base: readonly AgentMessage[],
   suffix: readonly AgentMessage[]
@@ -100,6 +109,12 @@ function appendWithoutOverlap(
   return [...base, ...suffix]
 }
 
+/**
+ * 判定两条消息是否等价，供去重时比较重叠后缀。
+ * @param left 左侧消息；undefined 视为不相等，用于索引越界时的防御
+ * @param right 右侧消息
+ * @returns 两侧都存在且 JSON 序列化一致时为 true
+ */
 function sameMessage(left: AgentMessage | undefined, right: AgentMessage): boolean {
   return left !== undefined && JSON.stringify(left) === JSON.stringify(right)
 }

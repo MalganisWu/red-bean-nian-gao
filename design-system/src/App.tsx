@@ -9,9 +9,19 @@ import {
 
 import { TABS, TAB_GROUPS, type TabGroupDefinition, type TabId } from './showcase/tabs'
 
+/** 展示页组件的统一形态：不接受 props，直接返回一棵 React 元素树。 */
 type PageComponent = () => ReactElement
 
-/** 拉取展示页模块并取出其中的页面组件，供 `React.lazy` 作为加载函数使用。 */
+/**
+ * 拉取展示页模块并取出其中的页面组件，供 `React.lazy` 作为加载函数使用。
+ *
+ * 本函数是懒加载失败语义的中转点：动态 import 被拒绝、或模块求值抛错时，它不会吞掉
+ * 异常，而是让 Promise 继续拒绝，由 `React.lazy` 在渲染期把错误抛给最近的错误边界。
+ *
+ * @param loadModule - 动态 import 的加载函数，由调用方闭包住具体页面路径。
+ * @param selectPage - 从已加载模块里挑出页面组件的选择器，把模块导出形状与懒加载约定解耦。
+ * @returns 形如 `{ default: PageComponent }` 的模块包装，符合 `React.lazy` 对加载函数的约定。
+ */
 async function loadPageModule<TModule>(
   loadModule: () => Promise<TModule>,
   selectPage: (module: TModule) => PageComponent
@@ -20,6 +30,16 @@ async function loadPageModule<TModule>(
   return { default: selectPage(module) }
 }
 
+/**
+ * 把「动态 import + 选择器」组装成 `React.lazy` 组件，供路由表按页签取用。
+ *
+ * 失败语义与 `loadPageModule` 一致：不降级、不返回备用组件，加载错误一律交给
+ * 错误边界处理——静默兜底会让「页面加载失败」伪装成空白页，反而掩盖问题。
+ *
+ * @param loadModule - 动态 import 的加载函数，闭包住具体页面模块路径。
+ * @param selectPage - 从加载到的模块里取出页面组件的选择器。
+ * @returns 可交给 React 渲染、并在首次进入时触发懒加载的组件。
+ */
 function lazyPage<TModule>(
   loadModule: () => Promise<TModule>,
   selectPage: (module: TModule) => PageComponent
@@ -27,6 +47,13 @@ function lazyPage<TModule>(
   return lazy(() => loadPageModule(loadModule, selectPage))
 }
 
+/**
+ * 页签 id 到展示页组件的路由表：每个条目都是一段独立的懒加载分包，
+ * 只有切到对应页签才拉取，避免首屏把全部展示页打进主包。
+ *
+ * 键类型是 `TabId` 而非 `string`，因此新增页签时类型检查会强制补上对应条目，
+ * 不会留下「点了没反应」的空档。
+ */
 const PAGES: Record<TabId, LazyExoticComponent<PageComponent>> = {
   philosophy: lazyPage(
     () => import('./foundations/PhilosophyPage'),
@@ -122,6 +149,13 @@ const PAGES: Record<TabId, LazyExoticComponent<PageComponent>> = {
   ),
 }
 
+/**
+ * 懒加载期间的占位：以 `role="status"` 把「正在加载」暴露给辅助技术。
+ *
+ * 只给文字、不做骨架屏——占位与真实页面尺寸不一致时骨架反而制造布局抖动。
+ *
+ * @returns 承载加载文案的占位元素。
+ */
 function PageLoading(): ReactElement {
   return (
     <div className="ds-page-loading" role="status">
@@ -130,7 +164,16 @@ function PageLoading(): ReactElement {
   )
 }
 
-/** 把主题同步到根元素与本地存储，下次打开时直接恢复。 */
+/**
+ * 把主题同步到根元素与本地存储，下次打开时直接恢复。
+ *
+ * 持久化没有兜底：`localStorage` 被禁用或写满时 `setItem` 会抛错并向上冒泡。
+ * 这是有意的取舍——本函数只负责同步，加 try/catch 静默吞掉错误会让「主题不生效」
+ * 无从排查；本会话内的主题切换仍依赖调用方在 `useEffect` 中触发。
+ *
+ * @param theme - 目标主题；`dark` 时给根元素加 `dark` 类并同步 `color-scheme`，
+ *   `light` 时移除该类，两套主题都通过语义 token 生效。
+ */
 function applyTheme(theme: 'light' | 'dark'): void {
   document.documentElement.classList.toggle('dark', theme === 'dark')
   document.documentElement.style.colorScheme = theme

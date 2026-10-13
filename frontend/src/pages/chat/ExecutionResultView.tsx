@@ -8,12 +8,22 @@ import { formatDateTime, formatShortDateTime } from '@/lib/datetime'
 import { useTaskStore } from '@/stores/task-store'
 import type { MessageSection } from '@/types/chat'
 
+/** 单次执行页属性：目标任务与执行的标识，以及返回上一层的回调。 */
 interface ExecutionResultViewProps {
+  /** 执行所属的任务 id；用于拉取执行详情。 */
   taskId: string
+  /** 要展示的执行 id。 */
   executionId: string
+  /** 点击返回时触发。 */
   onBack: () => void
 }
 
+/**
+ * 把时间字符串格式化为当天的 `HH:mm:ss`，用于展示执行的计划、开始与完成时刻。
+ *
+ * @param value - ISO 时间字符串；空值或非法值判为不可展示。
+ * @returns `HH:mm:ss` 文案；无法解析时返回 `undefined`，调用方据此隐藏对应行。
+ */
 function timeOnly(value: string | null | undefined): string | undefined {
   if (!value) return undefined
   const date = new Date(value)

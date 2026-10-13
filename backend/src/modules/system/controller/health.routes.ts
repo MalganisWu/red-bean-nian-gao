@@ -32,7 +32,13 @@ export function registerHealthRoutes(server: FastifyInstance, controller: Health
   })
 }
 
-/** GET /readyz：聚合依赖探针结果，并以裸 body 输出就绪状态与状态码。 */
+/**
+ * GET /readyz：聚合依赖探针结果，并以裸 body 输出就绪状态与状态码。
+ *
+ * @param controller - 探针控制器，负责聚合各依赖状态。
+ * @param request - Fastify 请求，仅用于取客户端断开时的取消信号。
+ * @param reply - Fastify 响应，按就绪结果决定 HTTP 状态码。
+ */
 async function reportReadiness(
   controller: HealthController,
   request: FastifyRequest,

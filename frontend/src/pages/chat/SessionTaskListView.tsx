@@ -10,9 +10,13 @@ import { toScheduledTaskListItem } from '@/components/task/scheduledTaskPresenta
 import { useChatStore } from '@/stores/chat-store'
 import { useTaskStore } from '@/stores/task-store'
 
+/** 会话内任务列表视图属性：返回回调，以及选中任务、选中某次执行两项导航回调。 */
 interface SessionTaskListViewProps {
+  /** 点击返回时触发。 */
   onBack: () => void
+  /** 选中某个任务时触发，携带任务 id。 */
   onSelectTask: (taskId: string) => void
+  /** 选中某次执行时触发，携带任务 id 与执行 id。 */
   onSelectExecution: (taskId: string, executionId: string) => void
 }
 

@@ -4,8 +4,15 @@ import { isTokenExpiringSoon } from '@/lib/token'
 import { AppError, parseApiError } from '@/lib/errors'
 import { decodeRefreshToken } from './response-validation'
 
+/** 响应体校验/解包器：把不可信的 `unknown` 收窄为调用方声明的可信类型，形状不符时应抛错。 */
 type ResponseDecoder<TValue> = (value: unknown) => TValue
 
+/**
+ * 读取响应体并解析为 JSON；空响应体按 `null` 处理（如 204）。
+ *
+ * @param response - fetch 响应；body 只会被消费一次。
+ * @returns 解析后的 `unknown`；空体返回 `null`，非 JSON 文本会让 `JSON.parse` 抛错。
+ */
 async function readJson(response: Response): Promise<unknown> {
   const source = await response.text()
   if (!source) return null

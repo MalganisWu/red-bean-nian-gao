@@ -155,8 +155,8 @@
     }
   },
   {
-    "name": "未导出符号不参与门禁",
-    "valid": true,
+    "name": "未导出符号同样参与门禁：判据是可见范围，不是导出性",
+    "valid": false,
     "record": {
       "symbolPath": "normalizeError",
       "kind": "function",
@@ -165,6 +165,19 @@
       "params": ["value"],
       "hasDestructuredParam": false,
       "returnTypeText": "Error"
+    }
+  },
+  {
+    "name": "接口成员与类成员同判：公开属性只要描述，不要 tag",
+    "valid": true,
+    "record": {
+      "symbolPath": "ChatRunHandle.runId",
+      "kind": "property",
+      "exported": true,
+      "jsdocText": "/** 本次运行标识，同时也是取消注册表里的 requestId。 */",
+      "params": [],
+      "hasDestructuredParam": false,
+      "returnTypeText": "string"
     }
   },
   {
@@ -232,7 +245,7 @@
     }
   },
   {
-    "name": "纯英文描述必须失败：注释读者只读中文",
+    "name": "纯英文描述必须失败：中文是主要工作语言",
     "valid": false,
     "record": {
       "symbolPath": "loadConfig",
@@ -281,6 +294,19 @@
       "params": ["modelName"],
       "hasDestructuredParam": false,
       "returnTypeText": "JsonObject"
+    }
+  },
+  {
+    "name": "返回联合含 void 时视为无返回值，不要求 @returns",
+    "valid": true,
+    "record": {
+      "symbolPath": "authorize",
+      "kind": "method",
+      "exported": true,
+      "jsdocText": "/**\n * 判定是否放行；拒绝时抛出而不是返回 false。\n * @param request - 待判定的出站请求。\n */",
+      "params": ["request"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "Promise<void> | void"
     }
   }
 ]

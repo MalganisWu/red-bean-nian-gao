@@ -10,8 +10,11 @@ import { registerUserRoutes as bindUserRoutes } from './controller/identity.rout
 
 /** Identity HTTP 驱动适配器的组装依赖。 */
 export interface UserRouteDependencies {
+  /** 注册用例服务；由 Module 组装，本函数不新建仓储或散列器。 */
   readonly registration: IdentityRegistrationService
+  /** 资料用例服务；自有视图与公开视图的读取与更新都由它承担。 */
   readonly profiles: IdentityProfileService
+  /** 认证端口；既用于构造控制器，也用于生成鉴权前置处理器。 */
   readonly authService: AuthServicePort
 }
 

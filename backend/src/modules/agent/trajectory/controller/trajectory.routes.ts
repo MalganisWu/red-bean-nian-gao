@@ -13,7 +13,13 @@ import { requestAbortSignal } from '../../../../shared/http/fastify-http-boundar
 import { envelope, sendOk } from '../../../../shared/http/response.js'
 import type { TrajectoryController } from './trajectory.controller.js'
 
-/** 从路径参数解包会话 id（共享契约的 zod schema）。 */
+/**
+ * 从路径参数解包会话 id（共享契约的 zod schema）。
+ * 校验失败即抛 400 语义的校验错误，不让非法 id 进入 Controller 的查询路径。
+ *
+ * @param value - Fastify 解出的原始路径参数对象，按不可信输入处理。
+ * @returns 校验通过的会话 id。
+ */
 function parseTrajectorySessionId(value: unknown): string {
   const parsed = trajectoryParamsSchema.safeParse(value)
   if (!parsed.success) throw validationError('会话 ID 不能为空')
@@ -41,7 +47,14 @@ export function registerTrajectoryRoutes(
   })
 }
 
-/** GET /api/sessions/:id/trajectory：返回单个会话的轨迹投影。 */
+/**
+ * GET /api/sessions/:id/trajectory：返回单个会话的轨迹投影。
+ * 轨迹按当前认证用户过滤，越权访问在 Controller 层即返回未找到。
+ *
+ * @param controller - 轨迹查询控制器；此处只接线，不持有其生命周期。
+ * @param request - 携带认证主体、路径参数与中止信号的 Fastify 请求。
+ * @param reply - 成功信封的回写目标。
+ */
 async function getSessionTrajectory(
   controller: TrajectoryController,
   request: FastifyRequest,

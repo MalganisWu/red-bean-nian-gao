@@ -35,6 +35,7 @@ export interface DelegationBlockProps {
   defaultExpanded?: boolean | undefined
 }
 
+/** 委派状态到中文文案的映射；键与 `DelegationStatus` 一一对应，新增状态时类型检查会强制补齐。 */
 const STATUS_TEXT: Record<DelegationStatus, string> = {
   running: '正在执行',
   completed: '成功',
@@ -44,7 +45,15 @@ const STATUS_TEXT: Record<DelegationStatus, string> = {
   incomplete: '未完成',
 }
 
-/** 渲染子执行里的一条过程项；无内容的项不渲染。 */
+/**
+ * 渲染子执行里的一条过程项：步骤文本直接成段，工具项交给 `ToolItem`。
+ *
+ * 无载荷的项返回 `null` 而不是空占位——空节点会在轨道里留下无意义的垂直空隙。
+ *
+ * @param item - 子执行内的一条过程项，按 `itemType` 分派渲染。
+ * @param index - 该项在列表中的序号，仅用于生成稳定的 React key。
+ * @returns 渲染出的过程项元素；`itemType` 未知或缺载荷时返回 `null`。
+ */
 function renderDelegationItem(item: ReasonItem, index: number): ReactElement | null {
   if (item.itemType === 'step') {
     return (

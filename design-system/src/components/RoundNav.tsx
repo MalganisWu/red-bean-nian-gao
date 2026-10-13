@@ -10,6 +10,7 @@ import { cn } from '../lib/utils'
 
 /** 一个轮次对应的一根横杠。 */
 export interface RoundNavEntry {
+  /** 轮次标识：既是横杠的 React key，也是 `onSelect` 回调带出的值。 */
   id: string
   /** 悬停摘要卡内容（调用方渲染，如 Q+A+meta）；无则悬停不出卡 */
   preview?: ReactNode
@@ -25,17 +26,32 @@ export interface RoundNavProps {
   onSelect?: ((id: string) => void) | undefined
 }
 
+/** 悬停预览卡的状态：落到哪一根横杠，以及摘要卡在视口里的落点。 */
 interface HoverState {
+  /** 当前悬停的轮次条目；摘要卡渲染它的 `preview`。 */
   entry: RoundNavEntry
+  /** 摘要卡左边缘的视口 x 坐标（px）；默认在轨道左侧展开，空间不足时回退到横杠右侧。 */
   x: number
+  /** 摘要卡上边缘的视口 y 坐标（px）；已夹在视口内，避免上下溢出。 */
   y: number
 }
 
+/** 静止态横杠宽度（px）：细到不抢视线，又足够构成可点击的视觉目标。 */
 const DEFAULT_WIDTH = 10
+/** 当前轮横杠宽度（px）：比静止态略长，用来标出「你正停在这一轮」。 */
 const CURRENT_WIDTH = 21
+/** 波纹峰值宽度（px）：指针所在横杠能伸长的上限，形成跟着指针走的凸起。 */
 const PEAK_WIDTH = 42
+/** 波纹影响半径（单位是横杠序号）：距离超过它的横杠不受指针影响，保持静止宽度。 */
 const WAVE_RADIUS = 3
 
+/**
+ * 按到指针的序号距离算横杠宽度：越近越接近 `PEAK_WIDTH`，超出 `WAVE_RADIUS` 回落到
+ * `DEFAULT_WIDTH`。指数取 1.32（而非线性）让凸起比线性更尖，指针附近变化明显、边缘平滑收束。
+ *
+ * @param distance - 该横杠与指针位置的序号距离（取绝对值，单位为横杠根数）。
+ * @returns 该横杠应有的宽度（px），介于 `DEFAULT_WIDTH` 与 `PEAK_WIDTH` 之间。
+ */
 function waveWidth(distance: number): number {
   const influence = Math.max(0, 1 - distance / WAVE_RADIUS)
   return DEFAULT_WIDTH + (PEAK_WIDTH - DEFAULT_WIDTH) * Math.pow(influence, 1.32)

@@ -27,12 +27,14 @@ import { optionalField } from '../../../../shared/object/optional-field.js'
  * 这个决定只有写入方做得出来，读取方无从推断，所以标记落在数据里而不是代码里。
  */
 
+/** 单次 attempt 的 token 用量形状；cacheReadTokens 允许为 null（供应商未上报缓存命中）。 */
 const usageSchema = z.object({
   promptTokens: z.number().int().nonnegative(),
   completionTokens: z.number().int().nonnegative(),
   cacheReadTokens: z.number().int().nonnegative().nullable(),
 })
 
+/** 一次 LLM attempt 的校验形状；endedAt 必有，未闭合的 attempt 在固化时已补成 startedAt。 */
 const attemptSchema = z.object({
   attempt: z.number().int().positive(),
   startedAt: z.number().finite(),
@@ -41,6 +43,7 @@ const attemptSchema = z.object({
   error: z.string().optional(),
 })
 
+/** user 事实的校验形状；ignorable 只可能是字面量 true，用于标记可安全跳过的记录。 */
 const userFactSchema = z.object({
   type: z.literal(RUN_FACT_TYPES.USER),
   content: z.string(),
@@ -50,6 +53,7 @@ const userFactSchema = z.object({
   ignorable: z.literal(true).optional(),
 })
 
+/** assistant 事实的校验形状；attempts 承载空响应重试留下的全部 attempt，供回放。 */
 const assistantFactSchema = z.object({
   type: z.literal(RUN_FACT_TYPES.ASSISTANT),
   at: z.number().finite(),
@@ -62,6 +66,7 @@ const assistantFactSchema = z.object({
   ignorable: z.literal(true).optional(),
 })
 
+/** compaction 事实的校验形状；durationMs 可空以兼容未测到耗时的存量摘要记录。 */
 const compactionFactSchema = z.object({
   type: z.literal(RUN_FACT_TYPES.COMPACTION),
   at: z.number().finite(),
@@ -79,6 +84,7 @@ const compactionFactSchema = z.object({
   ignorable: z.literal(true).optional(),
 })
 
+/** tool 事实的校验形状；status 可缺省（存量记录按 result/error 推断完成或失败）。 */
 const toolFactSchema = z.object({
   type: z.literal(RUN_FACT_TYPES.TOOL),
   callId: z.string(),
@@ -94,6 +100,7 @@ const toolFactSchema = z.object({
   ignorable: z.literal(true).optional(),
 })
 
+/** run 终态机取值集合；与 SESSION_RUN_STATUSES 对齐，未知状态一律拒绝。 */
 const sessionRunStatusSchema = z.enum([
   SESSION_RUN_STATUSES.RUNNING,
   SESSION_RUN_STATUSES.COMPLETED,
@@ -103,6 +110,7 @@ const sessionRunStatusSchema = z.enum([
   SESSION_RUN_STATUSES.EXHAUSTED,
 ])
 
+/** 取消归属取值集合；区分用户主动取消与系统（超时等）取消。 */
 const sessionRunCancelledBySchema = z.enum([
   SESSION_RUN_CANCELLED_BY.USER,
   SESSION_RUN_CANCELLED_BY.SYSTEM,
@@ -128,6 +136,7 @@ export const SESSION_RUN_ROW_COLUMNS = `
   schema_version
 `
 
+/** session_runs 查询行的校验形状；facts 为待逐条二次校验的 JSONB 数组。 */
 const sessionRunRowSchema = z.object({
   run_id: z.string(),
   session_id: z.string(),
@@ -227,6 +236,13 @@ export function parseRunFacts(value: unknown): readonly RunFact[] {
   return facts
 }
 
+/**
+ * 按 type 选对应 schema 校验一条已知事实并映射为领域对象；
+ * 调用方已保证 type 属于已知集合且版本一致，这里只做字段级校验与可空字段归一。
+ * @param entry 事实日志里的一条原始对象；形状不符即抛 RunFactStoreError
+ * @param type 已判定为已知的事实类型，用于选 schema
+ * @returns 通过校验的领域事实
+ */
 function parseKnownFact(entry: Record<string, unknown>, type: string): RunFact {
   const schema =
     type === RUN_FACT_TYPES.USER
@@ -293,6 +309,11 @@ function parseKnownFact(entry: Record<string, unknown>, type: string): RunFact {
   }
 }
 
+/**
+ * 判定字符串是否为当前已知的事实类型；未知类型由调用方按 ignorable 纪律决定跳过或拒绝。
+ * @param type 事实记录里的 type 字段
+ * @returns 属于已知类型时为 true
+ */
 function isKnownFactType(type: string): boolean {
   return (
     type === RUN_FACT_TYPES.USER ||
@@ -302,18 +323,38 @@ function isKnownFactType(type: string): boolean {
   )
 }
 
+/**
+ * 判定事实日志条目是否为非数组对象；逐条校验前先排除数组与 null。
+ * @param value 待判定的未知值
+ * @returns 是非数组对象时为 true
+ */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/**
+ * 把数据库的 null 取消归属归一为 undefined；领域模型里「缺失」与「显式 null」都表示无归属。
+ * @param value 数据库读出的取消归属，可为 null
+ * @returns 取消归属；数据库为 null 时为 undefined
+ */
 function toCancelledBy(value: SessionRunCancelledBy | null): SessionRunCancelledBy | undefined {
   return value ?? undefined
 }
 
+/**
+ * 把取消时刻的 nullable 日期列映射为 epoch 毫秒；null 归一为 undefined，便于可选字段整体省略。
+ * @param value 取消时刻日期列，可为 null
+ * @returns 取消时刻的 epoch 毫秒；列为 null 时为 undefined
+ */
 function cancelledAt(value: Date | null): number | undefined {
   return value === null ? undefined : value.getTime()
 }
 
+/**
+ * 把 nullable 日期列映射为 epoch 毫秒并保留 null 语义；endedAt 的 null 表示 run 尚未结束。
+ * @param value 日期列，可为 null
+ * @returns epoch 毫秒；列为 null 时为 null
+ */
 function toEpochMs(value: Date | null): number | null {
   return value === null ? null : value.getTime()
 }

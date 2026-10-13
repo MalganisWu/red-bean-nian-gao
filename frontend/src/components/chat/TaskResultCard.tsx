@@ -11,17 +11,31 @@ import type { Task } from '@/types/task'
 import { MessageCard } from './MessageCard'
 import { getTaskResultDefaultCollapsed } from './taskResultState'
 
+/** 定时任务结果卡片属性：待渲染的展示消息，以及它是否为该任务的最新一次运行。 */
 interface TaskResultCardProps {
+  /** 待渲染的展示消息；其 meta.scheduled_task 提供该轮任务的运行元信息。 */
   message: DisplayMessage
   /** 同一任务在当前上下文中的最新一次运行默认保持展开。 */
   isLatest?: boolean | undefined
 }
 
+/**
+ * 生成任务卡片的「执行规则」文案：周期任务展示 cron，单次任务展示触发时间。
+ *
+ * @param task - 源任务；读取 `ScheduleType`、`CronExpr` 与 `RunAt`。
+ * @returns 单行执行规则文案；cron 为空时回落为「周期执行」，时间缺失时回落为「单次执行」。
+ */
 function taskRule(task: Task): string {
   if (task.ScheduleType === 'recurring') return task.CronExpr || '周期执行'
   return formatDateTime(task.RunAt, '单次执行')
 }
 
+/**
+ * 生成任务卡片的「下次执行」文案：已结束的单次任务直接标记终态，其余展示下次触发时间。
+ *
+ * @param task - 源任务；读取 `ScheduleType`、`IsActive` 与 `NextRunAt`。
+ * @returns 单行下次执行文案；单次且已停用返回「已结束」，无下次触发时间则回落为「待调度」。
+ */
 function nextRunLabel(task: Task): string {
   if (task.ScheduleType === 'once' && !task.IsActive) return '已结束'
   return formatDateTime(task.NextRunAt, '待调度')

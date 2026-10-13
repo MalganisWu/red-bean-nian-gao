@@ -11,20 +11,29 @@ import { cn } from '../lib/utils'
 
 /** 工具行的 Props；`status` 决定配色与图标，`duration` 为已格式化的耗时文案。 */
 export interface ToolItemProps {
+  /** 工具名（如 `sys_read_file`）；以等宽字体展示，过长时截断并悬浮显示全名。 */
   name: string
+  /** 工具调用的唯一标识（`callId`）；仅用于与轨迹记录对齐，不参与渲染。 */
   callId?: string | undefined
   /** 当前工具调用承载一个子 Agent 委派。 */
   isDelegation?: boolean | undefined
   /** 工具作用目标；兼容旧调用方名称 label。 */
   label?: string | undefined
+  /** 调用状态：`running`/`cancelled`/`incomplete` 用弱化色，`success` 用成功色，`failed` 用危险色。 */
   status: 'running' | 'success' | 'failed' | 'cancelled' | 'incomplete'
+  /** 已格式化好的耗时文案（如 `1.2s`）；不传则不显示耗时列，窄屏下本就隐藏。 */
   duration?: string | undefined
+  /** 入参文本（通常是 JSON 串）；与 `result`/`error` 任一存在才允许展开，否则整行不可展开。 */
   params?: string | undefined
+  /** 返回结果文本；失败时也可能同时给出 `result` 与 `error`。 */
   result?: string | undefined
+  /** 失败原因；存在时展开区以危险色展示，输入输出区的左侧竖线也转为危险色。 */
   error?: string | undefined
+  /** 首次挂载是否展开详情；仅当存在 `params`/`result`/`error` 时才有意义，默认 false（收起）。 */
   defaultExpanded?: boolean | undefined
 }
 
+/** 状态到中文文案的映射：`status` 是机器可读的枚举，展示统一取这里，避免各处硬编码中文。 */
 const STATUS_TEXT: Record<ToolItemProps['status'], string> = {
   running: '正在运行',
   success: '成功',

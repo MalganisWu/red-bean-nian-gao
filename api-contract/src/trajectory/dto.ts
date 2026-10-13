@@ -7,7 +7,9 @@
 
 /** 一次 LLM 调用的 token 三段用量。 */
 export interface TrajectoryTokenUsageDto {
+  /** 输入 token 数（含系统提示与上下文）。 */
   readonly input: number
+  /** 输出 token 数（模型生成的补全）。 */
   readonly output: number
   /** 缓存命中；null = Provider 未返回 / 未采集。 */
   readonly cache: number | null
@@ -25,16 +27,23 @@ export type TrajectoryRecordKindDto =
 
 /** 一次实际 LLM 请求（call 的可展开子行；重试时多条）。 */
 export interface TrajectoryAttemptDto {
+  /** 尝试记录的稳定 ID。 */
   readonly id: string
+  /** 全局稳定序号（展示顺序即序号顺序）。 */
   readonly seq: number
+  /** 本次尝试使用的模型标识。 */
   readonly model: string
   /** 尝试序，如 "2/3"。 */
   readonly attempt: string
+  /** 本次尝试耗时毫秒。 */
   readonly durationMs: number
   /** 成功请求的用量；失败请求为 null。 */
   readonly tokens: TrajectoryTokenUsageDto | null
+  /** 本次尝试的结局：success 成功、error 失败。 */
   readonly status: 'success' | 'error'
+  /** 失败原因文本；成功时缺省。 */
   readonly error?: string | undefined
+  /** 本次尝试发生的时刻，epoch 毫秒。 */
   readonly at: number
 }
 
@@ -46,8 +55,11 @@ export interface TrajectoryAttemptDto {
  * 映射，wire 只带机制值。
  */
 export interface TrajectoryEndStateDto {
+  /** 终态机制值；取值域见类型注释，展示文案由前端映射。 */
   readonly state: 'completed' | 'failed' | 'cancelled' | 'exhausted' | 'interrupt' | 'crashed'
+  /** 进入该终态的时刻，epoch 毫秒。 */
   readonly at: number
+  /** 补充说明；缺省表示没有额外备注。 */
   readonly note?: string | undefined
 }
 
@@ -57,6 +69,7 @@ export interface TrajectoryRecordDto {
   readonly id: string
   /** 全局稳定序号（展示顺序即序号顺序）。 */
   readonly seq: number
+  /** 记录类型；决定本行其余可选字段的语义。 */
   readonly kind: TrajectoryRecordKindDto
   /** 绝对时刻（epoch ms）。 */
   readonly at: number
@@ -89,21 +102,29 @@ export interface TrajectoryRecordDto {
   readonly waitMs?: number | undefined
   /** 检查器详情字段。 */
   readonly thinking?: string | undefined
+  /** 模型回复全文；缺省表示该记录不携带回复。 */
   readonly reply?: string | undefined
+  /** 入参原样文本；缺省表示该记录不携带入参。 */
   readonly params?: string | undefined
+  /** 结果原样文本；缺省表示该记录不携带结果。 */
   readonly result?: string | undefined
+  /** 模型标识；缺省表示该记录不关联具体模型。 */
   readonly model?: string | undefined
 }
 
 /** 一轮对话（用户消息开轮）。 */
 export interface TrajectoryTurnDto {
+  /** 轮次序号，从 1 开始。 */
   readonly turn: number
+  /** 本轮开始时刻，epoch 毫秒。 */
   readonly startedAt: number
+  /** 本轮耗时毫秒。 */
   readonly durationMs: number
   /** 本轮 token 合计（含子 Agent）；G0 主会话未采集时为 null。 */
   readonly tokens: number | null
   /** 轮次备注（如「压缩后上下文 8,100 tok 起」）。 */
   readonly note?: string | undefined
+  /** 本轮内的轨迹记录，按序号升序。 */
   readonly records: TrajectoryRecordDto[]
   /** 轮次终态；G0 可由回复存在性推导，不可推导时为 null。 */
   readonly endState?: TrajectoryEndStateDto | null | undefined
@@ -111,26 +132,39 @@ export interface TrajectoryTurnDto {
 
 /** 上下文压缩事件（轮次之间的一等公民记录）。 */
 export interface TrajectoryCompactionDto {
+  /** 压缩事件的稳定 ID。 */
   readonly id: string
+  /** 全局稳定序号（展示顺序即序号顺序）。 */
   readonly seq: number
   /** 发生在第几轮之后。 */
   readonly afterTurn: number
+  /** 压缩发生的时刻，epoch 毫秒。 */
   readonly at: number
+  /** 压缩耗时毫秒。 */
   readonly durationMs: number
+  /** 压缩前的 token 估算值。 */
   readonly beforeTokens: number
+  /** 压缩后的 token 估算值。 */
   readonly afterTokens: number
   /** 被总结的消息条数。 */
   readonly messages: number
+  /** 压缩策略标识；缺省表示未记录策略。 */
   readonly strategy?: string | undefined
+  /** 压缩结果：success 成功、failed 失败、interrupted 被打断。 */
   readonly status: 'success' | 'failed' | 'interrupted'
 }
 
 /** 会话轨迹完整视图。 */
 export interface SessionTrajectoryDto {
+  /** 会话 ID。 */
   readonly sessionId: string
+  /** 会话标题。 */
   readonly title: string
+  /** 会话内全部轮次，按轮次序号升序。 */
   readonly turns: TrajectoryTurnDto[]
+  /** 最近一次压缩事件；null 或缺失表示没有可展示的压缩。 */
   readonly compaction?: TrajectoryCompactionDto | null | undefined
+  /** 会话终态；null 或缺失表示会话尚未结束或未采集。 */
   readonly sessionEnd?: TrajectoryEndStateDto | null | undefined
   /** 主会话累计 token；G0 为 null（未采集），子 Agent 合计见 subAgentTokens。 */
   readonly totalTokens: number | null

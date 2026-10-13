@@ -15,15 +15,19 @@ export type TrajectoryRecordKind =
 
 /** 一次实际 LLM HTTP 请求（call 的可展开子行；重试时多条）。 */
 export interface TrajectoryAttempt {
+  /** 尝试的唯一 id（选中态与泳道联动依赖它）。 */
   id: string
   /** 全局稳定序号（加载期分配）。 */
   seq?: number
+  /** 本次尝试实际命中的模型名；重试可能在不同模型间切换，故逐条记录而非挂在调用上。 */
   model: string
   /** 尝试序，如 '2/3'。 */
   attempt: string
+  /** 本次尝试的实际耗时毫秒；`running` 态为进行中区间，不代表最终值。 */
   durationMs: number
   /** 成功请求的 token 三段；失败请求缺省。 */
   tokens?: TrajectoryTokenUsage
+  /** 尝试终态：`success` / `error` 已定稿，`running` 仍在流式进行中（不虚构耗时）。 */
   status: 'success' | 'error' | 'running'
   /** 失败原因（重试触发原因，如「LLM 空响应」）。 */
   error?: string
@@ -40,11 +44,13 @@ export type TrajectoryEndStateValue =
 
 /** 轮次终态标记。 */
 export interface TrajectoryTurnEnd {
+  /** 轮次终态的机制值；展示文案由 trajectoryEndStateLabel 映射，不在此写死。 */
   state: TrajectoryEndStateValue
   /** 结束时刻 HH:MM:SS。 */
   at: string
   /** 附注（如「1 个工具失败，已降级恢复」）。 */
   note?: string
+  /** 全局稳定序号；缺省则终态行不显示序号。 */
   seq?: number
 }
 
@@ -56,8 +62,11 @@ export type TrajectoryRecordStatus = 'success' | 'error' | 'running' | 'interrup
 
 /** 步骤级 token 用量（三段：输入 / 输出 / 缓存命中）。 */
 export interface TrajectoryTokenUsage {
+  /** 输入 token 数。 */
   input: number
+  /** 输出 token 数。 */
   output: number
+  /** 缓存命中 token 数。 */
   cache: number
 }
 
@@ -67,6 +76,7 @@ export interface TrajectoryRecord {
   id: string
   /** 全局稳定序号 #N（消费方在加载期按展示顺序分配；折叠/过滤不改变）。 */
   seq?: number
+  /** 记录类型（封闭联合），决定身份 chip、泳道归属与可展开子项。 */
   kind: TrajectoryRecordKind
   /** 绝对时刻，HH:MM:SS。 */
   at: string
@@ -82,6 +92,7 @@ export interface TrajectoryRecord {
   totalTokens?: number
   /** 自身耗时毫秒；用户消息等即时事件为 undefined。 */
   durationMs?: number
+  /** 记录状态；缺省表示该记录类型不带状态语义（如用户消息），消费方按成功档渲染。 */
   status?: TrajectoryRecordStatus
   /** 子 Agent 的内部工具调用（kind=subagent 时可展开）。 */
   children?: TrajectoryRecord[]
@@ -94,17 +105,23 @@ export interface TrajectoryRecord {
   waitMs?: number
   /** 检查器详情字段：思考 / 回复 / 参数 / 结果 / 模型。 */
   thinking?: string
+  /** 模型回复正文（kind=call）；未采集时检查器该 tab 不显示内容。 */
   reply?: string
+  /** 调用参数原文（工具入参 / JSON 字符串），供审计核对。 */
   params?: string
+  /** 执行结果原文（工具输出），失败时可能是错误信息。 */
   result?: string
+  /** 记录级模型名；缺省时消费方回落到最后一次尝试携带的模型。 */
   model?: string
 }
 
 /** 一轮对话（用户消息开轮，到下一轮用户消息前结束）。 */
 export interface TrajectoryTurn {
+  /** 轮次序号（从 1 起）；也是折叠状态与间隔推导的键。 */
   turn: number
   /** 轮次开始时刻，HH:MM:SS。 */
   startedAt: string
+  /** 轮次耗时毫秒；未终结轮次只是已知活动区间的下界，不是最终耗时。 */
   durationMs: number
   /** 本轮 token 合计（含子 Agent）；null = 未采集（显示占位「—」，不虚构）。 */
   tokens: number | null
@@ -112,6 +129,7 @@ export interface TrajectoryTurn {
   note?: string
   /** 轮次终态标记；有值则记录表尾部渲染一条 turn-end 行。 */
   endState?: TrajectoryTurnEnd
+  /** 本轮按时序排列的扁平记录；层级由消费方按位置推导，wire 上不预分组。 */
   records: TrajectoryRecord[]
 }
 
@@ -119,24 +137,33 @@ export interface TrajectoryTurn {
 export interface TrajectoryGap {
   /** 空档秒数。 */
   seconds: number
+  /** 空档起点时刻，HH:MM:SS。 */
   from: string
+  /** 空档终点时刻，HH:MM:SS。 */
   to: string
+  /** 空档性质文案（如「等待用户输入」「会话空闲」），说明这段时间在等什么。 */
   label: string
 }
 
 /** 上下文压缩事件（轮次之间的一等公民记录）。 */
 export interface TrajectoryCompaction {
+  /** 压缩事件唯一 id；与记录共用选中态与泳道联动。 */
   id: string
   /** 全局稳定序号。 */
   seq?: number
   /** 发生在第几轮之后。 */
   afterTurn: number
+  /** 压缩发生时刻，HH:MM:SS。 */
   at: string
+  /** 压缩本身耗时毫秒（不含随后的等待）。 */
   durationMs: number
+  /** 压缩前上下文 token 数，作为缩放的基准。 */
   beforeTokens: number
+  /** 压缩后上下文 token 数；失败/中断时可能不小于 beforeTokens。 */
   afterTokens: number
   /** 被总结的消息条数。 */
   messages: number
+  /** 压缩策略标识；缺省表示后端未采集，消费方不展示策略名。 */
   strategy?: string
   /** 压缩终态；失败/中断时上下文未收缩，后续请求输入会异常跳涨，审计必须可辨。 */
   status?: 'success' | 'failed' | 'interrupted'
@@ -144,8 +171,11 @@ export interface TrajectoryCompaction {
 
 /** 会话结束标记（可选，渲染在记录表尾部）。 */
 export interface TrajectorySessionEnd {
+  /** 会话结束时刻，HH:MM:SS。 */
   at: string
+  /** 会话终态的机制值；展示文案由 trajectoryEndStateLabel 映射。 */
   state: TrajectoryEndStateValue
+  /** 全局稳定序号；缺省则结束行不显示序号。 */
   seq?: number
 }
 

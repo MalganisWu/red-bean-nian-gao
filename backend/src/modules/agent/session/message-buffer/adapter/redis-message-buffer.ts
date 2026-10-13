@@ -5,13 +5,23 @@ import { serializeAgentMessage } from '../../../serialization/agent-message-seri
 import type { MessageBuffer, MessageBufferGeneration } from '../port/message-buffer.port.js'
 import { optionalField } from '../../../../../shared/object/optional-field.js'
 
+/**
+ * 恢复缓冲的默认存活时长（秒），24 小时。
+ * 缓冲只是「运行中断后还能续上」的短期增量，过期即弃，不必长期保留；
+ * 取一天是为了盖过用户隔夜回来继续同一会话的常见间隔。
+ */
 const DEFAULT_TTL_SECONDS = 24 * 60 * 60
+/** 单条 tool_call 的宽松结构校验；只保证能安全映射回领域模型，不做业务校验。 */
 const toolCallSchema = z.object({
   index: z.number().int().optional(),
   id: z.string(),
   type: z.string(),
   function: z.object({ name: z.string(), arguments: z.string() }),
 })
+/**
+ * 单条 Redis 消息的宽松结构；字段用下划线命名对齐序列化后的键名，
+ * 用可选字段容纳不同角色消息的形状差异，真正的领域形状由 `decodeMessage` 收口。
+ */
 const rawMessageSchema = z.object({
   role: z.string(),
   content: z.string().nullable(),
@@ -22,12 +32,31 @@ const rawMessageSchema = z.object({
 
 /** 消息缓冲实际用到的 Redis 能力子集；只声明这两个方法，避免把整个连接暴露给缓冲实现。 */
 export interface RedisMessageBufferStore {
+  /**
+   * 向列表尾部追加一个值，并刷新整键的过期时间；写入与设 TTL 需原子完成。
+   *
+   * @param key - 目标列表键。
+   * @param value - 待追加的序列化字符串。
+   * @param ttlSeconds - 追加后整键的存活秒数。
+   * @param signal - 取消信号；取消后放弃写入。
+   */
   appendListWithExpiry(
     key: string,
     value: string,
     ttlSeconds: number,
     signal: AbortSignal
   ): Promise<void>
+  /**
+   * 守卫式追加：仅当 `guardKey` 的值等于 `expectedValue` 时才追加，用于拒绝已失租 owner 的写入。
+   *
+   * @param guardKey - 守卫键，通常是会话锁键。
+   * @param expectedValue - 守卫键应持有的值，通常是本轮的 writeProof。
+   * @param key - 目标列表键。
+   * @param value - 待追加的序列化字符串。
+   * @param ttlSeconds - 追加后整键的存活秒数。
+   * @param signal - 取消信号；取消后放弃写入。
+   * @returns 守卫成立并写入成功时为 true；守卫不符时不做写入并返回 false。
+   */
   appendListWithExpiryIfValue(
     guardKey: string,
     expectedValue: string,
@@ -36,9 +65,38 @@ export interface RedisMessageBufferStore {
     ttlSeconds: number,
     signal: AbortSignal
   ): Promise<boolean>
+  /**
+   * 读取列表全量但不删除。
+   *
+   * @param key - 目标列表键。
+   * @param signal - 取消信号；取消后放弃读取。
+   * @returns 列表内的序列化字符串；键不存在时为空数组。
+   */
   listRange(key: string, signal: AbortSignal): Promise<readonly string[]>
+  /**
+   * 取出列表全量并删除键；具有消费语义。
+   *
+   * @param key - 目标列表键。
+   * @param signal - 取消信号；取消后放弃本次消费。
+   * @returns 本次取出的序列化字符串；键不存在时为空数组。
+   */
   consumeList(key: string, signal: AbortSignal): Promise<readonly string[]>
+  /**
+   * 删除键；键不存在时幂等成功。
+   *
+   * @param key - 目标键。
+   * @param signal - 取消信号；取消后放弃删除。
+   */
   delete(key: string, signal: AbortSignal): Promise<void>
+  /**
+   * 守卫式删除：仅当 `guardKey` 的值等于 `expectedValue` 时才删除，避免误删他人内容。
+   *
+   * @param guardKey - 守卫键，通常是会话锁键。
+   * @param expectedValue - 守卫键应持有的值，通常是本轮的 writeProof。
+   * @param key - 目标键。
+   * @param signal - 取消信号；取消后放弃删除。
+   * @returns 守卫成立并删除成功时为 true；守卫不符时不做删除并返回 false。
+   */
   deleteIfValue(
     guardKey: string,
     expectedValue: string,
@@ -49,7 +107,9 @@ export interface RedisMessageBufferStore {
 
 /** 与既有 `agent:cache:*:buffer` 键布局兼容的 Redis 恢复缓冲区。 */
 export class RedisMessageBuffer implements MessageBuffer {
+  /** 注入的 Redis 能力子集；缓冲只走这里声明的几个方法。 */
   readonly #redis: RedisMessageBufferStore
+  /** 每次写入为缓冲键设定的存活秒数，构造时经校验固定。 */
   readonly #ttlSeconds: number
 
   public constructor(redis: RedisMessageBufferStore, ttlSeconds = DEFAULT_TTL_SECONDS) {
@@ -227,10 +287,23 @@ export class RedisMessageBuffer implements MessageBuffer {
   }
 }
 
+/**
+ * 拼装会话的恢复缓冲键；沿用既有 `agent:cache:*:buffer` 布局，保证与旧数据兼容。
+ *
+ * @param sessionId - 目标会话标识。
+ * @returns 该会话的缓冲键。
+ */
 function bufferKey(sessionId: string): string {
   return `agent:cache:${sessionId}:buffer`
 }
 
+/**
+ * 在缓冲键上追加分代 revision，得到这一次运行专属的键；各代因此互不覆盖。
+ *
+ * @param sessionId - 目标会话标识。
+ * @param generation - 本次运行的分代，只用其 `revision` 参与拼键。
+ * @returns 该会话该代的缓冲键。
+ */
 function generationKey(sessionId: string, generation: MessageBufferGeneration): string {
   return `${bufferKey(sessionId)}:${generation.revision.toString()}`
 }
@@ -239,12 +312,20 @@ function generationKey(sessionId: string, generation: MessageBufferGeneration): 
  * 反序列化并逐条校验。Redis 里存放的内容不可信（可能是旧版本写入的、或被人手工改过），
  * 因此每条都过一遍 Zod，形状不对就抛错而不是把脏数据带进上下文。
  * 缺失的可选字段用 `optionalField` 处理，保证「缺席」与「显式 undefined」在结果里是同一种表示。
+ *
+ * @param values - Redis 返回的原始字符串列表。
+ * @returns 逐条校验通过后的消息；任一条不合法即抛错，不做部分返回。
  */
 function decodeMessages(values: readonly string[]): readonly AgentMessage[] {
   return values.map((value): AgentMessage => decodeMessage(value))
 }
 
-/** 反序列化单条消息并逐字段校验；任一步失败都以同一条中文错误抛出。 */
+/**
+ * 反序列化单条消息并逐字段校验；任一步失败都以同一条中文错误抛出。
+ *
+ * @param value - 单条消息的原始字符串。
+ * @returns 校验通过并映射回领域的消息。
+ */
 function decodeMessage(value: string): AgentMessage {
   let parsedJson: unknown
   try {
@@ -271,6 +352,14 @@ function decodeMessage(value: string): AgentMessage {
   }
 }
 
+/**
+ * 给底层失败补上中文上下文再抛出，并保留 cause 链——
+ * 只取 message 重抛会让日志与观测断链，原始错误必须留在 cause 里。
+ *
+ * @param context - 中文上下文前缀，说明这次操作在做什么。
+ * @param cause - 被包装的原始错误，可能是任意抛出物。
+ * @returns 带上下文与 cause 的错误。
+ */
 function contextualError(context: string, cause: unknown): Error {
   return new Error(`${context}: ${cause instanceof Error ? cause.message : String(cause)}`, {
     cause,

@@ -14,15 +14,25 @@ import type { ChildExecutionLease } from '../port/child-execution-lifecycle.port
  * 就能在保存前发现自己已经不该写了。
  */
 export class RevisionHeartbeatLease implements ChildExecutionLease {
+  /** 子执行仓储；续租经它把 updated_at 前移，失配即视为失租。 */
   readonly #repository: SubExecutionRepository
+  /** 本次租约对应的子执行标识。 */
   readonly #executionId: string
+  /** 认领时拿到的 revision；续租必须带上它，失配即说明所有权已被接管。 */
   readonly #revision: bigint
+  /** 租期硬上限毫秒数；过期计时器到点即中止，与心跳是否成功无关。 */
   readonly #leaseMilliseconds: number
+  /** 心跳间隔毫秒数；必须小于租期，否则永远来不及续上。 */
   readonly #heartbeatMilliseconds: number
+  /** 取当前时间的函数；续租时写入记录，测试可注入固定值。 */
   readonly #now: () => Date
+  /** 失租时被 abort 的控制器；调用方看 `signal.aborted` 判断是否还能写。 */
   readonly #controller = new AbortController()
+  /** 心跳定时器句柄；释放时清除。 */
   #heartbeatTimer: ReturnType<typeof setTimeout> | undefined
+  /** 过期定时器句柄；每次续租成功都重排，释放时清除。 */
   #expiryTimer: ReturnType<typeof setTimeout> | undefined
+  /** 是否已主动释放；置位后定时器回调不再续租也不再中止。 */
   #released = false
 
   public constructor(

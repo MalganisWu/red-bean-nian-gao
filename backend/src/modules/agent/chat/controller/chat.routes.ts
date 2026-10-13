@@ -59,7 +59,12 @@ export function registerChatRoutes(
   })
 }
 
-/** POST /api/agent/chat：发起一轮流式对话，把运行结果投影为 SSE 帧流。 */
+/**
+ * POST /api/agent/chat：发起一轮流式对话，把运行结果投影为 SSE 帧流。
+ * @param controller Chat 用例控制器，负责启动运行并交出运行句柄
+ * @param request Fastify 请求，body 经 zod 校验后作为发起命令
+ * @param reply Fastify 响应，转为 SSE 帧流后交出
+ */
 async function startChat(
   controller: ChatController,
   request: FastifyRequest,
@@ -69,7 +74,12 @@ async function startChat(
   await sendSse(reply, requestAbortSignal(request), run)
 }
 
-/** POST /api/agent/chat/cancel：按当前用户与 request_id 取消单个请求，返回成功信封。 */
+/**
+ * POST /api/agent/chat/cancel：按当前用户与 request_id 取消单个请求，返回成功信封。
+ * @param controller Chat 用例控制器，把取消转发到取消注册表
+ * @param request Fastify 请求，body 提供 request_id、认证主体提供 userId
+ * @param reply Fastify 响应，承载成功信封
+ */
 async function cancelChat(
   controller: ChatController,
   request: FastifyRequest,
@@ -86,7 +96,12 @@ async function cancelChat(
   )
 }
 
-/** POST /api/agent/chat/answer：提交询问卡片答案，把恢复运行投影为 SSE 帧流。 */
+/**
+ * POST /api/agent/chat/answer：提交询问卡片答案，把恢复运行投影为 SSE 帧流。
+ * @param controller Chat 用例控制器，以 resume 语义恢复运行
+ * @param request Fastify 请求，body 携带交互 ID 与答案
+ * @param reply Fastify 响应，转为 SSE 帧流后交出
+ */
 async function answerChat(
   controller: ChatController,
   request: FastifyRequest,
@@ -96,7 +111,11 @@ async function answerChat(
   await sendSse(reply, requestAbortSignal(request), run)
 }
 
-/** 组装认证与链路上下文，三个端点共用。 */
+/**
+ * 组装认证与链路上下文，三个端点共用。
+ * @param request Fastify 请求，提供认证主体、traceId 与中止信号
+ * @returns 发起命令所需的用户、链路与取消上下文
+ */
 function chatContext(request: FastifyRequest): ChatRequestContext {
   return {
     userId: authenticatedPrincipal(request).userId,
@@ -108,6 +127,9 @@ function chatContext(request: FastifyRequest): ChatRequestContext {
 /**
  * SSE 传输投影：设置流式响应头、绑定断连清理，并把流对象输出为帧流。
  * 断连后的响应已不可写；运行失败会由 completion 与应用生命周期统一观测。
+ * @param reply Fastify 响应，设置 SSE 响应头后交出帧流
+ * @param disconnectSignal 客户端断连信号，触发时以断连原因关闭运行句柄
+ * @param run 已启动的运行，提供帧流所需的事件迭代器与 start 事件
  */
 async function sendSse(
   reply: FastifyReply,

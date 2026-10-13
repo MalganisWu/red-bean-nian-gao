@@ -17,27 +17,45 @@ import type {
 } from '@/types/chat'
 import type { QuestionCardAnswer } from '@/components/retroui/QuestionCard'
 
+/** MessageCard 的属性：正文 / sections 二者取一，外加流式标记、回合元信息、卡片确认回调与回合终态。 */
 interface MessageCardProps {
+  /** 纯文本正文；与 sections 二者取一，结构化消息走 sections。 */
   content?: string | undefined
+  /** 结构化分段（思考、工具、卡片等）；优先于 content 渲染。 */
   sections?: MessageSection[] | undefined
+  /** 是否仍在流式接收；决定进行中计时与折叠态。 */
   isStreaming?: boolean | undefined
   /** 回合元信息（run_started_at 用于历史回合总耗时重算） */
   meta?: DisplayMessageMeta | undefined
   /** pending 卡片确认/拒绝回调（answer 调用由上层注入） */
   onCardConfirm?:
     ((interactionId: string, answers: Record<string, QuestionCardAnswer>) => void) | undefined
+  /** pending 卡片拒绝回调；用户拒绝作答时触发。 */
   onCardRefuse?: ((interactionId: string) => void) | undefined
+  /** 当前卡片的提交态；非空时卡片按 submitting/error 等状态渲染。 */
   cardSubmission?: CardSubmissionState | null | undefined
   /** 回合级显式终态；不能从单个 Tool/SubAgent failed 反推。 */
   terminalStatus?: 'completed' | 'failed' | 'cancelled' | undefined
 }
 
+/**
+ * 判断一个子 Agent 委派是否被取消或未结束：自身状态为 cancelled / incomplete，
+ * 或其后代 sections 中任意一处中断。
+ *
+ * @param subAgent - 子 Agent 段数据；`sections` 缺省时按空数组处理。
+ * @returns 该委派是否处于中断态。
+ */
 function hasInterruptedSubAgent(subAgent: SubAgentSectionData): boolean {
   if (subAgent.status === 'cancelled' || subAgent.status === 'incomplete') return true
   return (subAgent.sections ?? []).some(isInterruptedSection)
 }
 
-/** 单个 section 内是否有被取消或未结束的工具、推理步骤或子 Agent。 */
+/**
+ * 单个 section 内是否有被取消或未结束的工具、推理步骤或子 Agent。
+ *
+ * @param section - 待检查的消息 section；只对 tool_group / reason / sub_agent / process 有意义。
+ * @returns 该 section 是否含中断的工作；其余类型恒为 `false`。
+ */
 function isInterruptedSection(section: MessageSection): boolean {
   if (section.type === 'tool_group') {
     return section.tools.some((tool) => tool.status === 'cancelled' || tool.status === 'incomplete')
@@ -56,11 +74,22 @@ function isInterruptedSection(section: MessageSection): boolean {
   return false
 }
 
+/**
+ * 判断一组 Process 步骤中是否存在被取消或未结束的工作。
+ *
+ * @param steps - Process 步骤列表；逐个委托 `isInterruptedStep` 判定。
+ * @returns 任意一步中断即返回 `true`。
+ */
 function hasInterruptedWork(steps: ProcessStepItem[]): boolean {
   return steps.some(isInterruptedStep)
 }
 
-/** 单个 Process 步骤是否被取消或未结束（工具本身，或它挂载的子 Agent）。 */
+/**
+ * 单个 Process 步骤是否被取消或未结束（工具本身，或它挂载的子 Agent）。
+ *
+ * @param step - 单个过程步骤；工具中断看 `tool` 状态，委派中断看 `subAgent`。
+ * @returns 该步骤是否处于中断态。
+ */
 function isInterruptedStep(step: ProcessStepItem): boolean {
   const interruptedTool =
     step.kind === 'tool' &&

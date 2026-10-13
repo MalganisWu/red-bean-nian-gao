@@ -43,14 +43,26 @@ import {
 } from './agent-run-support.js'
 import { optionalField } from '../../../../shared/object/optional-field.js'
 
+/**
+ * 收尾阶段的超时上限（30 秒），也是 `finalizationTimeoutMilliseconds` 的缺省值。
+ *
+ * 收尾跑在独立于客户端信号的一次性超时信号上：会话保存、后台任务投递、事实日志终态化任一步骤
+ * 卡死时，都必须在有限时间内放弃，否则一个卡住的 run 会连同其后端资源一起长期滞留。取 30 秒
+ * 是因为收尾只做落库与投递、没有外部 LLM 调用，正常远快于此，留出的余量用于吸收数据库抖动。
+ */
 const FINALIZATION_TIMEOUT_MILLISECONDS = 30_000
 
 /** 服务依赖；`deliveryQueue` / `runFacts` / `logger` 均可缺省，缺省即关闭对应能力。 */
 export interface ProductAgentRunServiceOptions {
+  /** Agent 配置与执行定义的加载器。 */
   readonly loader: AgentLoader
+  /** 统一执行 Port，真正跑 Runtime。 */
   readonly executor: AgentExecutionPort
+  /** 会话运行状态服务，负责 lease、checkpoint 与消息恢复。 */
   readonly sessions: SessionRunServicePort
+  /** 会话消息缓冲；用于恢复未提交消息。 */
   readonly messageBuffer: MessageBuffer
+  /** 后台任务结果投递队列；缺省即不投递。 */
   readonly deliveryQueue?: TaskResultDeliveryPort | undefined
   /**
    * 会话事实日志（session_runs）仓储；缺省时跳过事实写入（部分测试与轻量装配场景）。
@@ -59,11 +71,17 @@ export interface ProductAgentRunServiceOptions {
   readonly runFacts?: RunFactRepository | undefined
   /** 仅记录服务端诊断信息；不得把 error 字段序列化进 SSE。 */
   readonly logger?: AgentRunLogger | undefined
+  /** 收尾阶段超时（毫秒）；缺省为 FINALIZATION_TIMEOUT_MILLISECONDS。 */
   readonly finalizationTimeoutMilliseconds?: number | undefined
 }
 
 /** 服务端诊断日志的窄接口；只有 error 一档，因为这里的用途就是记录异常。 */
 export interface AgentRunLogger {
+  /**
+   * 记录一条服务端错误日志；只用于诊断，不得写入 SSE。
+   * @param message 日志正文
+   * @param fields 结构化上下文字段（如 run_id / session_id）
+   */
   error(message: string, fields?: Readonly<Record<string, unknown>>): void
 }
 
@@ -80,13 +98,21 @@ export interface AgentRunLogger {
  * 客户端断开不该让「这次运行已经产生的状态」丢失——那会留下一个永远停在 running 的会话。
  */
 export class ProductAgentRunService implements AgentRunServicePort {
+  /** Agent 配置加载器；准备阶段据此收窄出执行配置。 */
   readonly #loader: AgentLoader
+  /** 统一执行 Port；执行阶段转入后台调用它跑 Runtime。 */
   readonly #executor: AgentExecutionPort
+  /** 会话运行状态服务；负责加载与保存会话状态。 */
   readonly #sessions: SessionRunServicePort
+  /** 会话消息缓冲。 */
   readonly #messageBuffer: MessageBuffer
+  /** 后台任务结果投递队列；未配置时为 undefined，收尾时跳过投递。 */
   readonly #deliveryQueue: TaskResultDeliveryPort | undefined
+  /** 会话事实日志仓储；未配置时为 undefined，跳过事实写入。 */
   readonly #runFacts: RunFactRepository | undefined
+  /** 诊断日志器；未配置时为 undefined，静默丢弃诊断。 */
   readonly #logger: AgentRunLogger | undefined
+  /** 收尾阶段超时（毫秒）；构造时校验为正整数。 */
   readonly #finalizationTimeoutMilliseconds: number
 
   public constructor(options: ProductAgentRunServiceOptions) {
@@ -173,6 +199,17 @@ export class ProductAgentRunService implements AgentRunServicePort {
     return handle
   }
 
+  /**
+   * 执行阶段：转入后台跑 Runtime，随后在独立超时信号上完成收尾（提交会话、投递任务、终态化事实）。
+   * 本方法不抛出——所有失败经 `handle.fail` 从流内传播给消费者。
+   *
+   * @param config 已收窄的执行配置
+   * @param state 会话运行状态（lease、checkpoint、待恢复消息）
+   * @param traceId 链路追踪 ID
+   * @param sections 展示段落收集器
+   * @param handle 本轮 SSE 句柄，承载事件与最终关闭
+   * @param facts 事实日志写入器；未装配时为 undefined
+   */
   async #execute(
     config: ExecutableAgentConfig,
     state: SessionRunState,
@@ -322,10 +359,24 @@ export class ProductAgentRunService implements AgentRunServicePort {
   }
 }
 
+/**
+ * 读取执行配置里的 provider 名，供 run 事实日志记录来源；缺省时回落为空串。
+ * 回落而非 `undefined` 是因为 `session_runs.provider` 是非空列，调用点不必再补默认值。
+ *
+ * @param config - 已收窄的执行配置
+ * @returns provider 标识；配置未声明时为「」
+ */
 function configProvider(config: ExecutableAgentConfig): string {
   return config.provider ?? ''
 }
 
+/**
+ * 读取执行配置里的模型名，供 run 事实日志记录本轮所用模型；缺省时回落为空串。
+ * 与 provider 同理，空串兜底是为了对接下游非空列，而不是把「未配置」伪装成有效模型名。
+ *
+ * @param config - 已收窄的执行配置
+ * @returns 模型标识；配置未声明时为「」
+ */
 function configModel(config: ExecutableAgentConfig): string {
   return config.model ?? ''
 }
@@ -333,6 +384,14 @@ function configModel(config: ExecutableAgentConfig): string {
 /**
  * 把执行结果映射为事实日志的终态命令（R11）：chat cancel 等用户取消在产品内表现为
  * cancelled 终态，统一归属 cancelled_by='user'；interrupted 对应 Runtime 的 suspended。
+ *
+ * Outcome 与错误两个入参缺一不可：`suspended` 是等待用户确认的正常中间态，只有同时看到
+ * 「completed 且无错误」才判成功，其余组合一律落到 failed 并带上可定位的原因文本——
+ * 事实日志是事后排查的唯一依据，不能把不同失败形态压成同一个终态。
+ *
+ * @param outcome - Runtime 的执行终态；undefined 表示执行前段即失败、根本没拿到 Outcome
+ * @param runError - 执行或会话保存阶段累积的错误；用于区分 completed 与 failed
+ * @returns 与 run 状态一一对应的终态命令；无匹配分支时兜底为 failed
  */
 function finalizeCommand(
   outcome: AgentExecutionOutcome | undefined,

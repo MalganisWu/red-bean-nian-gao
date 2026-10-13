@@ -5,6 +5,7 @@
 interface BackLinkProps {
   /** 完整文案（含动词，如「返回聊天」「返回任务详情」）；组件自动加 ‹ 前缀 */
   label: string
+  /** 点击返回时触发的导航回调，由调用方负责实际跳转。 */
   onClick: () => void
 }
 

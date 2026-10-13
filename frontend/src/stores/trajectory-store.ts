@@ -29,22 +29,37 @@ import { formatEpochToClock } from '@/pages/chat/trajectory-mapper'
 
 /** 流式构建中的可变记录。 */
 interface LiveRecord {
+  /** 记录标识；实时侧用 `live-r<n>`，与历史回放序号错开避免两投影撞车。 */
   id: string
+  /** 轮次内的显示序号（从 1 起）。 */
   seq: number
+  /** 记录种类（调用 / 工具 / 子 Agent / 轮次结束等），决定渲染形态。 */
   kind: TrajectoryRecord['kind']
+  /** 记录的展示时钟（HH:MM:SS），与持久化投影同格式。 */
   at: string
+  /** 记录行摘要；随流式内容增长而更新，失败时带错误首行。 */
   summary: string
+  /** 工具或子 Agent 的名称（用于按名对齐同一调用的多次事件）。 */
   name?: string
+  /** 记录指向的目标名（如子 Agent 委派对象），缺省表示无。 */
   target?: string
+  /** 已定稿的耗时（毫秒）；进行中的记录缺省，界面显示占位而非虚构耗时。 */
   durationMs?: number
   /** `interrupt` = LLM 发起挂起（等审批）；`incomplete` = 用户打断，均可能出现在实时侧。 */
   status?: 'success' | 'error' | 'running' | 'interrupt' | 'incomplete'
+  /** 累积的思考文本；reason 事件逐段追加。 */
   thinking?: string
+  /** 累积的回答文本；token 事件逐段追加，摘要优先取它。 */
   reply?: string
+  /** 工具入参（已序列化为字符串）；无参数时缺省。 */
   params?: string
+  /** 工具结果文本；成功时为返回内容，失败时缺省而由 error 承载。 */
   result?: string
+  /** 本次 LLM 调用使用的模型名；未知时为空串。 */
   model?: string
+  /** 本轮次 token 合计；DONE 事件带回服务端真实值时写入。 */
   totalTokens?: number
+  /** 内嵌的子记录（如子 Agent 展开的工具行）。 */
   children?: TrajectoryRecord[]
   /** 本次调用的尝试明细（status 事件驱动）。 */
   attempts?: TrajectoryAttempt[]
@@ -52,14 +67,18 @@ interface LiveRecord {
   waitMs?: number
 }
 
+/** 实时投影中的一轮：轮次号 + 起始时刻 + 已构建的记录，与持久化轮次靠 turnBase 对齐。 */
 interface LiveTurn {
   /**
    * 轮次号。与持久化历史投影对齐（见 alignToHistory），使同一个 run 在两个投影里
    * 拿到同一个轮次号——视图据此用实时轮次取代历史里那条尚未终结的轮次。
    */
   turn: number
+  /** 轮次起始的展示时钟（HH:MM:SS）。 */
   startedAt: string
+  /** 轮次起始的 epoch 毫秒；用于计算耗时与对齐。 */
   startedAtMs: number
+  /** 本轮已构建的记录列表（按发生顺序）。 */
   records: LiveRecord[]
   /** 当前未定的步骤记录（reason/token 累积点）。 */
   currentCall?: LiveRecord | undefined
@@ -67,6 +86,7 @@ interface LiveTurn {
 
 /** 实时投影与历史投影的对齐基准：已终结的历史轮次数。 */
 export interface TrajectoryHistoryBase {
+  /** 已终结的历史轮次数；实时轮次号从它之后续接。 */
   readonly turnBase: number
 }
 
@@ -86,6 +106,7 @@ export interface TrajectoryLiveState {
   readonly turnBase: number
   /** 进行中记录的客户端计时起点（recordId → startMs）；定稿时换算 durationMs 后清除。 */
   readonly recordStartTimes: Readonly<Record<string, number>>
+  /** 并入一条 SSE 事件；类型未知或缺少归属轮次时原样返回、不产生更新。 */
   readonly applyEvent: (event: ParsedSSEEvent) => void
   /** 新一轮用户输入开始时调用（发送即开轮，不等 START）。 */
   readonly beginUserTurn: (content: string, sessionId?: string | null) => void
@@ -105,25 +126,51 @@ export interface TrajectoryLiveState {
    * 与 chat 投影的 `settleIncompleteTools` 保持同址。
    */
   readonly settleIncomplete: () => void
+  /** 清空实时投影（会话 id、轮次与计时表）。 */
   readonly reset: () => void
 }
 
+/** 实时记录 id 的全局递增号源；与历史回放序号错开命名，避免两个投影的 id 撞车。 */
 let SEQ = 0
+/**
+ * 实时尝试项（attempt）id 的全局递增号源。
+ * 与 SEQ 分开计数：一次调用可能有多次尝试，共用一个号源会让记录与尝试的编号互相跳动。
+ */
 let REQ_SEQ = 0
+/** 生成实时记录的全局唯一 id（`live-r<n>`）；同一次会话内不复用，便于按 id 对齐两个投影。 */
 const nextId = () => `live-r${++SEQ}`
+/** 生成实时尝试项的全局唯一 id（`live-q<n>`）；前缀与记录 id 区分，调试时一眼可辨来源。 */
 const nextReqId = () => `live-q${++REQ_SEQ}`
 
+/**
+ * epoch 毫秒 → HH:MM:SS 展示时钟。
+ * 实时侧统一走这一处：与持久化投影同格式，流式与回放切换时时间列不会变形。
+ *
+ * @param ms - epoch 毫秒时间戳。
+ */
 const clock = (ms: number) => formatEpochToClock(ms)
 
 /** 审批行的展示名：与持久化投影的 cardRecord 口径一致（两侧同源，便于按 callId 对齐）。 */
 const APPROVAL_ROW_NAME = 'approval'
 
-/** 当前轮次的可写引用；没有则忽略事件（防御乱序）。 */
+/**
+ * 当前轮次的可写引用；没有则忽略事件（防御乱序）。
+ *
+ * @param turns - 实时轮次列表；始终取末尾一轮作为事件的归属轮次。
+ * @returns 末尾轮次；列表为空时返回 undefined，调用方据此直接丢弃该事件。
+ */
 function currentTurn(turns: readonly LiveTurn[]): LiveTurn | undefined {
   return turns.at(-1)
 }
 
-/** 发送即开轮：建立本轮实时轮次，轮次号续在已终结的历史轮次之后。 */
+/**
+ * 发送即开轮：建立本轮实时轮次，轮次号续在已终结的历史轮次之后。
+ *
+ * @param state - 当前实时投影状态；只读，用于取 turnBase 推算本轮轮次号。
+ * @param content - 用户输入原文；直接作为本轮第一条 user 记录的摘要。
+ * @param sessionId - 会话 id；新会话此时可能还没拿到（START 事件才带回），允许 null/undefined。
+ * @returns 仅含 liveTurns / recordStartTimes / liveSessionId 的状态补丁，交由 set 合并。
+ */
 function beginTurnState(
   state: TrajectoryLiveState,
   content: string,
@@ -154,7 +201,13 @@ function beginTurnState(
   }
 }
 
-/** 把一条 SSE 事件并入实时轨迹投影；未知类型与乱序事件原样返回，不产生更新。 */
+/**
+ * 把一条 SSE 事件并入实时轨迹投影；未知类型与乱序事件原样返回，不产生更新。
+ *
+ * @param state - 当前实时投影状态；只读，内部先复制轮次再改动。
+ * @param event - 单条已解析的 SSE 事件；按 eventType 分派到对应分支。
+ * @returns 状态补丁；类型未知或前置条件不满足（如缺少归属轮次）时返回原 state，表示不更新。
+ */
 function reduceTrajectoryEvent(
   state: TrajectoryLiveState,
   event: ParsedSSEEvent
@@ -351,7 +404,9 @@ function reduceTrajectoryEvent(
   }
 }
 
-/** 轨迹专用 store；与 chat 主投影消费同一批 SSE 事件，但各自维护独立投影。 */
+/**
+ * 轨迹专用 store；与 chat 主投影消费同一批 SSE 事件，但各自维护独立投影。
+ */
 export const useTrajectoryStore = create<TrajectoryLiveState>()((set) => ({
   streamingSessionId: null,
   liveSessionId: null,
@@ -395,7 +450,12 @@ export const useTrajectoryStore = create<TrajectoryLiveState>()((set) => ({
     }),
 }))
 
-/** 全局递增序号（与历史回放同序衔接）。 */
+/**
+ * 全局递增序号（与历史回放同序衔接）。
+ *
+ * @param turns - 实时轮次列表；累加各轮已有记录数即得下一个序号。
+ * @returns 下一个可用的全局序号（从 1 起，跨轮连续）。
+ */
 function nextSeqValue(turns: readonly LiveTurn[]): number {
   return turns.reduce((n, t) => n + t.records.length, 0) + 1
 }
@@ -403,6 +463,9 @@ function nextSeqValue(turns: readonly LiveTurn[]): number {
 /**
  * 取当前 LLM 调用记录；没有则新建（流式中 reason/token 的归属点）。
  * 不再分配轮次内调用序号——行序本身表达顺序，`#N` 全局序号承担引用职责。
+ *
+ * @param turn - 事件归属的实时轮次；其 currentCall 字段即下一段思考/回答的落脚点。
+ * @returns 当前调用记录；已存在则直接复用，否则新建并挂到该轮末尾。
  */
 function ensureCall(turn: LiveTurn): LiveRecord {
   if (turn.currentCall !== undefined) return turn.currentCall
@@ -419,6 +482,14 @@ function ensureCall(turn: LiveTurn): LiveRecord {
   return call
 }
 
+/**
+ * 把一次尝试（attempt）落定为终态：改写 status，并在带错误时补上 error 文本。
+ *
+ * @param req - 待落定的尝试记录；只读取，不就地修改。
+ * @param status - 落定终态，仅 success / error 两种。
+ * @param error - 失败原因文本；缺省表示无错误，此时不产出 error 键。
+ * @returns 落定后的新尝试对象；原对象保持不变。
+ */
 function settleAttempt(
   req: TrajectoryAttempt,
   status: 'success' | 'error',
@@ -431,6 +502,12 @@ function settleAttempt(
   }
 }
 
+/**
+ * 取文本首行作为摘要，并在超长时截断兜底。
+ *
+ * @param text - 原始文本；可能多行、可能为空。
+ * @returns 首行；空文本返回空串，超过 200 字符时截断并追加省略号。
+ */
 function firstLine(text: string): string {
   const line = text.split('\n', 1)[0] ?? ''
   /* 200 字符与截断标记必须与后端持久化投影（SUMMARY_MAX_CHARS）保持一致：
@@ -441,6 +518,9 @@ function firstLine(text: string): string {
 /**
  * 步骤摘要：与后端持久化投影同口径——有回答内容时取回答首行，否则回落到思考首行。
  * 流式期间两者都在增长，因此记录行文本会持续跟随，而不是停在思考的第一句。
+ *
+ * @param step - 当前 LLM 调用记录；按 reply 优先、thinking 兜底的顺序取文本。
+ * @returns 摘要首行；两者都为空时返回「进行中…」占位。
  */
 function callSummary(step: LiveRecord): string {
   const text = step.reply !== undefined && step.reply !== '' ? step.reply : step.thinking

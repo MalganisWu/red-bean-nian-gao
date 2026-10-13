@@ -53,6 +53,12 @@ export function toSessionTrajectoryDto(view: SessionTrajectory): SessionTrajecto
   }
 }
 
+/**
+ * 把轨迹的结束态映射成 wire DTO；`note` 是内部可选字段，缺失时整字段不出现在响应里。
+ *
+ * @param end - 领域层的结束态，含运行终止的判定依据与时间点。
+ * @returns 只保留契约字段的结束态 DTO。
+ */
 function toEndStateDto(end: TrajectoryEndState): TrajectoryEndStateDto {
   return {
     state: end.state,
@@ -61,6 +67,13 @@ function toEndStateDto(end: TrajectoryEndState): TrajectoryEndStateDto {
   }
 }
 
+/**
+ * 把一次压缩（compaction）映射成 wire DTO，压缩前后的 token 与消息数一并透出，
+ * 供前端还原「这次压缩省了多少」。`strategy` 为可选字段，缺失即不出现。
+ *
+ * @param c - 领域层的压缩记录。
+ * @returns 只含契约字段的压缩 DTO。
+ */
 function toCompactionDto(c: TrajectoryCompaction): TrajectoryCompactionDto {
   return {
     id: c.id,
@@ -76,6 +89,14 @@ function toCompactionDto(c: TrajectoryCompaction): TrajectoryCompactionDto {
   }
 }
 
+/**
+ * 递归把一条轨迹记录映射成 wire DTO。`children`（子代理记录）与 `attempts`（重试记录）
+ * 只在存在时展开，其余可选字段交给 `optionalField` 决定是否出现：DTO 里绝不出现 value 为
+ * `undefined` 的字段，前端据此可用「字段是否存在」做一次判断。
+ *
+ * @param r - 领域层的轨迹记录，可能带下钻用的 children/attempts。
+ * @returns 只含契约字段的记录 DTO，子记录已递归转换。
+ */
 function toRecordDto(r: TrajectoryRecord): TrajectoryRecordDto {
   return {
     id: r.id,
@@ -100,6 +121,13 @@ function toRecordDto(r: TrajectoryRecord): TrajectoryRecordDto {
   }
 }
 
+/**
+ * 把一次尝试（attempt）映射成 wire DTO；`error` 仅在失败尝试上出现，
+ * 成功尝试不带该字段，前端无需为空错误串做特判。
+ *
+ * @param q - 领域层的单次尝试记录，含模型、耗时与 token。
+ * @returns 只含契约字段的尝试 DTO。
+ */
 function toAttemptDto(q: TrajectoryAttempt): TrajectoryAttemptDto {
   return {
     id: q.id,

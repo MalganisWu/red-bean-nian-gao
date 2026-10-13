@@ -40,7 +40,16 @@ export function registerSessionRoutes(
   })
 }
 
-/** GET /api/sessions：按游标分页列出当前用户的会话。 */
+/**
+ * GET /api/sessions：按游标分页列出当前用户的会话。
+ *
+ * 只负责解包与信封：分页参数经共享解析器兜底，用户身份取自认证主体，随后整包交给 Controller，
+ * 使 Controller 保持与 Fastify 解耦。
+ *
+ * @param controller - 会话查询控制器，承接解包后的标量入参
+ * @param request - Fastify 请求对象，提供 query、认证主体与中止信号
+ * @param reply - Fastify 响应对象，用于发送成功信封
+ */
 async function listSessions(
   controller: SessionController,
   request: FastifyRequest,
@@ -60,7 +69,15 @@ async function listSessions(
   )
 }
 
-/** GET /api/sessions/:id：返回单个会话详情。 */
+/**
+ * GET /api/sessions/:id：返回单个会话详情。
+ *
+ * 路径参数经共享解析器校验，非法 ID 会在此处以 400 终止，不会带着坏参数进入 Controller。
+ *
+ * @param controller - 会话查询控制器，承接解包后的标量入参
+ * @param request - Fastify 请求对象，提供路径参数、认证主体与中止信号
+ * @param reply - Fastify 响应对象，用于发送成功信封
+ */
 async function getSessionDetail(
   controller: SessionController,
   request: FastifyRequest,

@@ -35,7 +35,9 @@ import { DefaultTrajectoryService } from './trajectory/service/default-trajector
 
 /** Task 等后台业务可依赖的 Agent 公共能力，不暴露 Runtime 与 Session Adapter。 */
 export interface AgentTaskCapabilities {
+  /** 后台执行能力：Task 侧据此跑一次无人值守的后台运行。 */
   readonly backgroundExecution: BackgroundAgentExecutionPort
+  /** 外部回合写入能力：Task 把已完成的子执行结果写回产品会话。 */
   readonly externalTurnWriter: ExternalSessionTurnWriterPort
 }
 
@@ -46,17 +48,31 @@ export interface AgentTaskCapabilities {
  * Executor 和 Loader 被闭包持有，不进入 public-api 生成的声明文件。
  */
 export interface AgentModuleCore extends AgentTaskCapabilities {
+  /** 会话级锁注册表；跨模块在写入同一会话前用它与 Chat 路径互斥。 */
   readonly sessionLocks: SessionLockRegistry
+  /**
+   * 接回 Task 的结果投递能力，补齐运行、Chat 与查询用例，产出完整 Module。
+   *
+   * @param deliveryQueue - Task 提供的结果投递 Port；由 Composition Root 接线，Agent 不感知其实现。
+   * @param idGenerator - 进程级 ID 生成器；不属于 Agent 的领域能力，故与 core 分开传入。
+   * @returns 组装完成的 Agent Module，公开 HTTP 层所需的入站 Port。
+   */
   complete(deliveryQueue: TaskResultDeliveryPort, idGenerator: IdGenerator): AgentModule
 }
 
 /** 接回 Task 结果投递能力之后的完整 Agent Module 输出面，供 Composition Root 装配。 */
 export interface AgentModule extends AgentTaskCapabilities {
+  /** 跨实例取消注册表；Chat 用例据此绑定与撤销单次运行的取消键。 */
   readonly cancelRegistry: CancelRegistryPort
+  /** Agent 运行服务；一次流式运行的启动与收尾入口。 */
   readonly runService: AgentRunServicePort
+  /** Chat 入站用例；HTTP 层发起的对话、回答与取消都走这里。 */
   readonly chat: ChatUseCasePort
+  /** Chat 运行生命周期；应用停机时取消并等待所有活动运行收尾。 */
   readonly chatLifecycle: ChatRunLifecyclePort
+  /** 会话查询用例；HTTP 层读取会话与消息的入口。 */
   readonly sessionQueries: DefaultSessionQueryService
+  /** 轨迹查询用例；按会话与子执行读取运行事实。 */
   readonly trajectory: DefaultTrajectoryService
 }
 

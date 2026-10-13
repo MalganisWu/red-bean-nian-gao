@@ -129,6 +129,9 @@ export function collapseToProcessFold(
 /**
  * 在完整 Process 内按稳定 ID 建立委派关系，不依赖工具名称、Agent 名称或相邻顺序。
  * 缺失/错误 parent_call_id 与重复数据保持独立步骤，避免旧历史内容丢失。
+ *
+ * @param steps - 收束后的过程步骤列表；子 Agent 步骤按其 parent_call_id 匹配父工具步骤。
+ * @returns 挂载完成后的步骤列表；已并入父工具的子 Agent 步骤已从顶层剔除。
  */
 function attachSubAgentsToParents(steps: ProcessStepItem[]): ProcessStepItem[] {
   const grouped = steps.map((step) => ({ ...step }))
@@ -225,7 +228,12 @@ export function normalizePersistedSections(
   return sections.map(normalizePersistedSection)
 }
 
-/** 归一化单个持久化 section：转换工具耗时字段并递归处理子 Agent 内层 sections。 */
+/**
+ * 归一化单个持久化 section：转换工具耗时字段并递归处理子 Agent 内层 sections。
+ *
+ * @param s - 从持久化 JSON 读出的单个 section。
+ * @returns 归一化后的运行时 section；未涉及的类型原样返回。
+ */
 function normalizePersistedSection(s: PersistedMessageSection): MessageSection {
   if (s.type === 'tool_group') {
     return { ...s, tools: s.tools.map(normalizeTool) }
@@ -245,6 +253,12 @@ function normalizePersistedSection(s: PersistedMessageSection): MessageSection {
   return s
 }
 
+/**
+ * 归一化持久化的 reason 项：把内层工具卡片转换为运行时形态。
+ *
+ * @param item - 持久化 reason 项；`itemType` 为 `tool` 时其 `tool` 一并归一化。
+ * @returns 归一化后的运行时 reason 项；无工具时 `tool` 保持 `undefined`。
+ */
 function normalizeReasonItem(item: ReasonItemDto): ReasonItem {
   return {
     itemType: item.itemType,
@@ -254,6 +268,13 @@ function normalizeReasonItem(item: ReasonItemDto): ReasonItem {
   }
 }
 
+/**
+ * 归一化持久化的子 Agent 段：递归处理内层 sections，并把残留的 `running` 折叠为 `incomplete`——
+ * 历史回放里已不再有真正运行中的委派，留着会让旧任务永久显示为运行中。
+ *
+ * @param data - 持久化子 Agent 段数据；`sections` 缺省时按空数组处理。
+ * @returns 归一化后的子 Agent 段；已结束任务的 `running` 已改写为 `incomplete`。
+ */
 function normalizeSubAgent(data: PersistedSubAgentSectionData): SubAgentSectionData {
   return {
     ...data,
@@ -262,6 +283,14 @@ function normalizeSubAgent(data: PersistedSubAgentSectionData): SubAgentSectionD
   }
 }
 
+/**
+ * 归一化持久化的工具卡片：旧数据的 `duration` 既可能是毫秒数值（引擎 Task 1 起写入），
+ * 也可能是旧字符串，数值迁到 `durationMs`、字符串留在 `duration`；另把 `running` 折叠为
+ * `incomplete`，并清掉仅存于运行期的打点 `startedAtMs`。
+ *
+ * @param t - 持久化工具卡片；`duration` 的运行时类型可能是数值或字符串。
+ * @returns 归一化后的运行时工具卡片；未记录耗时时 `durationMs` 保持 `undefined`。
+ */
 function normalizeTool(t: PersistedToolCard): ToolCard {
   const persisted: unknown = t.duration
   const status: ToolCard['status'] = t.status === 'running' ? 'incomplete' : t.status

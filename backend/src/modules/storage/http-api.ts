@@ -8,7 +8,9 @@ import { registerStorageRoutes as bindStorageRoutes } from './controller/storage
 
 /** Storage HTTP 驱动适配器的组装依赖。 */
 export interface StorageRouteDependencies {
+  /** 存储用例服务；由 Module 组装，本函数只用它构造控制器。 */
   readonly storageService: StorageService
+  /** 认证端口；用于生成鉴权前置处理器，五个端点全部要求已登录。 */
   readonly authService: AuthServicePort
 }
 

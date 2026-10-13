@@ -10,6 +10,10 @@ import {
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
+/**
+ * 确认卡问题夹具：只含一个「scope」单选问题，三个选项分别代表完整修复、
+ * 一并整理与只出补丁，用来演示单选作答的主流程。
+ */
 const QUESTIONS = [
   {
     id: 'scope',
@@ -24,6 +28,12 @@ const QUESTIONS = [
   },
 ] satisfies QuestionCardQuestion[]
 
+/**
+ * 首个问题的引用；下游的选项常量与默认作答都以它为准。
+ *
+ * 下面的断言不是业务逻辑，只是让「示例必须至少有一个问题与三个选项」
+ * 在夹具被改坏时立刻失败，而不是渲染出空卡片。
+ */
 const PRIMARY_QUESTION = QUESTIONS[0]
 if (PRIMARY_QUESTION === undefined) throw new Error('确认卡示例必须包含问题')
 const [PRIMARY_OPTION, SECONDARY_OPTION, PATCH_ONLY_OPTION] = PRIMARY_QUESTION.options ?? []
@@ -35,10 +45,20 @@ if (
   throw new Error('确认卡示例必须包含三个选项')
 }
 
+/**
+ * 静态展示用的默认作答：把「scope」题选中第一个选项。
+ *
+ * 供已作答 / 提交中 / 错误等只读形态复用，避免每张卡片各写一份答案。
+ */
 const DEFAULT_ANSWERS: Record<string, QuestionCardAnswer> = {
   scope: { kind: 'option', value: PRIMARY_OPTION },
 }
 
+/**
+ * 选项值到确认按钮文案的映射：按钮回显「将要执行什么」，而不是笼统的「确认」。
+ *
+ * 未命中映射时调用方回退到通用文案，因此这里可以只覆盖已知的三个选项。
+ */
 const CONFIRM_LABELS: Record<string, string> = {
   [PRIMARY_OPTION]: '确认：仅修复并测试',
   [SECONDARY_OPTION]: '确认：一并整理',

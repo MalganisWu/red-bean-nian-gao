@@ -15,8 +15,11 @@ import { ChatUseCaseError } from '../port/chat-use-case.port.js'
 import type { ChatRunHandle } from '../stream/chat-run-handle.js'
 import { optionalField } from '../../../../shared/object/optional-field.js'
 
+/** 活动运行登记项：运行句柄，以及句柄关闭后仍需等待的清理 Promise。 */
 interface ActiveRun {
+  /** 运行句柄；停机与清理都从它入手。 */
   readonly handle: ChatRunHandle
+  /** 句柄关闭后仍需等待的清理 Promise；等它兑现才能安全释放资源。 */
   readonly cleanup: Promise<void>
 }
 
@@ -25,12 +28,19 @@ interface ActiveRun {
  * 具名类型让 `#startRun` 的参数不再是无名结构——调用点读方法名即可知道传的是什么。
  */
 interface ChatRunInput {
+  /** 发起该运行的用户标识；决定运行归属与取消键。 */
   readonly userId: string
+  /** 链路追踪标识；透传到运行与日志。 */
   readonly traceId: string
+  /** 客户端请求的中止信号；断连时据此通知运行收尾。 */
   readonly signal: AbortSignal
+  /** 本次运行的会话标识；缺省已由服务补齐。 */
   readonly sessionId: string
+  /** 本次运行的 agent 标识；缺省已由服务补齐。 */
   readonly agentId: string
+  /** 本轮要落库的消息；已是服务筛选后的结果。 */
   readonly messages: StartChatCommand['messages']
+  /** 人工交互的回答标记；仅 answer 路径携带。 */
   readonly answer?: AnswerMarker | undefined
 }
 
@@ -38,12 +48,19 @@ interface ChatRunInput {
  * Chat 用例默认实现：统一拥有消息选择、ID、取消注册和活动运行生命周期。
  */
 export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort {
+  /** 运行服务；一次流式运行的实际启动与收尾入口。 */
   readonly #runService: AgentRunServicePort
+  /** 取消注册表；绑定运行信号，使其他请求能跨实例取消本运行。 */
   readonly #cancelRegistry: CancelRegistryPort
+  /** ID 生成器；缺省会话标识与运行 ID 都从它取。 */
   readonly #idGenerator: IdGenerator
+  /** 已启动且仍在运行的活动登记；停机时逐个收束。 */
   readonly #activeRuns = new Map<string, ActiveRun>()
+  /** 正在启动中的运行；停机时需要等它们落地，避免漏掉刚注册的运行。 */
   readonly #startingRuns = new Set<Promise<StartedChatRun>>()
+  /** 停机时用于中止所有活动运行的内部控制器，独立于调用方传入的信号。 */
   readonly #shutdownController = new AbortController()
+  /** 是否正在停机；置真后拒绝一切新的启动请求。 */
   #draining = false
 
   public constructor(options: {
@@ -118,7 +135,12 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
     )
   }
 
-  /** 新会话运行输入：缺省 sessionId/agentId 在此一次补齐，字段与 `ChatRunInput` 逐一对应。 */
+  /**
+   * 新会话运行输入：缺省 sessionId/agentId 在此一次补齐，字段与 `ChatRunInput` 逐一对应。
+   * @param command 发起命令；缺省 sessionId/agentId 会在此补为生成值与默认 agent
+   * @param messages 本轮已筛选好的消息；原样写入运行输入
+   * @returns 字段齐备的运行输入，供 `#startRun` 使用
+   */
   #newRunInput(command: StartChatCommand, messages: ChatRunInput['messages']): ChatRunInput {
     return {
       userId: command.userId,
@@ -130,7 +152,11 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
     }
   }
 
-  /** 恢复运行输入：回答路径不携带新消息，答案归一化为 AnswerMarker。 */
+  /**
+   * 恢复运行输入：回答路径不携带新消息，答案归一化为 AnswerMarker。
+   * @param command 回答命令；answers 缺省补空对象、refused 缺省视否
+   * @returns 字段齐备的运行输入，messages 恒为空数组
+   */
   #resumeRunInput(command: AnswerChatCommand): ChatRunInput {
     return {
       userId: command.userId,
@@ -147,6 +173,12 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
     }
   }
 
+  /**
+   * 启动一次运行：绑定取消键、调用运行服务、登记活跃项，并组装首帧 start 事件。
+   * 启动失败必须注销取消键，否则注册表条目泄漏、后续 cancel 会误伤。
+   * @param command 已补齐缺省的运行输入；含身份、消息与可选的回答标记
+   * @returns 运行句柄与首帧 start 事件
+   */
   async #startRun(command: ChatRunInput): Promise<StartedChatRun> {
     if (this.#draining) throw new Error('Chat 服务正在停机')
     const runId = this.#idGenerator.generate('RUN')
@@ -199,6 +231,9 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
    * 从集合里摘除的时机写在 `finally` 里而不是 `then`：启动失败的运行同样要摘掉，
    * 否则它会永远留在集合里，停机时白等一个已 reject 的 Promise。
    * 末尾那个空 `catch` 是为了消费掉这条派生链上的拒绝——原始 Promise 仍会正常抛给调用方。
+   *
+   * @param starting 待登记的启动中 Promise
+   * @returns 原样的启动中 Promise，调用方仍可直接 await
    */
   #trackStart(starting: Promise<StartedChatRun>): Promise<StartedChatRun> {
     this.#startingRuns.add(starting)
@@ -210,16 +245,33 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
     return starting
   }
 
+  /**
+   * 收束当前所有活动运行，返回它们各自的清理 Promise 供停机方等待。
+   * 只做「关停」不等待：调用方拿到全部清理 Promise 后才决定等多久。
+   * @returns 每个活动运行对应的清理 Promise 数组
+   */
   #closeActiveRuns(): Promise<void>[] {
     return [...this.#activeRuns.values()].map((run): Promise<void> => closeActiveRun(run))
   }
 
+  /**
+   * 运行收尾清理：等句柄完成、注销取消键、再从活动表摘除。
+   * 顺序不可颠倒——先等完成再注销，避免运行仍在途时取消键就被清掉。
+   * @param runId 运行标识；用于从活动表摘除
+   * @param key 该运行的取消键；运行结束后注销
+   * @param handle 运行句柄；以其 completion 作为收尾完成信号
+   */
   async #cleanupRun(runId: string, key: string, handle: ChatRunHandle): Promise<void> {
     await handle.completion
     await this.#deregisterQuietly(key)
     this.#activeRuns.delete(runId)
   }
 
+  /**
+   * 尽力注销取消键：注销失败只吞掉不抛出。
+   * 运行结果优先于取消注册清理错误，Redis TTL 仍会提供最终兜底。
+   * @param key 待注销的取消键
+   */
   async #deregisterQuietly(key: string): Promise<void> {
     try {
       await this.#cancelRegistry.deregister(key)
@@ -258,12 +310,21 @@ export function selectMessagesForTurn(
   return []
 }
 
-/** 关停单个活动运行：先关句柄再等它自己的清理落地。 */
+/**
+ * 关停单个活动运行：先关句柄再等它自己的清理落地。
+ * @param run 待关停的活动运行登记项；先 `close` 再等其 `cleanup` 兑现
+ */
 async function closeActiveRun(run: ActiveRun): Promise<void> {
   await run.handle.close('server_shutdown')
   await run.cleanup
 }
 
+/**
+ * 让一个操作与中止信号赛跑，谁先到谁兑现，并保证不在调用方的 signal 上留下监听器。
+ * 中止先到时以归一化后的中止原因拒绝，用于把「等多久」与「停哪些运行」分开表达。
+ * @param operation 待等待的操作，成功或失败都透传（失败经 `normalizeError`）
+ * @param signal 中止信号；已中止或等待期间触发都会以中止原因拒绝
+ */
 function raceWithAbort(operation: Promise<void>, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return Promise.reject(abortReason(signal))
 
@@ -293,6 +354,11 @@ function raceWithAbort(operation: Promise<void>, signal: AbortSignal): Promise<v
   return new Promise<void>(settleAgainstAbort)
 }
 
+/**
+ * 取中止信号携带的原因，非 Error 的取值折叠为固定文案，保证调用方总能拿到 Error。
+ * @param signal 已中止的信号，其 reason 由 abort 时的入参决定
+ * @returns 归一化后的中止原因
+ */
 function abortReason(signal: AbortSignal): Error {
   return signal.reason instanceof Error ? signal.reason : new Error('Chat shutdown aborted')
 }

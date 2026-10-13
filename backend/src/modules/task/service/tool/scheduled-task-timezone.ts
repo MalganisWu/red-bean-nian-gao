@@ -70,6 +70,20 @@ export function validateTimezone(timezone: string): void {
   }
 }
 
+/**
+ * 把「给定时区下的年月日时分秒」换算成绝对时刻，并校验该本地时间真实存在。
+ * 先按 UTC 猜一个时刻，再按 guess 的时间差迭代修正；夏令时切换造成的空档或重复时间
+ * 会使修正后仍对不上本地字段，此时返回 undefined 交由调用方判为非法输入。
+ *
+ * @param year - 本地年份。
+ * @param month - 本地月份（1-12）。
+ * @param day - 本地日。
+ * @param hour - 本地小时（0-23）。
+ * @param minute - 本地分钟。
+ * @param second - 本地秒。
+ * @param timezone - 解释该本地时间所用的 IANA 时区名。
+ * @returns 对应的绝对时刻；本地时间不存在（如夏令时空档）时为 undefined。
+ */
 function zonedDate(
   year: number,
   month: number,
@@ -117,15 +131,29 @@ function zonedDate(
     : undefined
 }
 
+/** 某个绝对时刻在指定时区下展开出的本地日历字段。 */
 interface ZonedParts {
+  /** 本地年份。 */
   readonly year: number
+  /** 本地月份（1-12，非 JS 的 0 基）。 */
   readonly month: number
+  /** 本地日。 */
   readonly day: number
+  /** 本地小时（0-23，按 h23 取值避免 12/24 歧义）。 */
   readonly hour: number
+  /** 本地分钟。 */
   readonly minute: number
+  /** 本地秒。 */
   readonly second: number
 }
 
+/**
+ * 用 `Intl` 把绝对时刻展开成给定时区下的本地日历字段，供换算迭代与存在性校验使用。
+ *
+ * @param date - 待展开的绝对时刻。
+ * @param timezone - 目标 IANA 时区名。
+ * @returns 该时刻在该时区下的本地年月日时分秒。
+ */
 function zonedParts(date: Date, timezone: string): ZonedParts {
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
@@ -153,6 +181,14 @@ function zonedParts(date: Date, timezone: string): ZonedParts {
   }
 }
 
+/**
+ * 从格式化结果里取出一个必需的日期部分并转成数字；缺失即抛错，
+ * 因为格式化器缺字段说明运行环境异常，继续下去只会得到错位的时间。
+ *
+ * @param values - `formatToParts` 抽出的字段映射。
+ * @param name - 字段名，如 year/month/day/hour/minute/second。
+ * @returns 该字段的数值。
+ */
 function requiredDatePart(values: ReadonlyMap<string, string>, name: string): number {
   const value = values.get(name)
   if (value === undefined) throw new Error(`时区格式缺少 ${name}`)

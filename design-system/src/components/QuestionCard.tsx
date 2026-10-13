@@ -11,18 +11,25 @@ import { cn } from '../lib/utils'
 
 /** 卡片里的一个问题；`options` 与 `select` 成对使用，缺省按单选处理。 */
 export interface QuestionCardQuestion {
+  /** 问题标识；作为作答记录的键，必须在同一次确认内唯一。 */
   id: string
+  /** 问题正文，渲染为主标题，允许含反引号内联代码。 */
   text: string
   /** 可选影响说明；旧协议没有该字段时不渲染。 */
   description?: string | undefined
+  /** 可选项列表；缺省时不渲染任何选项，只剩自定义输入或跳过入口。 */
   options?: string[] | undefined
+  /** 选择方式，缺省按 `single` 单选处理；`multi` 时选项渲染为复选框。 */
   select?: 'single' | 'multi' | undefined
 }
 
 /** 单个问题的作答；`value` 用于单选与自定义输入，`values` 用于多选，`skip` 两者都不用。 */
 export interface QuestionCardAnswer {
+  /** 作答方式，决定 `value` / `values` 哪个字段有效：`skip` 两者都不用。 */
   kind: 'option' | 'multi' | 'custom' | 'skip'
+  /** 单选选中的选项值，或自定义输入的文本；仅 `option` / `custom` 时有效。 */
   value?: string | undefined
+  /** 多选选中的选项值；仅 `multi` 时有效，空数组等同于未作答。 */
   values?: string[] | undefined
 }
 
@@ -50,6 +57,15 @@ export interface QuestionCardProps {
   onRefuse?: (() => void) | undefined
 }
 
+/**
+ * 计算确认卡的初始作答：在外部传入的作答之上，为未作答的单选问题默认选中第一个选项。
+ *
+ * 默认选中是为了让单问题的确认卡能一步提交；多选与无选项的问题保持空，等用户显式作答。
+ *
+ * @param questions - 卡片里的全部问题。
+ * @param answers - 外部受控回填的作答；缺省时视为空。
+ * @returns 以问题 id 索引的初始作答表。
+ */
 function initialAnswersFor(
   questions: QuestionCardQuestion[],
   answers?: Record<string, QuestionCardAnswer>
@@ -67,6 +83,14 @@ function initialAnswersFor(
   return initial
 }
 
+/**
+ * 把一条作答转成人类可读的文案，用于已答态的只读回显。
+ *
+ * 跳过显式显示「已跳过」而不是留空——留空会让用户分不清是没答还是答了空。
+ *
+ * @param answer - 待展示的作答；`undefined` 视为未作答。
+ * @returns 回显文案，未作答时为空串。
+ */
 function answerLabel(answer: QuestionCardAnswer | undefined): string {
   if (!answer) return ''
   if (answer.kind === 'skip') return '已跳过'
@@ -74,6 +98,14 @@ function answerLabel(answer: QuestionCardAnswer | undefined): string {
   return answer.value ?? ''
 }
 
+/**
+ * 把问题文案里的反引号片段渲染成内联代码，其余文本原样输出。
+ *
+ * 与过程轨道同款轻量切分：确认卡文案只需要内联代码，不引入完整 Markdown 引擎。
+ *
+ * @param content - 待渲染的原始文案。
+ * @returns 文本与内联 `code` 元素交错组成的节点数组。
+ */
 function renderInlineCode(content: string): ReactNode {
   return content.split(/(`[^`\n]+`)/g).map((part, index) =>
     part.startsWith('`') && part.endsWith('`') ? (
@@ -89,15 +121,21 @@ function renderInlineCode(content: string): ReactNode {
   )
 }
 
-function AnsweredQuestion({
-  question,
-  answer,
-  refused,
-}: {
+/**
+ * 已答或拒答后的只读回显行：展示问题原文与用户的最终选择。
+ *
+ * 拒答与作答用不同的指示点颜色区分，但都只是状态提示，不提供修改入口——
+ * 要改得重新发起一次确认。
+ *
+ * @param props - 组件属性；`question` 是问题定义，`answer` 是其作答，`refused` 标记是否拒答。
+ * @returns 只读的问题与回答回显元素。
+ */
+function AnsweredQuestion(props: {
   question: QuestionCardQuestion
   answer?: QuestionCardAnswer | undefined
   refused: boolean
 }): ReactNode {
+  const { question, answer, refused } = props
   return (
     <div className="min-w-0 py-1 first:pt-0 last:pb-0">
       <p className="m-0 min-w-0 font-sans text-[13px] font-[550] leading-[1.55] text-foreground [overflow-wrap:anywhere]">

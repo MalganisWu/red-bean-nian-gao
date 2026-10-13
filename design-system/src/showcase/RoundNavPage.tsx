@@ -5,6 +5,12 @@ import { RoundNav, type RoundNavEntry } from '@/components/RoundNav'
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
+/**
+ * 轮次夹具：每项为 `[id, 问题, 回答, 元信息]`，共五轮。
+ *
+ * 五轮是刻意安排的长度——短到能一屏看完，又足以让指针落在两轮之间、
+ * 触发 RoundNav 的平滑波峰与悬停摘要，因此顺序即导航栏从下到上的排列顺序。
+ */
 const ROUNDS = [
   ['r1', '计算一组数据', '已返回计算结果', '12s · 1 次工具调用'],
   ['r2', '补充另一组计算', '结果为 363', '3s · 1 次工具调用'],

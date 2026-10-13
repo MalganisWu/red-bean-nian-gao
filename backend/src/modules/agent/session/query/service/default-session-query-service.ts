@@ -9,20 +9,27 @@ import type { SessionSummary } from '../../model/session.js'
 
 /** 会话列表查询入参；`cursor` 为空串表示取首页。 */
 export interface ListSessionsQuery {
+  /** 目标归属用户；决定可见范围，取自认证上下文以免越权。 */
   readonly userId: string
+  /** 上一页末条的游标；空串表示取首页。 */
   readonly cursor: string
+  /** 本页最大条数；调用方需已完成上限收敛。 */
   readonly limit: number
 }
 
 /** 会话列表结果；`nextCursor` 为空串表示没有下一页。 */
 export interface SessionQueryPage {
+  /** 本页会话摘要；按最近更新在前排列。 */
   readonly sessions: readonly SessionSummary[]
+  /** 下一页游标；空串表示已是末页。 */
   readonly nextCursor: string
 }
 
 /** 详情查询入参；必须同时带 userId，越权访问与不存在因此收敛到同一条 404 分支。 */
 export interface GetSessionQuery {
+  /** 目标会话标识。 */
   readonly sessionId: string
+  /** 期望的归属用户；与记录不符时与不存在收敛到同一条 404。 */
   readonly userId: string
 }
 
@@ -31,6 +38,7 @@ export interface GetSessionQuery {
  * Controller 直接依赖本类。列表与详情查询可在各公开方法内一次读完。
  */
 export class DefaultSessionQueryService {
+  /** 注入的会话仓储；只做读取，所有权与分页语义由仓储保证。 */
   readonly #repository: SessionRepository
 
   public constructor(repository: SessionRepository) {

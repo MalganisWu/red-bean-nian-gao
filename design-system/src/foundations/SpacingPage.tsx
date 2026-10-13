@@ -1,13 +1,25 @@
 import './SpacingPage.css'
 
+/** 间距刻度中的一行：一个 token 的取值、倍数关系与适用说明。 */
 interface SpacingRow {
+  /** 间距 token 名，形如 `--spacing-4`，末尾数字即相对 4px 基础单位的倍数。 */
   token: string
+  /** 该档位的像素值，恒为 4 的整数倍，用于直接落到样式或与设计稿对齐。 */
   px: number
+  /** 相对 4px 基础单位的倍数，展示在刻度条旁以读出档位之间的递进关系。 */
   multiplier: number
+  /** 该档位的典型使用场景，帮助实现时按语义而非数字挑档。 */
   desc: string
+  /** 刻度条的色带分级：primary 为高频小间距、accent 为常用中间档、muted 为大间距。 */
   color: 'primary' | 'accent' | 'muted'
 }
 
+/**
+ * 间距刻度表：从 1×base 到 12×base 的完整档位。
+ *
+ * 所有取值都是 4px 基础单位的整数倍，档位随倍数单调递增；越低频、越大的间距越少用，
+ * 因此色带从 primary 逐级过渡到 muted，视觉上直接读出「常用到谨慎」的递进。
+ */
 const SPACING_ROWS: readonly SpacingRow[] = [
   {
     token: '--spacing-1',
@@ -68,6 +80,12 @@ const SPACING_ROWS: readonly SpacingRow[] = [
   },
 ]
 
+/**
+ * 使用映射：`{ component, details }`。
+ *
+ * 把刻度落到具体场景（阅读列宽、移动端边距、回合间隔、正文段落、工具项、交互目标），
+ * 说明每个场景取哪一档或哪个范围，避免只记数值而不知用途。
+ */
 const USAGE_MAP = [
   { component: 'Desktop reading column', details: '720–760px — 最终回答与完整回合' },
   { component: 'Mobile page gutter', details: '16px — 360px 宽度不横向溢出' },

@@ -13,10 +13,13 @@ import { isArrayOf, isNumber, isRecord, isString } from '../common/schema.js'
 /** 路径参数：会话 id。 */
 export const trajectoryParamsSchema = z.object({ id: z.string().min(1) })
 
+/** 轨迹记录类型集合；`isRecordDto` 用它挡住未登记的类型取值。 */
 const RECORD_KINDS = new Set(['user', 'call', 'tool', 'subagent', 'turn-end', 'session-end'])
+/** 记录状态集合；success / error 是执行结果，interrupt / incomplete 是打断类终态。 */
 const RECORD_STATUSES = new Set(['success', 'error', 'interrupt', 'incomplete'])
 /** 单次尝试只有成/败两态：挂起与打断是**调用级**状态，不属于某一次 HTTP 尝试。 */
 const ATTEMPT_STATUSES = new Set(['success', 'error'])
+/** 轮次/会话终态集合；按触发者区分，四个近义值不得混用（详见 `TrajectoryEndStateDto`）。 */
 const END_STATES = new Set([
   'completed',
   'failed',
@@ -25,8 +28,14 @@ const END_STATES = new Set([
   'interrupt',
   'crashed',
 ])
+/** 压缩状态集合；三态之外一律拒收。 */
 const COMPACTION_STATUSES = new Set(['success', 'failed', 'interrupted'])
 
+/**
+ * token 用量守卫；`input` / `output` 必为数字，`cache` 允许为 null（表示未采集）。
+ * @param value - 待判定的用量对象；`cache` 为 null 或数字皆可，`input` / `output` 缺一即判假。
+ * @returns 形状成立时为 true，否则 false。
+ */
 function isTokenUsage(value: unknown): value is TrajectoryTokenUsageDto {
   return (
     isRecord(value) &&
@@ -36,6 +45,11 @@ function isTokenUsage(value: unknown): value is TrajectoryTokenUsageDto {
   )
 }
 
+/**
+ * 单次尝试的守卫；`tokens` 可为 null（失败请求），`status` 按尝试级取值域校验。
+ * @param value - 待判定的尝试明细；`status` 必须是 `ATTEMPT_STATUSES` 内的取值，`tokens` 可为 null。
+ * @returns 形状成立时为 true，否则 false。
+ */
 function isAttempt(value: unknown): value is TrajectoryAttemptDto {
   return (
     isRecord(value) &&
@@ -51,6 +65,11 @@ function isAttempt(value: unknown): value is TrajectoryAttemptDto {
   )
 }
 
+/**
+ * 轨迹记录的守卫；必填字段之外，`status` / `tokens` / `children` / `attempts` 可选且给了就必须合法。
+ * @param value - 待判定的记录；`kind` 与可选的 `status` 必须是已登记取值，`children` 逐条递归校验。
+ * @returns 形状成立时为 true，否则 false。
+ */
 function isRecordDto(value: unknown): value is TrajectoryRecordDto {
   if (!isRecord(value)) return false
   if (!isString(value['id']) || !isNumber(value['seq'])) return false
@@ -68,6 +87,11 @@ function isRecordDto(value: unknown): value is TrajectoryRecordDto {
   return true
 }
 
+/**
+ * 轮次/会话终态的守卫；`state` 必须是 `END_STATES` 内的取值。
+ * @param value - 待判定的终态标记；`state` 取值未知或 `at` 非数字即判假。
+ * @returns 形状成立时为 true，否则 false。
+ */
 function isEndState(value: unknown): value is TrajectoryEndStateDto {
   return (
     isRecord(value) &&
@@ -77,6 +101,11 @@ function isEndState(value: unknown): value is TrajectoryEndStateDto {
   )
 }
 
+/**
+ * 压缩事件的守卫；`status` 必须是 `COMPACTION_STATUSES` 内的取值，其余字段必为数字。
+ * @param value - 待判定的压缩事件；`status` 取值未知或任一计数非数字即判假。
+ * @returns 形状成立时为 true，否则 false。
+ */
 function isCompaction(value: unknown): value is TrajectoryCompactionDto {
   return (
     isRecord(value) &&

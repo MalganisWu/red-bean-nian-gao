@@ -15,12 +15,21 @@ import {
 
 /** 启动期工具登记入口；登记处封闭后再调用会抛错，杜绝运行期注册。 */
 export interface ToolRegistrar {
+  /**
+   * 登记一个工具，仅在启动注册期内合法：登记处封闭后再调用会抛错。
+   * @param tool - 待登记的工具；为 `null` / `undefined`、名字为空、名字与 schema 不一致或重名都会抛错
+   */
   provide(tool: Tool | null | undefined): void
 }
 
 /** 一个工具提供方插件；`name` 归一化后必须唯一，`register` 里登记它拥有的全部工具。 */
 export interface ToolProviderPlugin {
+  /** 插件名，启动期用来去重；为空或重复都会让启动失败。 */
   readonly name: string
+  /**
+   * 把自己的全部工具登记到登记处；只在启动注册期内被调用一次。
+   * @param registrar - 启动期登记入口，插件经由它登记而不是直接改注册表
+   */
   register(registrar: ToolRegistrar): void
 }
 
@@ -33,9 +42,16 @@ export interface ToolProviderPlugin {
  * 指向两个不同的东西。这些错误都只在运行期表现为「工具莫名不可用」，所以在这里挡住。
  */
 class StartupRegistrar implements ToolRegistrar {
+  /** 工具名到工具实例的映射；登记期不断写入，封闭后不再变动。 */
   readonly #tools = new Map<string, Tool>()
+  /** 是否已封闭；`true` 之后 `provide` 一律抛错。 */
   #sealed = false
 
+  /**
+   * 登记一个工具，并在这里完成全部校验。
+   * @param tool - 待登记的工具；为 `null` / `undefined`、名字为空或带首尾空白、
+   *   名字与 `schema.function.name` 不一致、重名都会抛错
+   */
   public provide(tool: Tool | null | undefined): void {
     if (this.#sealed) throw new Error('tool registry is sealed')
     if (tool === null || tool === undefined) {
@@ -59,10 +75,15 @@ class StartupRegistrar implements ToolRegistrar {
     this.#tools.set(name, tool)
   }
 
+  /** 封闭登记处；封闭后 `provide` 只抛错，工具表内容就此固定。 */
   public seal(): void {
     this.#sealed = true
   }
 
+  /**
+   * 取当前登记内容的只读副本；复制而不是暴露内部 Map，封闭后的表因此不会被调用方改写。
+   * @returns 工具名到工具实例的只读快照
+   */
   public snapshot(): ReadonlyMap<string, Tool> {
     return new Map(this.#tools)
   }
@@ -76,7 +97,9 @@ class StartupRegistrar implements ToolRegistrar {
  * 再拿去委派表试一次会把「工具出错」变成「工具不存在」或更糟的重复执行。
  */
 class CompositeDispatcher implements ToolDispatcher {
+  /** 系统工具分发表；优先命中它，只有它报 `NOT_FOUND` 时才会去问委派表。 */
   readonly #system: ToolDispatcher
+  /** 子 Agent 委派分发表；仅在系统表未命中时接手。 */
   readonly #delegation: ToolDispatcher
 
   public constructor(system: ToolDispatcher, delegation: ToolDispatcher) {
@@ -84,6 +107,15 @@ class CompositeDispatcher implements ToolDispatcher {
     this.#delegation = delegation
   }
 
+  /**
+   * 分发一次调用：先查系统工具，仅当结果为 `NOT_FOUND` 才把同一次调用交给委派表。
+   * 其它错误（工具存在但执行失败）原样抛出，不再去委派表试一次，避免把「工具出错」
+   * 变成「工具不存在」或造成重复执行。
+   * @param call - 模型发起的工具调用
+   * @param context - 本次调用的上下文
+   * @param signal - 取消信号，向下透传给被选中的分发器
+   * @returns 被选中分发器的结果
+   */
   public async dispatch(
     call: ToolCall,
     context: ToolCallContext,
@@ -105,6 +137,7 @@ class CompositeDispatcher implements ToolDispatcher {
 
 /** 由静态链接插件组装并在启动后封闭的工具能力表。 */
 export class ToolRegistry {
+  /** 构造期封闭后不再变动的静态表；所有查询都基于它。 */
   readonly #tools: ReadonlyMap<string, Tool>
 
   public constructor(plugins: readonly (ToolProviderPlugin | null | undefined)[]) {
@@ -183,7 +216,12 @@ export class ToolRegistry {
     return new CompositeDispatcher(this.dispatcher(systemIds), delegation)
   }
 
-  /** 去重后取出工具实例：授权列表里重复的 ID 不该让同一个工具被注册两次（后者会覆盖前者）。 */
+  /**
+   * 去重后取出工具实例：授权列表里重复的 ID 不该让同一个工具被注册两次（后者会覆盖前者）。
+   * 未知 ID 静默跳过，与 `schemas` 的容错策略一致。
+   * @param ids - 授权工具 ID 列表
+   * @returns 去重且过滤掉未知 ID 后的工具实例数组，顺序即入参顺序
+   */
   #requestedTools(ids: readonly string[]): readonly Tool[] {
     const tools: Tool[] = []
     const seen = new Set<string>()

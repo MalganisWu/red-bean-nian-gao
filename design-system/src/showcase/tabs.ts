@@ -3,14 +3,19 @@ export type TabGroupId = 'foundations' | 'components'
 
 /** 分组定义；`label` 是展示用的中英文名。 */
 export interface TabGroupDefinition {
+  /** 分组标识；侧栏按它把页签收拢成「基础」「组件」两组。 */
   id: TabGroupId
+  /** 展示用的中英文名，渲染为侧栏分组标题。 */
   label: string
 }
 
 /** 页签定义；`group` 决定它挂在哪个分组下。 */
 export interface TabDefinition {
+  /** 页签标识；同时用作路由段与页面查找键，改名等于改 URL。 */
   id: TabId
+  /** 展示用的中英文名，渲染为侧栏条目文字。 */
   label: string
+  /** 所属分组；决定该页签出现在哪个分组标题之下。 */
   group: TabGroupId
 }
 

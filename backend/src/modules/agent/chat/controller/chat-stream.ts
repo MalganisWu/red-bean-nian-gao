@@ -88,11 +88,25 @@ export async function* streamFrames(
   }
 }
 
+/**
+ * `nextOrHeartbeat` 的步进结果：拿到一个上游事件，或应发一帧心跳，或发现已断连。
+ * 用判别字段 `kind` 表达三种去向，调用方按它分支，不必再从 Promise 的兑现或超时反推。
+ */
 type NextOrHeartbeat =
   | { readonly kind: 'event'; readonly iteration: IteratorResult<ProductStreamEvent> }
   | { readonly kind: 'heartbeat' }
   | { readonly kind: 'disconnected' }
 
+/**
+ * 等待上游下一个事件，同时与心跳、断连两条路径赛跑，谁先到就返回谁。
+ *
+ * 定时器与断连监听都挂在调用方传入的 `disconnectSignal` 上，返回前统一摘除，
+ * 不在外部信号上遗留监听器；心跳只表示连接保活，不携带业务进展。
+ * @param next 上游迭代器的下一次 `next()`，事件就绪时返回
+ * @param heartbeatMilliseconds 静默多少毫秒后返回心跳步进结果
+ * @param disconnectSignal 客户端断连信号，已中止或随后触发都返回断连结果
+ * @returns 三种走向之一：事件、心跳或断连
+ */
 async function nextOrHeartbeat(
   next: Promise<IteratorResult<ProductStreamEvent>>,
   heartbeatMilliseconds: number,

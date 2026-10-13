@@ -16,20 +16,38 @@ import {
 
 /** 任务列表的 Props；筛选与排序受控，`filterCounts` 用于在档位上显示条数。 */
 export interface ScheduledTaskListProps {
+  /** 任务列表全量数据；为空时整块展示空态而非表格。 */
   items: ScheduledTaskListItemData[]
+  /** 当前筛选档位，受控；默认 `all`，即不做筛选。 */
   filter?: ScheduledTaskFilter | undefined
+  /** 各档位的任务条数；用于在档位标签后显示数字，缺省或某档缺省则不显示数字。 */
   filterCounts?: Partial<Record<ScheduledTaskFilter, number>> | undefined
+  /** 切换筛选档位的回调；缺省时档位不可交互，点击不生效。 */
   onFilterChange?: ((filter: ScheduledTaskFilter) => void) | undefined
+  /** 选中任务主体的回调，点击标题区域时触发。 */
   onSelectTask: (item: ScheduledTaskListItemData) => void
+  /** 选中最近一次执行的回调；缺省时最近执行区域按钮处于禁用态，无跳转。 */
   onSelectExecution?: ((item: ScheduledTaskListItemData) => void) | undefined
+  /** 行尾动作槽位的渲染函数；缺省时渲染一个箭头提示可进入。 */
   renderActions?: ((item: ScheduledTaskListItemData) => ReactNode) | undefined
+  /** 是否加载中；默认 false。列表为空时展示整块加载态，已有数据时展示底部加载提示。 */
   loading?: boolean | undefined
+  /** 错误文案；非空时展示告警条，并在提供 `onRetry` 时给出重试入口。 */
   error?: string | null | undefined
+  /** 重试回调；仅在 `error` 非空且提供了该回调时渲染重试按钮。 */
   onRetry?: (() => void) | undefined
+  /** 排序按钮文案，默认「按下次执行」；仅在提供 `onSort` 时渲染该按钮。 */
   sortLabel?: string | undefined
+  /** 排序回调；缺省时不渲染排序按钮。 */
   onSort?: (() => void) | undefined
 }
 
+/**
+ * 筛选档位的呈现顺序与中文标签。
+ *
+ * 这是列表筛选栏的唯一事实来源：顺序即渲染顺序，`id` 与 `ScheduledTaskFilter` 一一对应，
+ * 后端不提供档位列表，故在模块内固化，避免每次渲染重建。
+ */
 const FILTERS: readonly { id: ScheduledTaskFilter; label: string }[] = [
   { id: 'all', label: '全部' },
   { id: 'active', label: '启用' },
@@ -38,26 +56,73 @@ const FILTERS: readonly { id: ScheduledTaskFilter; label: string }[] = [
   { id: 'ended', label: '已结束' },
 ]
 
+/**
+ * 把档位条数渲染成按钮后缀。
+ *
+ * 计数未知时返回空串，使按钮不出现孤立的数字或占位符；计数为 0 时照常显示 0，
+ * 因为「该档位确实没有任务」本身是有信息量的。
+ *
+ * @param count - 该档位的任务条数；undefined 表示尚未统计。
+ * @returns 以空格开头的数字后缀，或计数未知时的空串。
+ */
 function filterCountLabel(count: number | undefined): string {
   return count === undefined ? '' : ` ${count}`
 }
 
+/**
+ * 生命周期 → 状态文字颜色类。
+ *
+ * 仅「启用」用成功色强调，暂停与已结束统一降为弱化色，让活跃任务在列表中先被看到。
+ * 两套主题各有一份 `text-success` / `text-foreground-muted`，语义色在两套主题下都可读。
+ *
+ * @param lifecycle - 任务生命周期三态。
+ * @returns Tailwind 文字颜色类名。
+ */
 function lifecycleClass(lifecycle: ScheduledTaskLifecycle): string {
   return lifecycle === 'active' ? 'text-success' : 'text-foreground-muted'
 }
 
+/**
+ * 执行状态 → 文本颜色类。
+ *
+ * 成功用成功色、失败用危险色，等待与进行中降为弱化色，使失败最先被注意。
+ * 颜色取语义令牌，Light / Dark 两套主题下均保持可读。
+ *
+ * @param status - 单次执行的状态。
+ * @returns Tailwind 文字颜色类名；未知状态回退到弱化色，不会漏样式。
+ */
 function runStatusClass(status: ScheduledTaskRunStatus): string {
   if (status === 'completed') return 'text-success'
   if (status === 'failed') return 'text-danger'
   return 'text-foreground-muted'
 }
 
+/**
+ * 执行状态 → 状态圆点背景类。
+ *
+ * 与 {@link runStatusClass} 同一套映射，保证圆点与文案颜色一致；进行中会由调用方再叠加
+ * 呼吸动画。语义色在两套主题下都有对应令牌。
+ *
+ * @param status - 单次执行的状态。
+ * @returns Tailwind 背景色类名；未知状态回退到弱化色。
+ */
 function runStatusIndicatorClass(status: ScheduledTaskRunStatus): string {
   if (status === 'completed') return 'bg-success-indicator'
   if (status === 'failed') return 'bg-danger-indicator'
   return 'bg-foreground-muted'
 }
 
+/**
+ * 判断任务是否落在某个筛选档位内。
+ *
+ * `attention` 是前端派生档：以「最近一次执行失败」为准，而不是后端状态字段；
+ * `all` 恒真，其余档位比对生命周期。这样筛选逻辑与 {@link isScheduledTaskAttention}
+ * 保持单一判据，不会两处各写一份。
+ *
+ * @param item - 待判定的任务列表项。
+ * @param filter - 目标筛选档位。
+ * @returns 该任务是否应出现在此档位下。
+ */
 function matchesFilter(item: ScheduledTaskListItemData, filter: ScheduledTaskFilter): boolean {
   if (filter === 'all') return true
   if (filter === 'attention') return isScheduledTaskAttention(item)

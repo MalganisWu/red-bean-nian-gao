@@ -91,7 +91,9 @@ export const TASK_LIST_SELECT = `
 
 /** 执行记录的落库形态；由 `serializeExecution` 产出，`insertExecution` 消费。 */
 export interface SerializedExecution {
+  /** 原始领域执行记录；展示消息之外的可空字段插入时统一转 NULL。 */
   readonly execution: AgentTaskExecution
+  /** 经 Presenter 转 DTO 后再序列化的展示消息 JSON，落库为 `jsonb`。 */
   readonly displayMessages: string
 }
 

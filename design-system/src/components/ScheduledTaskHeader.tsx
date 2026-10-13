@@ -9,17 +9,29 @@ import {
 
 /** 任务详情页头部的 Props；页签受控，两个动作槽位由调用方注入现成按钮。 */
 export interface ScheduledTaskHeaderProps {
+  /** 任务标题，作为页面的主标题渲染。 */
   title: string
+  /** 任务来源说明；缺省则不渲染标题下方该行。 */
   source?: string | undefined
+  /** 任务类型短标签（如「定时任务」），与状态并列显示在标题上方。 */
   kindLabel: string
+  /** 任务生命周期三态，决定状态文案与是否强调为成功色。 */
   lifecycle: ScheduledTaskLifecycle
+  /** 当前选中的页签，受控；由调用方持有并决定高亮项。 */
   activeTab: ScheduledTaskDetailTab
+  /** 执行记录条数；仅在「执行记录」页签且非 undefined 时追加显示。 */
   historyCount?: number | undefined
+  /** 返回按钮文案，通常为上级视图名称。 */
   backLabel: string
+  /** 点击返回按钮时触发。 */
   onBack: () => void
+  /** 切换页签时触发，回传目标页签。 */
   onTabChange: (tab: ScheduledTaskDetailTab) => void
+  /** 主操作槽位，由调用方注入现成按钮；缺省且无 `moreAction` 时不渲染操作区。 */
   primaryAction?: ReactNode | undefined
+  /** 次级操作槽位，由调用方注入现成按钮；缺省则只渲染主操作。 */
   moreAction?: ReactNode | undefined
+  /** 标题标签层级；默认 2（h2），嵌入页面主区域时可传 1 提升为 h1。 */
   headingLevel?: 1 | 2 | undefined
 }
 

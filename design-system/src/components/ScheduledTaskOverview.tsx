@@ -3,25 +3,54 @@ import { scheduledTaskRunLabel, type ScheduledTaskRunSummary } from './scheduled
 
 /** 任务概览面板的 Props；字段都是已格式化的展示文案，缺省即不渲染对应行。 */
 export interface ScheduledTaskOverviewProps {
+  /** 执行计划的主文案（如「每天 9:00」），已格式化。 */
   scheduleLabel: string
+  /** 下次运行时间文案；缺省时该格显示占位符「—」。 */
   nextRunLabel?: string | undefined
+  /** 下次运行文案的语气，默认 `success`（用成功色强调时间点）；传 `muted` 则降为弱化色。 */
   nextRunTone?: 'success' | 'muted' | undefined
+  /** 失败处理策略文案；缺省时回退为「按任务策略处理」。 */
   retryLabel?: string | undefined
+  /** 触发方式文案；缺省时回退为「计划自动触发」。 */
   triggerLabel?: string | undefined
+  /** 时区名称；缺省则不显示「使用时区」说明。 */
   timezone?: string | undefined
+  /** Cron 表达式；缺省时整个「高级信息」折叠区不渲染。 */
   cron?: string | undefined
+  /** 创建任务时的原始要求；缺省时整个「任务内容」区块不渲染。 */
   instruction?: string | undefined
+  /** 最近一次执行摘要；缺省时该区块显示「任务尚未执行」空态。 */
   latestRun?: ScheduledTaskRunSummary | undefined
+  /** 点击「查看本次」的回调；缺省时不渲染该按钮。 */
   onViewLatest?: (() => void) | undefined
+  /** 点击「查看全部执行记录」的回调；缺省时不渲染该入口。 */
   onViewHistory?: (() => void) | undefined
 }
 
+/**
+ * 最近一次执行状态 → 文本颜色类。
+ *
+ * 成功用成功色、失败用危险色，等待与进行中降为弱化色，与列表、历史的映射保持一致，
+ * 使同一状态在概览里不出现另一种颜色。语义色在两套主题下都成立。
+ *
+ * @param status - 最近一次执行的状态。
+ * @returns Tailwind 文字颜色类名；未知状态回退到弱化色。
+ */
 function latestStatusClass(status: ScheduledTaskRunSummary['status']): string {
   if (status === 'completed') return 'text-success'
   if (status === 'failed') return 'text-danger'
   return 'text-foreground-muted'
 }
 
+/**
+ * 最近一次执行状态 → 状态圆点背景类。
+ *
+ * 与 {@link latestStatusClass} 同一套映射，保证圆点与文案颜色一致；语义色在
+ * Light / Dark 两套主题下都有对应令牌。
+ *
+ * @param status - 最近一次执行的状态。
+ * @returns Tailwind 背景色类名；未知状态回退到弱化色。
+ */
 function latestStatusIndicatorClass(status: ScheduledTaskRunSummary['status']): string {
   if (status === 'completed') return 'bg-success-indicator'
   if (status === 'failed') return 'bg-danger-indicator'

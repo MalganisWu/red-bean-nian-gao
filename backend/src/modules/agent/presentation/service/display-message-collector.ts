@@ -9,13 +9,17 @@ export interface PresentationClock {
 
 /** 构造选项；`buildSections` 用于把当次运行累积的 section 挂到 assistant 消息上。 */
 export interface DisplayMessageCollectorOptions {
+  /** 时间戳来源；缺省用 `Date.now`，注入后测试可产出确定的时间。 */
   readonly now?: PresentationClock | undefined
+  /** 构造当次运行 section 的方法；缺省则 assistant 消息只带正文分节。 */
   readonly buildSections?: (() => AgentJsonValue) | undefined
 }
 
 /** Runtime 回调携带的上下文；`metadata` 是节点之间共享的可变袋。 */
 export interface PresentationContext {
+  /** 当前运行的会话标识；与上次不同即视为一次新运行的起点。 */
   readonly sessionId: string
+  /** 节点之间共享的可变元数据袋；展示历史快照也写在这里。 */
   readonly metadata: Map<string, unknown>
 }
 
@@ -30,10 +34,15 @@ export interface PresentationContext {
  * `messages` 取值时深拷贝：调用方拿到的是快照，改它不会影响收集器内部状态。
  */
 export class DisplayMessageCollector {
+  /** 时间戳来源；可注入，测试据此产出确定的时间。 */
   readonly #now: PresentationClock
+  /** 构造当次运行 section 的方法；缺省则只产出正文分节。 */
   readonly #buildSections: (() => AgentJsonValue) | undefined
+  /** 已收集的展示消息；对外经 `messages` getter 深拷贝返回。 */
   readonly #messages: DisplayMessage[] = []
+  /** 本次运行开始时间（epoch 毫秒）；会话切换时刷新。 */
   #runStartedAt = 0
+  /** 当前运行归属的会话标识；用来识别运行起点。 */
   #runSessionId = ''
 
   public constructor(options: DisplayMessageCollectorOptions = {}) {
@@ -141,6 +150,10 @@ export class DisplayMessageCollector {
     this.#messages.push(structuredClone(message))
   }
 
+  /**
+   * 标记运行起点：会话标识与上次不同时刷新 `runStartedAt`，让后续消息归入新一次运行。
+   * @param sessionId 当前运行会话 ID；与上次相同则不做任何改动
+   */
   #markRunStart(sessionId: string): void {
     if (this.#runSessionId !== sessionId) {
       this.#runSessionId = sessionId

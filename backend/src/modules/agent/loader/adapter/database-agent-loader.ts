@@ -22,7 +22,9 @@ import type {
   AgentRuntimeConfig,
 } from '../../execution/model/agent-execution-contract.js'
 
+/** 任意 JSON 对象（键为字符串、值未知）；`model_params` / `metadata` 等自由结构列共用此 schema。 */
 const jsonRecordSchema = z.record(z.string(), z.unknown())
+/** `core_agents` 表行的校验 schema；行进入领域层前必经此处，字段类型在此定死。 */
 const coreAgentRowSchema = z.object({
   agent_id: z.string().min(1),
   name: z.string().min(1),
@@ -35,6 +37,7 @@ const coreAgentRowSchema = z.object({
   metadata: jsonRecordSchema,
   is_active: z.boolean(),
 })
+/** `llm_configs` 表行的校验 schema；`credential_id` 允许 null，表示该配置不绑定凭据。 */
 const llmConfigRowSchema = z.object({
   llm_config_id: z.string().min(1),
   name: z.string().min(1),
@@ -42,20 +45,27 @@ const llmConfigRowSchema = z.object({
   model_name: z.string().min(1),
   credential_id: z.string().nullable(),
 })
+/** `api_credentials` 表行的校验 schema；api_key 只在内存中用于构造 Adapter，不进入日志。 */
 const credentialRowSchema = z.object({
   api_credential_id: z.string().min(1),
   api_base_url: z.string(),
   api_key: z.string(),
 })
 
+/** `core_agents` 行的领域类型，由 schema 推导以保证与校验结果一致。 */
 type CoreAgentRow = z.infer<typeof coreAgentRowSchema>
+/** `llm_configs` 行的领域类型，由 schema 推导以保证与校验结果一致。 */
 type LlmConfigRow = z.infer<typeof llmConfigRowSchema>
 
 /** Loader 依赖；全部在构造期传入，`load` 期间不回查数据库。 */
 export interface DbMainAgentLoaderOptions {
+  /** SQL 执行器；agent、LLM 配置与凭据都从它查。 */
   readonly database: SqlExecutor
+  /** 工具注册表；按 agent 授权取系统工具 schema 与组合分派器。 */
   readonly registry: ToolRegistry
+  /** 模型适配器工厂；按 provider / 凭据 / 模型名构造 LLM 适配器。 */
   readonly adapterFactory: AgentModelAdapterFactory
+  /** 子 Agent 工具工厂；为单次加载构建可委派工具与装饰链。 */
   readonly subAgentToolFactory: RuntimeSubAgentToolFactory
 }
 
@@ -67,6 +77,7 @@ export interface DbMainAgentLoaderOptions {
  * 因此在流式运行中途改配置不会影响正在跑的这一次——这正是产品所说的「能力图在启动期定死」。
  */
 export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
+  /** 构造期注入的依赖；`load` 期间只用它，不回查数据库之外的来源。 */
   readonly #options: DbMainAgentLoaderOptions
 
   public constructor(options: DbMainAgentLoaderOptions) {
@@ -145,6 +156,12 @@ export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
     }
   }
 
+  /**
+   * 按主键读取并校验一行 agent 定义；不存在时抛错。
+   * @param agentId 目标 agent 主键
+   * @param signal 本次查询的中止信号
+   * @returns 校验通过的 agent 行
+   */
   async #loadAgent(agentId: string, signal: AbortSignal): Promise<CoreAgentRow> {
     const result = await this.#options.database.query(
       `SELECT agent_id, name, description, system_prompt, llm_config_name,
@@ -158,6 +175,12 @@ export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
     return parseRow(coreAgentRowSchema, row, 'core_agents')
   }
 
+  /**
+   * 按名称读取并校验一行 LLM 配置；不存在时抛错。
+   * @param name LLM 配置名（agent 行里的 llm_config_name）
+   * @param signal 本次查询的中止信号
+   * @returns 校验通过的 LLM 配置行
+   */
   async #loadLlmConfig(name: string, signal: AbortSignal): Promise<LlmConfigRow> {
     const result = await this.#options.database.query(
       `SELECT llm_config_id, name, provider, model_name, credential_id
@@ -170,6 +193,12 @@ export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
     return parseRow(llmConfigRowSchema, row, 'llm_configs')
   }
 
+  /**
+   * 按主键读取并校验一行 API 凭据；不存在时抛错。凭据只在内存中用于构造 Adapter，不进日志。
+   * @param id 凭据主键（LLM 配置行里的 credential_id）
+   * @param signal 本次查询的中止信号
+   * @returns 校验通过的凭据行
+   */
   async #loadCredential(
     id: string,
     signal: AbortSignal
@@ -195,6 +224,10 @@ export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
    * - 查不到的 agent **静默跳过**而不是报错。`is_active = true` 的过滤意味着被禁用的子 Agent
    *   会直接消失；父 Agent 因此少一个可委派对象，但它自己仍然能跑——
    *   这与「主 agent 被禁用就直接失败」是有意区分的两种强度。
+   *
+   * @param agentIds 配置里声明的可委派 agent 主键；按其书写顺序重建结果以保证工具清单稳定
+   * @param signal 本次查询的中止信号
+   * @returns 按 agentIds 顺序排列的子 Agent 定义；查不到的会被静默跳过
    */
   async #loadChildDefinitions(
     agentIds: readonly string[],
@@ -227,12 +260,22 @@ export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
   }
 }
 
-/** 把一行 `core_agents` 原始数据校验后转成按 agent_id 索引的 Map 条目。 */
+/**
+ * 把一行 `core_agents` 原始数据校验后转成按 agent_id 索引的 Map 条目。
+ * @param row 数据库返回的原始行，尚未校验
+ * @returns [agent_id, 已校验行] 二元组，供构建保序的 Map
+ */
 function toCoreAgentEntry(row: unknown): readonly [string, CoreAgentRow] {
   const parsed = parseRow(coreAgentRowSchema, row, 'core_agents child')
   return [parsed.agent_id, parsed]
 }
 
+/**
+ * 从 `model_params` JSON 提取模型调用参数；每个字段缺失即不设置，交给 Runtime 用自身默认值。
+ * 已识别的字段做类型校验，非法值直接抛错而非静默丢弃。
+ * @param value 已校验为 JSON 对象的 model_params 列
+ * @returns 供 Runtime 使用的模型参数；未出现的字段不产出键
+ */
 function parseModelParams(value: Readonly<Record<string, unknown>>): AgentModelParams {
   return {
     ...numberProperty(value, 'temperature', 'model_params.temperature'),
@@ -247,6 +290,8 @@ function parseModelParams(value: Readonly<Record<string, unknown>>): AgentModelP
  *
  * 默认关闭是刻意的：压缩会改写上下文并产生额外的模型调用，是一项有代价的优化，
  * 不该因为某个字段缺失就被悄悄打开。启用时才构造 restorer——不启用就完全不引入这依赖。
+ * @param value 已校验为 JSON 对象的 metadata 列
+ * @returns Runtime 运行参数；仅当显式启用压缩时才带上 compression 字段
  */
 function parseRuntimeConfig(value: Readonly<Record<string, unknown>>): AgentRuntimeConfig {
   const config: AgentRuntimeConfig = {
@@ -298,6 +343,14 @@ function parseRuntimeConfig(value: Readonly<Record<string, unknown>>): AgentRunt
   }
 }
 
+/**
+ * 从对象里取有限数值字段；缺失返回空对象（表示不设置），存在但非法则抛错。
+ * 返回值固定按 `temperature` 命名，因为当前唯一的有限数值参数就是它。
+ * @param value 来源对象（如 model_params）
+ * @param key 源字段名（下划线命名）
+ * @param label 报错时使用的字段路径，便于定位是哪一列出错
+ * @returns 命中且合法时为 { temperature }，缺失时为空对象
+ */
 function numberProperty(
   value: Readonly<Record<string, unknown>>,
   key: string,
@@ -311,6 +364,14 @@ function numberProperty(
   return { temperature: candidate }
 }
 
+/**
+ * 从对象里取非负安全整数字段；缺失返回空对象，存在但非法则抛错。
+ * @param value 来源对象
+ * @param key 源字段名（下划线命名）
+ * @param outputKey 输出的驼峰字段名，用于与 Runtime 侧命名对齐
+ * @param label 报错时使用的字段路径
+ * @returns 命中且合法时为 { [outputKey]: number }，缺失时为空对象
+ */
 function integerProperty(
   value: Readonly<Record<string, unknown>>,
   key: string,
@@ -325,6 +386,13 @@ function integerProperty(
   return { [outputKey]: Number(candidate) }
 }
 
+/**
+ * 从对象里取布尔字段；缺失返回空对象，存在但非布尔则抛错。返回值固定按 `thinking` 命名。
+ * @param value 来源对象
+ * @param key 源字段名
+ * @param label 报错时使用的字段路径
+ * @returns 命中且合法时为 { thinking }，缺失时为空对象
+ */
 function booleanProperty(
   value: Readonly<Record<string, unknown>>,
   key: string,
@@ -340,6 +408,10 @@ function booleanProperty(
  * 数据库行进入领域层的唯一入口：逐字段 Zod 校验，失败即抛。
  * 解析失败会把完整的 Zod 报错带进消息——被拒的是不可信数据，排障时需要知道具体哪个字段、
  * 期望什么类型，而不是一句「数据无效」。
+ * @param schema 该行的 Zod schema
+ * @param row 数据库返回的原始行，类型未知
+ * @param table 表名，拼进报错消息以便定位失败来源
+ * @returns 校验通过后的领域对象；校验失败时抛错，不返回部分结果
  */
 function parseRow<TValue>(schema: z.ZodType<TValue>, row: unknown, table: string): TValue {
   const parsed = schema.safeParse(row)

@@ -9,11 +9,17 @@
  * 让整次运行以明确的错误结束——宁可断掉，也不要静默给出错误的内容。
  */
 export class RunEventQueue<TValue> implements AsyncIterable<TValue> {
+  /** 已入队待消费的值；单生产者写入，消费端按 FIFO 取出。 */
   readonly #values: TValue[] = []
+  /** 等待新值的 resolve 回调；入队或关闭时统一唤醒。 */
   readonly #waiters: Array<() => void> = []
+  /** 队列容量上限；越界视为故障信号而非丢弃策略。 */
   readonly #capacity: number
+  /** 溢出时的回调；用于把故障信号通知给生产者（如中止整次运行）。 */
   readonly #onOverflow: ((error: Error) => void) | undefined
+  /** 是否已收尾（正常关闭或失败）；置真后 push 静默丢弃。 */
   #closed = false
+  /** 失败收尾时记录的错误；消费端排空缓冲后抛给迭代方。 */
   #error: Error | undefined
 
   public constructor(capacity = 512, onOverflow?: (error: Error) => void) {

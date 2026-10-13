@@ -10,6 +10,7 @@ import { toSessionTrajectoryDto } from './trajectory-presenter.js'
  * 默认实现为 `DefaultTrajectoryService`（内部 1:1，无独立 Port），由 `agent.module.ts` 组装。
  */
 export interface TrajectoryControllerDependencies {
+  /** 轨迹查询用例；控制器只读它，不开启任何写路径。 */
   readonly trajectory: DefaultTrajectoryService
 }
 
@@ -18,6 +19,7 @@ export interface TrajectoryControllerDependencies {
  * 负责 wire 投影与应用错误映射。请求解包与成功信封由 `trajectory.routes.ts` 承担。
  */
 export class TrajectoryController {
+  /** 控制器依赖，构造期一次性注入；装配入口在 `agent.module.ts`。 */
   readonly #dependencies: TrajectoryControllerDependencies
 
   public constructor(dependencies: TrajectoryControllerDependencies) {

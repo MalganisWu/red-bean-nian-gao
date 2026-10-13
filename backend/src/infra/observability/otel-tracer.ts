@@ -20,6 +20,7 @@ import type { TraceAttribute, TraceSpan, TracerPort } from '../../shared/observa
 
 import { newSpanId, newTraceId } from './structured-log-tracer.js'
 
+/** 结构性属性键；这些键在 OTel 上有专用通道，当成自定义属性写入只会污染链路元数据。 */
 const RESERVED_ATTRIBUTES = new Set([
   'trace.id',
   'runtime.trace_id',
@@ -39,6 +40,7 @@ const RESERVED_ATTRIBUTES = new Set([
  * 因为 `generateTraceId()` 是 SDK 同步调用的，没有参数通道可以传。
  */
 export class PreferredTraceIdGenerator implements tracing.IdGenerator {
+  /** 承载「本次想要的 trace ID」的异步存储；仅 `within` 回调期间有值。 */
   readonly #preferred = new AsyncLocalStorage<string>()
 
   /**
@@ -79,8 +81,11 @@ export class PreferredTraceIdGenerator implements tracing.IdGenerator {
 
 /** 将 Runtime 中性的 tracing 契约适配到 OpenTelemetry API。 */
 export class OTelTracer implements TracerPort {
+  /** 底层 OTel tracer；所有 span 都由它按解析出的父上下文创建。 */
   readonly #tracer: ApiTracer
+  /** trace ID 生成器；仅根 span 借用它把外部 trace ID 固定下来，子 span 不得再指定。 */
   readonly #idGenerator: PreferredTraceIdGenerator
+  /** 当前活跃 span 的上下文；`within` 时进出，子 span 据此挂到父级。 */
   readonly #active = new AsyncLocalStorage<Context>()
 
   public constructor(tracer: ApiTracer, idGenerator: PreferredTraceIdGenerator) {
@@ -125,10 +130,19 @@ export class OTelTracer implements TracerPort {
   }
 }
 
+/**
+ * `TraceSpan` 在 OTel 上的实现：持有底层 span 与其上下文，负责设活跃与收尾。
+ * 建 span 与进入上下文被刻意拆开——`start` 只建，`within` 才把它设为活跃，
+ * 调用方因此可以选择只记录而不激活。收尾经 `end` 落定，失败语义见该方法。
+ */
 class OTelSpan implements TraceSpan {
+  /** 底层 OTel span；属性、异常与结束都落到它上面。 */
   readonly #span: ApiSpan
+  /** 本 span 的上下文；`within` 时把它设为活跃，期间产生的子 span 挂在它下面。 */
   readonly #context: Context
+  /** 与 `OTelTracer` 共享的活跃上下文存储，保证父子在同一份状态里串联。 */
   readonly #active: AsyncLocalStorage<Context>
+  /** 收尾幂等标记；`end` 只真正执行一次，重复调用直接返回。 */
   #ended = false
 
   public constructor(span: ApiSpan, context: Context, active: AsyncLocalStorage<Context>) {
@@ -137,16 +151,29 @@ class OTelSpan implements TraceSpan {
     this.#active = active
   }
 
+  /**
+   * 批量补充 span 属性；保留键交给 `otelAttributes` 统一过滤后丢弃。
+   * @param attributes - 追加到本 span 上的属性列表，与已有属性合并
+   */
   public setAttributes(...attributes: readonly TraceAttribute[]): void {
     this.#span.setAttributes(otelAttributes(attributes))
   }
 
-  /** 把本 span 设为异步上下文里的活跃 span，使期间产生的子 span 自动挂到它下面。 */
+  /**
+   * 把本 span 设为异步上下文里的活跃 span，使期间产生的子 span 自动挂到它下面。
+   * 绑定随回调作用域生效与解除：进入时压入上下文，回调返回的 Promise 落定后自动弹出，
+   * 因此回调之外的并发代码不会继续看到这个活跃 span。
+   * @param operation - 在该 span 上下文中执行的异步回调
+   * @returns 回调的返回值；其拒绝原样透传，由调用方负责在收尾时处理
+   */
   public within<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
     return this.#active.run(this.#context, operation)
   }
 
-  /** 幂等收尾；带错误时同时记录异常与 ERROR 状态，两者在观测后端是不同的检索维度。 */
+  /**
+   * 幂等收尾；带错误时同时记录异常与 ERROR 状态，两者在观测后端是不同的检索维度。
+   * @param error - 失败原因；传入时先把异常与 ERROR 状态写进 span，再结束
+   */
   public end(error?: Error): void {
     if (this.#ended) return
     this.#ended = true
@@ -163,6 +190,8 @@ class OTelSpan implements TraceSpan {
  * 只要 id 缺失或格式非法就返回 undefined 并退回根 span——**绝不因为一个坏 header 让请求失败**：
  * 观测是旁路，坏掉的传播信息只该让链路断开，不该影响业务。
  * `trace.flags` 缺省为已采样（上游发过来了通常就是想被采）。
+ * @param attributes - 入站属性列表，id 缺失或格式非法的会被忽略
+ * @returns 还原出的远端父上下文；信息不全或不合法时返回 undefined 以退回根 span
  */
 function remoteParentContext(attributes: readonly TraceAttribute[]): Context | undefined {
   const traceId =
@@ -189,12 +218,25 @@ function remoteParentContext(attributes: readonly TraceAttribute[]): Context | u
   return trace.setSpanContext(ROOT_CONTEXT, spanContext)
 }
 
+/**
+ * 按 span 名映射 OTel 的 span kind。
+ * 名字是业务与 SDK 唯一的约定点，因此这里用白名单硬编码，而不是靠属性或配置驱动；
+ * 未列名的名字归为 INTERNAL，表示只是一个进程内操作。
+ * @param name - span 名，与 `start` 收到的一致
+ * @returns 对应的 span kind
+ */
 function spanKind(name: string): SpanKind {
   if (name === 'http.request') return SpanKind.SERVER
   if (name === 'llm.stream') return SpanKind.CLIENT
   return SpanKind.INTERNAL
 }
 
+/**
+ * 把中性属性转成 OTel 属性，顺带丢掉保留键与空键。
+ * 丢弃而不是报错：这些键已由 `trace.*` 专用通道承载，重复写入只会让链路元数据自相矛盾。
+ * @param attributes - 中性层的属性列表
+ * @returns OTel 可接受的属性表；被保留键占用或键名为空的不出现
+ */
 function otelAttributes(attributes: readonly TraceAttribute[]): Attributes {
   const result: Attributes = {}
   for (const attribute of attributes) {
@@ -204,6 +246,13 @@ function otelAttributes(attributes: readonly TraceAttribute[]): Attributes {
   return result
 }
 
+/**
+ * 读取一个属性值；找不到或值为空串时返回 undefined。
+ * 空串按缺失处理，避免上游写入空 header 时被当成一个合法的父标识。
+ * @param attributes - 待查的属性列表
+ * @param key - 属性键
+ * @returns 该键的值；缺失或为空串时为 undefined
+ */
 function attributeValue(attributes: readonly TraceAttribute[], key: string): string | undefined {
   return attributes.find((attribute): boolean => attribute.key === key)?.value || undefined
 }

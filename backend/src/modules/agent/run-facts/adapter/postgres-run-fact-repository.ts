@@ -20,6 +20,7 @@ import { optionalField } from '../../../../shared/object/optional-field.js'
  * run_index 用单条 INSERT..SELECT 在会话内分配（配合 session 锁串行化同一会话的 run）。
  */
 export class PostgresRunFactRepository implements RunFactRepository {
+  /** PostgreSQL SQL 执行器；会话事实日志的读写都经它落到 session_runs 表。 */
   readonly #database: SqlExecutor
 
   public constructor(database: SqlExecutor) {
@@ -182,10 +183,21 @@ export class PostgresRunFactRepository implements RunFactRepository {
   }
 }
 
+/**
+ * 判定数据库返回值是否为非数组对象；在校验列形状前先排除数组与 null。
+ * @param value 待判定的未知值
+ * @returns 是非数组对象时为 true
+ */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/**
+ * 给仓储错误套上中文上下文并保留 cause 链：日志里既能看到是哪次操作失败，又不断掉底层根因。
+ * @param context 中文上下文（含关键 ID），用于定位是哪次 run / 会话操作失败
+ * @param cause 捕获到的原始错误；作为 cause 保留以不断链
+ * @returns 带上下文消息与 cause 链的新错误
+ */
 function contextualError(context: string, cause: unknown): Error {
   return new Error(`${context}: ${cause instanceof Error ? cause.message : String(cause)}`, {
     cause,

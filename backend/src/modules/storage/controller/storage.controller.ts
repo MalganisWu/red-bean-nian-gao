@@ -25,6 +25,7 @@ import { toObjectInfoDto } from './storage-presenter.js'
  * 继续传入应用层，底层 Adapter 负责销毁 MinIO 响应流。
  */
 export class StorageController {
+  /** 存储用例服务，构造时注入；对象命名、归属校验与 key 前缀都由它负责。 */
   readonly #storage: StorageService
 
   public constructor(storage: StorageService) {
@@ -129,6 +130,17 @@ export class StorageController {
     return this.#presign(command, signal, 'put')
   }
 
+  /**
+   * 预签名下载与上传的共用实现，按 `kind` 分派到应用层的对应方法。
+   *
+   * 两条路径的差异只有签名动作与失败文案，合并在此以免重复；映射规则仍是入参非法 400、
+   * 对象不存在 404、其余 500，与其它端点一致。
+   *
+   * @param command - 预签名命令，含归属用户、对象 key 与有效期；`userId` 来自 Principal
+   * @param signal - 请求生命周期绑定的取消信号，透传给应用层
+   * @param kind - 签名方向：`get` 签发下载 URL，`put` 签发上传 URL
+   * @returns URL 与本次实际采用的有效期（秒），字段名对齐 DTO 的响应形状
+   */
   async #presign(
     command: PresignObjectCommand,
     signal: AbortSignal,
@@ -146,6 +158,17 @@ export class StorageController {
   }
 }
 
+/**
+ * 把应用层错误收敛成 HTTP 语义：显式标记 INVALID_INPUT / NOT_FOUND 的
+ * `StorageApplicationError` 转成 400 / 404，其余按未知异常落 500。
+ *
+ * 对象存储的底层异常（MinIO 网络错误、凭据失效等）会带实现细节，一律不转发给调用方；
+ * 未识别的错误码也按未知处理，避免新增语义被静默当成客户端错误。
+ *
+ * @param cause - 应用层抛出的原始异常；类型未知，需在内部逐类判定
+ * @param fallback - 落 500 时写日志用的中文兜底文案，由调用点按操作语义给定
+ * @returns 可直接抛回 Fastify 的 HTTP 错误对象
+ */
 function mapStorageFailure(cause: unknown, fallback: string): Error {
   if (cause instanceof StorageApplicationError) {
     if (cause.code === STORAGE_APPLICATION_ERROR_CODES.INVALID_INPUT) {

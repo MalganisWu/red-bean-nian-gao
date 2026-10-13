@@ -27,10 +27,18 @@ export interface TrajectoryInspectorProps {
   className?: string | undefined
   /** 步骤概览里点击某次 LLM 请求时回调（用于跳转到请求详情）。 */
   onSelectRecord?: ((id: string) => void) | undefined
+  /** 点右上角关闭按钮时回调；面板的挂载/卸载由消费方决定，这里只上报意图。 */
   onClose: () => void
 }
 
-function KV({ pairs }: { pairs: readonly [string, React.ReactNode][] }) {
+/**
+ * 「键—值」两列网格：左键用弱化色、右键可传任意节点。
+ * 键列固定 88px，保证同一区块内多组 KV 的冒号位置对齐。
+ *
+ * @param props - 组件属性；`pairs` 为键值对列表，键兼作 React key，值可为任意可渲染节点。
+ */
+function KV(props: { pairs: readonly [string, React.ReactNode][] }) {
+  const { pairs } = props
   return (
     <div className="grid grid-cols-[88px_1fr] gap-x-3 gap-y-2 text-xs">
       {pairs.map(([k, v]) => (
@@ -43,7 +51,13 @@ function KV({ pairs }: { pairs: readonly [string, React.ReactNode][] }) {
   )
 }
 
-function Metric({ label, value, sub }: { label: string; value: string; sub?: string | undefined }) {
+/**
+ * 指标卡：一行标签 + 一行主值，可选再给一行说明（如占比、来源）。
+ *
+ * @param props - 组件属性；`sub` 传空则不渲染说明行。
+ */
+function Metric(props: { label: string; value: string; sub?: string | undefined }) {
+  const { label, value, sub } = props
   return (
     <div className="rounded-lg border border-border px-3 py-2.5">
       <div className="text-label text-foreground-faint">{label}</div>

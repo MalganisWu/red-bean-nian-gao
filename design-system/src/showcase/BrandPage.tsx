@@ -6,7 +6,13 @@ import { BrandMark } from '@/components/BrandMark'
  * 平视是一个点，近看是一枚红豆瓣。品牌色只承担识别与确认，不承担状态。
  */
 
-function Rule({ children }: { children: ReactNode }) {
+/**
+ * 一条带下划线的分组标题，把品牌页的展示区按语义分段。
+ *
+ * @param props - 组件属性；`children` 为标题文字。
+ */
+function Rule(props: { children: ReactNode }) {
+  const { children } = props
   return (
     <div className="mb-3 flex items-center gap-2 font-sans text-label tracking-caption text-foreground-muted">
       {children}
@@ -15,7 +21,15 @@ function Rule({ children }: { children: ReactNode }) {
   )
 }
 
-function Bean({ size }: { size: number }) {
+/**
+ * 单个尺寸的字标样例：渲染该尺寸的 BrandMark 并标注像素值。
+ *
+ * 字标本身是单色前景，因此同一张样例在 Light / Dark 下都成立，不需要两套示例。
+ *
+ * @param props - 组件属性；`size` 为字标边长（像素）。
+ */
+function Bean(props: { size: number }) {
+  const { size } = props
   return (
     <div className="flex flex-col items-center gap-2 border border-border-strong bg-card p-4">
       <BrandMark size={size} />

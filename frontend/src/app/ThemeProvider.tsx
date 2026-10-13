@@ -1,16 +1,28 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 
+/** 主题取值；仅 light / dark 两态，对应 `documentElement` 上 `dark` class 的开关。 */
 type Theme = 'light' | 'dark'
 
+/** 主题上下文的读写接口：当前主题，以及 setTheme / toggleTheme 两个动作。 */
 interface ThemeContextValue {
+  /** 当前生效的主题。 */
   theme: Theme
+  /** 显式设置主题；会同步到 documentElement 与 localStorage。 */
   setTheme: (theme: Theme) => void
+  /** 在 light / dark 之间切换，即 setTheme 的反向操作。 */
   toggleTheme: () => void
 }
 
+/** 主题上下文；默认值 null，读取方需自行处理「不在 Provider 内」的情形（见 useTheme）。 */
 const ThemeContext = createContext<ThemeContextValue | null>(null)
+/** localStorage 键名；带 `rbng-` 前缀避免与同域其它应用串键，改动会让已保存主题失效。 */
 const STORAGE_KEY = 'rbng-theme'
 
+/**
+ * 读取初始主题：从 localStorage 取上次保存值，非 `dark` 一律回落到 `light`。
+ *
+ * @returns 初始主题；首个访问或存储值非法时返回 `light`。
+ */
 function initialTheme(): Theme {
   const saved = window.localStorage.getItem(STORAGE_KEY)
   return saved === 'dark' ? 'dark' : 'light'

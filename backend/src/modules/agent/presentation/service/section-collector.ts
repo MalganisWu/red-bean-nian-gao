@@ -5,18 +5,29 @@ import type { SectionEventCollector } from '../../subagent/service/subagent-disp
 import type { PresentationClock } from './display-message-collector.js'
 import { optionalField } from '../../../../shared/object/optional-field.js'
 
+/** 工具在 section 时间线里的可变中间态；status 随 tool_result 改写，最终由 serializeToolItem 固化。 */
 interface MutableToolItem {
+  /** 本次工具调用的标识；tool_result 按它回填状态。 */
   readonly callId: string
+  /** 工具名。 */
   readonly name: string
+  /** 工具入参的 JSON 字符串；缺省表示无参数。 */
   readonly params?: string | undefined
+  /** 工具执行状态；随 tool_result 改写，最终由 serializeToolItem 固化。 */
   status: 'running' | 'success' | 'failed'
+  /** 工具成功时的结果正文。 */
   result?: string | undefined
+  /** 工具失败时的错误信息；有值即表示失败。 */
   error?: string | undefined
+  /** 工具执行耗时（毫秒）；由 tool_result 结算。 */
   duration?: number | undefined
 }
 
+/** 推理缓冲区里的单条 step 项；同一段推理的增量都累加到 content，flush 时整段固化。 */
 interface ReasonItem {
+  /** 项类型判别字段，恒为 `step`。 */
   readonly itemType: 'step'
+  /** 该段推理累积的文本；增量事件不断追加到这里。 */
   content: string
 }
 
@@ -30,13 +41,21 @@ interface ReasonItem {
  * 时间线的顺序就是 flush 的顺序，这样「边想边调工具边说」的真实交错才不会被抹平成三段。
  */
 export class SectionCollector implements ChildSectionCollector, SectionEventCollector {
+  /** 时间戳来源；可注入，测试据此产出确定的时间。 */
   readonly #now: PresentationClock
+  /** 已 flush 出的 section 时间线；顺序即 flush 顺序。 */
   readonly #sections: Record<string, AgentJsonValue>[] = []
+  /** 推理缓冲；收到不同类事件或 build 时整段 flush。 */
   readonly #reasonItems: ReasonItem[] = []
+  /** 工具组缓冲；收到不同类事件或 build 时整组 flush。 */
   readonly #toolItems: MutableToolItem[] = []
+  /** 各工具调用的开始时间，按 callId 索引；用于结算 duration。 */
   readonly #toolStartedAt = new Map<string, number>()
+  /** 当前推理段起点（epoch 毫秒）；0 表示无进行中的推理段。 */
   #reasonStartedAt = 0
+  /** 当前正文段起点（epoch 毫秒）；0 表示无进行中的正文段。 */
   #contentStartedAt = 0
+  /** 当前工具组起点（epoch 毫秒）；0 表示无进行中的工具组。 */
   #toolGroupStartedAt = 0
 
   public constructor(now: PresentationClock = Date.now) {
@@ -108,6 +127,10 @@ export class SectionCollector implements ChildSectionCollector, SectionEventColl
     return structuredClone(this.#sections)
   }
 
+  /**
+   * 追加正文增量：末尾已是 content 分节就续写，否则新起一段并记下起点。
+   * @param content 本 token 的正文增量；累加到末尾 content 分节的 content 字段
+   */
   #appendContent(content: string): void {
     const last = this.#sections.at(-1)
     if (last !== undefined && last['type'] === 'content') {
@@ -119,6 +142,12 @@ export class SectionCollector implements ChildSectionCollector, SectionEventColl
     this.#sections.push({ type: 'content', content, timestamp: this.#contentStartedAt })
   }
 
+  /**
+   * 把一个工具调用加入当前工具组缓冲：首次入组时记下组起点，并登记该调用的开始时间。
+   * @param name 工具名
+   * @param callId 本次调用的标识；同时作为 duration 结算的键
+   * @param params 工具入参；为 null 时不写 params 键
+   */
   #appendTool(name: string, callId: string, params: AgentJsonObject | null): void {
     const now = this.#now()
     if (this.#toolItems.length === 0) this.#toolGroupStartedAt = now
@@ -131,6 +160,7 @@ export class SectionCollector implements ChildSectionCollector, SectionEventColl
     })
   }
 
+  /** 把推理缓冲固化为一个 reason 分节并清空；缓冲为空时不产生任何分节。 */
   #flushReason(): void {
     if (this.#reasonItems.length === 0) return
     const now = this.#now()
@@ -144,6 +174,7 @@ export class SectionCollector implements ChildSectionCollector, SectionEventColl
     this.#reasonStartedAt = 0
   }
 
+  /** 给进行中的正文段补上 duration 并清空起点；无进行中的正文段时不做任何事。 */
   #flushContent(): void {
     if (this.#contentStartedAt === 0) return
     const last = this.#sections.at(-1)
@@ -153,6 +184,7 @@ export class SectionCollector implements ChildSectionCollector, SectionEventColl
     this.#contentStartedAt = 0
   }
 
+  /** 把工具组缓冲固化为一个 tool_group 分节并清空；缓冲为空时不产生任何分节。 */
   #flushTools(): void {
     if (this.#toolItems.length === 0) return
     this.#sections.push({
@@ -167,6 +199,12 @@ export class SectionCollector implements ChildSectionCollector, SectionEventColl
   }
 }
 
+/**
+ * 把工具中间态固化为 section 里的 JSON 项：可选字段统一走 optionalField 省略，
+ * 缺省即不写键，保证落库结构与当时发往 SSE 的帧形状一致。
+ * @param tool 工具在时间线里的中间态
+ * @returns 可写入 section 的 JSON 工具项
+ */
 function serializeToolItem(tool: MutableToolItem): AgentJsonValue {
   return {
     callId: tool.callId,

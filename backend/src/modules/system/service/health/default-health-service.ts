@@ -6,6 +6,10 @@ import type {
   VersionInfo,
 } from './port/health-service.port.js'
 
+/**
+ * 未注入构建版本时的占位快照：全部字段取 `unknown`，让本地与测试环境也能回答 version 探针，
+ * 而无需伪造一个看似真实的版本号。冻结避免调用方误改共享常量。
+ */
 const DEFAULT_VERSION: VersionInfo = Object.freeze({
   version: 'dev',
   commit: 'unknown',
@@ -14,9 +18,13 @@ const DEFAULT_VERSION: VersionInfo = Object.freeze({
 
 /** 并行执行依赖探针，并在应用排空期间立即报告 not_ready。 */
 export class HealthService implements HealthServicePort {
+  /** 三项依赖探针的实现；键名即探针名，会原样出现在 readiness 响应体里。 */
   readonly #checks: ReadinessChecks
+  /** 冻结后的版本快照；version 探针只读它，不触碰外部依赖。 */
   readonly #version: VersionInfo
+  /** 单个探针的超时上限（毫秒）；构造时校验必须为正有限值。 */
   readonly #timeoutMilliseconds: number
+  /** 排空开关：置 true 后 ready 立即 fail closed，供停机流程摘流量。 */
   #draining = false
 
   public constructor(
@@ -101,6 +109,14 @@ export class HealthService implements HealthServicePort {
   }
 }
 
+/**
+ * 在超时与父信号中止之间竞速运行单个依赖探针：任一先到即中止探针并抛出，区分「探针自身失败」
+ * 与「探针超时」。无论成败都在 finally 里清理定时器与父信号监听，避免句柄与监听泄漏。
+ *
+ * @param check - 单个依赖的探针实现，接收本函数派生的子信号。
+ * @param parentSignal - 请求级取消信号；客户端断开时透传中止到探针。
+ * @param timeoutMilliseconds - 探针超时上限（毫秒）。
+ */
 async function runWithTimeout(
   check: ReadinessCheck,
   parentSignal: AbortSignal,
@@ -148,6 +164,13 @@ async function runWithTimeout(
   }
 }
 
+/**
+ * 从中止信号取出可读的中止原因：仅在 reason 是 Error 时沿用，否则回退到稳定的兜底文案，
+ * 保证抛出的始终是 Error 而非任意值。
+ *
+ * @param signal - 被中止的信号，其 reason 可能是任意类型。
+ * @returns 归一为 Error 的中止原因，供上层归一为 error 状态。
+ */
 function abortReason(signal: AbortSignal): Error {
   return signal.reason instanceof Error ? signal.reason : new Error('readiness check aborted')
 }

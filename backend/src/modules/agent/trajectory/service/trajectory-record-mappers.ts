@@ -17,10 +17,22 @@ import {
  * 由投影器持有，经本接口传入。
  */
 export interface RecordMapperContext {
+  /** 子执行按 parent_call_id 建立的索引，供 sub_agent 段在本轮内并入执行记录。 */
   readonly subByCallId: ReadonlyMap<string, SubExecutionRecord>
-  /** 分配下一条记录（返回完整 id 与序号）。 */
+  /**
+   * 分配下一条记录（返回完整 id 与序号）。
+   *
+   * @param kind - 记录种类，决定前端如何渲染该行，不参与序号分配。
+   * @param at - 记录发生时刻（epoch 毫秒），取自段上的时间戳。
+   * @param summary - 单行摘要，仅用于列表展示，不承载完整内容。
+   * @returns 已分配序号的记录骨架；调用方按需再补 reply、tokens 等字段。
+   */
   nextRecord(kind: TrajectoryRecord['kind'], at: number, summary: string): TrajectoryRecord
-  /** 子 Agent token 累计（会话合计用）。 */
+  /**
+   * 子 Agent token 累计（会话合计用）。
+   *
+   * @param tokens - 本次子 Agent 段消耗的 token；缺 token 数据的段传 0。
+   */
   addSubAgentTokens(tokens: number): void
 }
 

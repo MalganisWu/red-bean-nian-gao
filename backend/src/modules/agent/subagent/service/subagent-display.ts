@@ -12,24 +12,35 @@ export const SUB_EXEC_DISPLAY_METADATA_KEY = 'sub_exec_display'
  * Runtime 事件必须保持 SDK 中性。
  */
 export interface SubAgentDisplayReadyEvent {
+  /** 事件类型判别符；固定值，用于把内部交接事件从普通 Runtime 事件里筛出来。 */
   readonly type: 'sub_agent_display_ready'
+  /** 子执行展示载荷；已归一为可序列化 JSON，绝不越过 SSE 边界。 */
   readonly data: AgentJsonValue
 }
 
 /** `sub_agent` 展示 section 使用的持久化载荷。 */
 export interface SubAgentSectionData {
+  /** 子 Agent 定义标识。 */
   readonly agentId: string
+  /** 子 Agent 展示名；父会话据此渲染分区标题。 */
   readonly agentName: string
+  /** 子执行标识；用于把展示分区关联回持久化记录。 */
   readonly executionId: string
+  /** 发起委派的父工具调用 id；空串或缺失表示不写该字段。 */
   readonly parentCallId?: string | undefined
+  /** 子执行的展示 section 集合；落库前会被深拷贝。 */
   readonly sections: AgentJsonValue
+  /** 子执行状态字符串；这里的裸字符串由领域层在落库前映射。 */
   readonly status: string
+  /** 结果摘要；空串或缺失表示不写该字段。 */
   readonly resultSummary?: string | undefined
 }
 
 /** 给子 Agent 事件套上父调用标识；`event` 既可能是 Runtime 事件，也可能是产品内部的展示交接事件。 */
 export interface SubAgentEnvelope {
+  /** 发起委派的父工具调用 id；是子段归位与结果回填的关联键。 */
   readonly parentCallId: string
+  /** 被套信封的事件；可能是 Runtime 事件，也可能是内部展示交接事件。 */
   readonly event: AgentRuntimeEvent | SubAgentDisplayReadyEvent
 }
 
@@ -38,12 +49,19 @@ export type ProductPipelineEvent = AgentRuntimeEvent | SubAgentEnvelope
 
 /** pipeline 节点共享的上下文；`eventSink` 可变，因为节点会把它包一层再往下传（见 `SectionBuildNode.execute`）。 */
 export interface ProductPipelineContext {
+  /** 节点间共享的元数据；注册表等跨节点状态放在这里，按 key 读写。 */
   readonly metadata: Map<string, unknown>
+  /** 事件出口；节点会接管它再往下传，undefined 表示尚无下游 sink。 */
   eventSink: ((event: ProductPipelineEvent) => void) | undefined
 }
 
 /** 归集本节点看到的事件，产出展示 section。 */
 export interface SectionEventCollector {
+  /**
+   * 归集一条 pipeline 事件，内部按其类型累积成展示 section。
+   *
+   * @param event - pipeline 中流动的事件。
+   */
   collect(event: ProductPipelineEvent): void
 }
 
@@ -52,6 +70,7 @@ export type SectionEventCollectorFactory = () => SectionEventCollector
 
 /** 按发起委派的父调用保存相互独立的 JSON 快照。 */
 export class SubExecDisplayRegistry implements SubAgentDisplayRegistryPort {
+  /** 父调用 id → 展示载荷 的快照表；写入时克隆，读写两侧都不共享可变引用。 */
   readonly #data = new Map<string, AgentJsonValue>()
 
   /**
@@ -82,6 +101,7 @@ export class SubExecDisplayRegistry implements SubAgentDisplayRegistryPort {
 export class SectionBuildNode {
   /** 节点名；pipeline 组装按它识别本节点。 */
   public readonly name = 'SectionBuildNode'
+  /** 收集器工厂；每次 execute 新建一个，避免上一次运行的事件泄漏到本次。 */
   readonly #createCollector: SectionEventCollectorFactory
 
   public constructor(createCollector: SectionEventCollectorFactory) {
@@ -188,6 +208,15 @@ export function embedSubAgentSections(
   return messages.map((message): DisplayMessage => embedMessage(message, data))
 }
 
+/**
+ * 处理单条展示消息：在匹配的子 Agent 委派工具组之后插入其展示 section。
+ * 非 assistant、无 sections 或未插入任何子段时返回消息的浅拷贝，绝不改写原消息；
+ * 匹配键是父工具调用的 callId，插入位置紧贴那一组工具，阅读顺序才是「父委派 → 子返回」。
+ *
+ * @param message - 父运行的一条展示消息。
+ * @param data - 父调用 ID → 子执行展示载荷 的映射。
+ * @returns 插入子执行 section 后的消息；无匹配时是原消息的浅拷贝。
+ */
 function embedMessage(
   message: DisplayMessage,
   data: ReadonlyMap<string, AgentJsonValue>
@@ -216,33 +245,80 @@ function embedMessage(
   return { ...message, sections: rebuilt }
 }
 
+/**
+ * 校验并克隆展示 sections：存在任一个非对象元素即视为脏数据，返回 undefined 让上层保留原样。
+ *
+ * @param value - 待校验的 section 数组。
+ * @returns 逐项深拷贝后的 section 数组；含非法元素时为 undefined。
+ */
 function parseSections(value: AgentJsonValue[]): AgentJsonValue[] | undefined {
   return value.every(isJsonObject) ? value.map(cloneJson) : undefined
 }
 
+/**
+ * 从工具项里读取父工具调用的 callId；非对象或缺字段时返回 undefined。
+ * 该 id 既用于匹配子执行载荷，也是父运行与子执行之间的关联键。
+ *
+ * @param value - 展示 section 里的单个工具项。
+ * @returns 工具调用的 callId；读不到时为 undefined。
+ */
 function toolCallId(value: AgentJsonValue): string | undefined {
   if (!isJsonObject(value)) return undefined
   const callId = value['callId']
   return typeof callId === 'string' ? callId : undefined
 }
 
+/**
+ * 给子执行展示载荷补上父调用标识，供前端把子段归到正确的父委派下。
+ * 载荷不是对象时退化为深拷贝，避免在非法数据上抛错。
+ *
+ * @param data - 子执行的展示载荷。
+ * @param parentCallId - 发起委派的父工具调用 ID。
+ * @returns 带 `parent_call_id` 的载荷副本。
+ */
 function withParentCallId(data: AgentJsonValue, parentCallId: string): AgentJsonValue {
   if (!isJsonObject(data)) return cloneJson(data)
   return { ...cloneJsonObject(data), parent_call_id: parentCallId }
 }
 
+/**
+ * 判定事件是否为「带父调用标识的信封」，用于把子 Agent 事件与普通 Runtime 事件分开。
+ *
+ * @param event - pipeline 中流动的事件。
+ * @returns 是信封时为 true，并把类型收窄为 `SubAgentEnvelope`。
+ */
 function isSubAgentEnvelope(event: ProductPipelineEvent): event is SubAgentEnvelope {
   return 'parentCallId' in event && 'event' in event
 }
 
+/**
+ * 判定值是否为普通 JSON 对象，用于把宽松展示数据收窄成 `AgentJsonObject`。
+ *
+ * @param value - 待判定的 JSON 值。
+ * @returns 是对象时为 true，并把类型收窄为 `AgentJsonObject`。
+ */
 function isJsonObject(value: AgentJsonValue): value is AgentJsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/**
+ * 深拷贝一个 JSON 值，切断与调用方之间的共享可变引用，注册表内部状态不被外部改动影响。
+ *
+ * @param value - 待拷贝的 JSON 值。
+ * @returns 独立的深拷贝。
+ */
 function cloneJson(value: AgentJsonValue): AgentJsonValue {
   return structuredClone(value)
 }
 
+/**
+ * 深拷贝一个 JSON 对象，并断言拷贝后仍然是对象。
+ * `structuredClone` 对纯对象不会改变形状，这里显式校验是为了在类型层面留住 `AgentJsonObject`：
+ * 一旦形状意外改变就立刻抛出，而不是把错误类型悄悄带下去。
+ *
+ * @param value - 待拷贝的 JSON 对象。
+ * @returns 独立的深拷贝。
+ */
 function cloneJsonObject(value: AgentJsonObject): AgentJsonObject {
   const clone = cloneJson(value)
   if (!isJsonObject(clone)) throw new Error('JSON object clone unexpectedly changed shape')

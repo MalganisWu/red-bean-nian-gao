@@ -3,54 +3,100 @@ import { normalizeError } from '../../shared/errors/normalize-error.js'
 
 import type { SqlExecutor, TransactionalSqlExecutor } from './postgres.js'
 
+/** 迁移历史表名；所有历史读写都走这一张表，改名对既有库即为不兼容变更。 */
 const HISTORY_TABLE = 'schema_migrations'
+
+/**
+ * advisory 锁名。
+ *
+ * 取固定的应用级字符串而不是某个表的行标识，是为了让「同一次迁移」的所有并发实例争用同一把锁；
+ * 它经 `hashtext()` 转成整数后交给 `pg_advisory_xact_lock`，因此锁随事务结束自动释放。
+ */
 const ADVISORY_LOCK_NAME = 'red-bean-nian-gao:schema_migrations'
 
 /** 一条迁移；`name` 是 14 位时间戳，`up`/`down` 必须成对给出且都非空。 */
 export interface Migration {
+  /** 14 位时间戳，同时充当历史行标识、目录排序依据与唯一性依据。 */
   readonly name: string
+  /** 供人和 CLI 阅读的说明，不参与 SQL 执行。 */
   readonly comment: string
+  /** 正向语句，整体在同一个事务里按数组顺序执行。 */
   readonly up: readonly string[]
+  /** 回滚语句，必须与 `up` 成对且非空，否则目录校验不通过。 */
   readonly down: readonly string[]
 }
 
 /** 一次 up/down 的批次；同批语句视为一个可整体回滚的单位。 */
 export interface MigrationGroup {
+  /** 分组号，等于历史中最大分组号加一；未发生变更的空批次为 0。 */
   readonly groupId: number
+  /** 本批涉及的迁移名，按目录定义顺序排列；空批次为空数组。 */
   readonly migrationNames: readonly string[]
 }
 
 /** 单条迁移的当前状态；`pending` 时 `groupId`/`migratedAt` 不会出现。 */
 export interface MigrationStatus {
+  /** 迁移名，与冻结目录中的条目一一对应。 */
   readonly name: string
+  /** 目录为该迁移写下的说明，透传自 `Migration.comment`。 */
   readonly comment: string
+  /** 是否已应用；`pending` 表示历史表里还没有这一条。 */
   readonly status: 'pending' | 'applied'
+  /** 已应用时所属的分组号；`pending` 时为 `undefined`。 */
   readonly groupId?: number | undefined
+  /** 已应用时的落地时间；`pending` 时为 `undefined`。 */
   readonly migratedAt?: Date | undefined
 }
 
 /** 应用启动所需的数据库迁移端口；默认实现为 `PostgresMigrator`。 */
 export interface DatabaseMigrationGatePort {
+  /**
+   * 应用所有尚未执行的迁移，供应用启动期调用。
+   * @param signal - 取消信号，透传给事务内的所有查询
+   * @returns 本次应用的批次；没有 pending 时返回分组号为 0 的空批次
+   */
   up(signal: AbortSignal): Promise<MigrationGroup>
+  /**
+   * 读取目录中每条迁移的当前状态，只读且可重复调用。
+   * @param signal - 取消信号，透传给底层查询
+   * @returns 每条目录迁移的状态；未在历史中出现过的条目为 `pending`
+   */
   status(signal: AbortSignal): Promise<readonly MigrationStatus[]>
 }
 
 /** migrate CLI 所需的完整迁移端口；默认实现为 `PostgresMigrator`。 */
 export interface MigrationRunnerPort extends DatabaseMigrationGatePort {
+  /**
+   * 回滚最近一个分组，按目录定义的逆序执行。
+   * @param signal - 取消信号，透传给事务内的所有查询
+   * @returns 本次回滚的批次；历史为空时返回分组号为 0 的空批次
+   */
   down(signal: AbortSignal): Promise<MigrationGroup>
 }
 
+/** 历史表中的一行已应用迁移；只在迁移器内部流转，不出现在对外契约里。 */
 interface AppliedMigration {
+  /** 历史行自增主键；读取顺序即写入顺序。 */
   readonly id: number
+  /** 迁移名，必须与目录中对应位置的条目一致。 */
   readonly name: string
+  /** 该行写入时所归属的分组号。 */
   readonly groupId: number
+  /** 该行落地进历史表的时间。 */
   readonly migratedAt: Date
 }
 
+/**
+ * 历史表数值列的形状。
+ *
+ * pg 的 BIGINT 可能以字符串返回，所以先把字符串数字归一成 `number` 再校验安全整数——
+ * 宁可在这里判失败，也不要让一个超出安全范围的 id 悄悄失去精度。
+ */
 const safeIntegerSchema = z
   .union([z.number().int(), z.string().regex(/^\d+$/u).transform(Number)])
   .refine(Number.isSafeInteger, 'must be a safe integer')
 
+/** 历史表一行的解析模式；`name` 必须是 14 位时间戳，`migrated_at` 必须是 `Date`。 */
 const historyRowSchema = z.object({
   id: safeIntegerSchema,
   name: z.string().regex(/^\d{14}$/u),
@@ -452,7 +498,9 @@ export const MIGRATIONS: readonly Migration[] = Object.freeze([
 
 /** 在执行规范化 SQL migration 时精确保留既有迁移历史。 */
 export class PostgresMigrator implements MigrationRunnerPort {
+  /** 事务与查询的执行入口；由构造函数注入，迁移器不自己建连接。 */
   readonly #database: TransactionalSqlExecutor
+  /** 已通过 `validateCatalog` 校验的迁移目录；构造完成后不再变化。 */
   readonly #migrations: readonly Migration[]
 
   public constructor(
@@ -524,7 +572,12 @@ export class PostgresMigrator implements MigrationRunnerPort {
     )
   }
 
-  /** 在事务内按目录顺序应用尚未执行的迁移，并记录本次分组号。 */
+  /**
+   * 在事务内按目录顺序应用尚未执行的迁移，并记录本次分组号。
+   * @param transaction - 事务内的执行器；语句与历史写入必须共用它，否则会跑到事务之外
+   * @param signal - 取消信号，透传给事务内的所有查询
+   * @returns 本次应用的批次；没有 pending 时返回分组号为 0 的空批次
+   */
   async #applyPendingMigrations(
     transaction: SqlExecutor,
     signal: AbortSignal
@@ -563,7 +616,12 @@ export class PostgresMigrator implements MigrationRunnerPort {
     )
   }
 
-  /** 在事务内按目录定义的逆序回滚最近一个分组。 */
+  /**
+   * 在事务内按目录定义的逆序回滚最近一个分组。
+   * @param transaction - 事务内的执行器；语句与历史删除必须共用它，否则会跑到事务之外
+   * @param signal - 取消信号，透传给事务内的所有查询
+   * @returns 本次回滚的批次；历史为空时返回分组号为 0 的空批次
+   */
   async #rollbackLatestGroup(
     transaction: SqlExecutor,
     signal: AbortSignal
@@ -589,7 +647,12 @@ export class PostgresMigrator implements MigrationRunnerPort {
     return { groupId, migrationNames: rollback.map((migration): string => migration.name) }
   }
 
-  /** 按写入顺序（`id ASC`）读出历史；顺序本身就是信息，`validateHistory` 依赖它。 */
+  /**
+   * 按写入顺序（`id ASC`）读出历史；顺序本身就是信息，`validateHistory` 依赖它。
+   * @param executor - 用于读取历史的执行器；事务内调用时必须是事务执行器
+   * @param signal - 取消信号，透传给查询
+   * @returns 已应用迁移，按历史表写入顺序排列
+   */
   async #loadApplied(
     executor: SqlExecutor,
     signal: AbortSignal
@@ -611,6 +674,17 @@ export class PostgresMigrator implements MigrationRunnerPort {
   }
 }
 
+/**
+ * 造一条冻结的迁移：条目本身与 up/down 语句数组都 `Object.freeze`。
+ *
+ * 冻结是为了让「目录只能追加、不得回头修改」这条纪律在运行期也有兜底——
+ * 若有人试图就地改写某条语句，得到的会是一个无声失败的赋值，而不是悄悄改变的迁移历史。
+ * @param name - 14 位时间戳，决定目录顺序
+ * @param comment - 该迁移的说明，供 CLI 与状态查询展示
+ * @param up - 正向语句，按数组顺序执行，必须非空
+ * @param down - 回滚语句，必须与 up 成对且非空
+ * @returns 冻结后的迁移对象
+ */
 function migration(
   name: string,
   comment: string,
@@ -624,6 +698,8 @@ function migration(
  * 启动时校验冻结目录自身的自洽性：14 位时间戳命名、不重复、严格升序、up/down 都非空。
  * 这些错误在编译期看不出来（目录是字面量数组），但一旦成立，后续每一次迁移都会带着它跑，
  * 所以宁可让进程起不来。
+ * @param migrations - 待校验的迁移目录
+ * @returns 原样返回的目录；只有校验通过才有返回值，否则直接抛错
  */
 function validateCatalog(migrations: readonly Migration[]): readonly Migration[] {
   const names = new Set<string>()
@@ -641,7 +717,12 @@ function validateCatalog(migrations: readonly Migration[]): readonly Migration[]
   return migrations
 }
 
-/** 把一条目录迁移与已应用历史合并成对外状态；历史里没有就是 pending。 */
+/**
+ * 把一条目录迁移与已应用历史合并成对外状态；历史里没有就是 pending。
+ * @param migration - 目录中的一条迁移，提供 name 与 comment
+ * @param appliedByName - 已应用历史，按迁移名索引
+ * @returns 该迁移的对外状态；历史里存在即为 applied，否则为 pending
+ */
 function toMigrationStatus(
   migration: Migration,
   appliedByName: ReadonlyMap<string, AppliedMigration>
@@ -658,6 +739,14 @@ function toMigrationStatus(
       }
 }
 
+/**
+ * 把历史表的原始行解析成内部形状。
+ *
+ * 解析失败即抛错，不做容错降级——读不懂的历史行意味着库里的数据与这份代码已经对不上，
+ * 此时继续迁移只会让分叉更大。
+ * @param row - 数据库返回的原始行
+ * @returns 校验后的已应用迁移记录
+ */
 function parseHistoryRow(row: unknown): AppliedMigration {
   const parsed = historyRowSchema.safeParse(row)
   if (!parsed.success) throw new Error('invalid migration history row', { cause: parsed.error })
@@ -674,6 +763,8 @@ function parseHistoryRow(row: unknown): AppliedMigration {
  *
  * 这条约束是「不修改已执行的 migration」这条纪律的执行者。只要有人回头改了历史中某条
  * migration 的名字或顺序，这里就会在启动时炸掉，而不是让不同环境的 schema 悄悄分叉。
+ * @param applied - 从历史表读出的记录，按写入顺序排列
+ * @param migrations - 冻结目录，作为逐位比对的基准
  */
 function validateHistory(
   applied: readonly AppliedMigration[],
@@ -693,10 +784,27 @@ function validateHistory(
   }
 }
 
+/**
+ * 在事务内取 advisory 锁，把同一数据库上的并发迁移串行化。
+ *
+ * 用 `pg_advisory_xact_lock` 而非会话级锁：它随事务结束自动释放，既不需要显式解锁，
+ * 也不会在连接复用后把锁留给下一个使用者。
+ * @param executor - 事务内的执行器；锁必须取在事务所用的那一条连接上
+ * @param signal - 取消信号，透传给取锁查询
+ */
 async function acquireMigrationLock(executor: SqlExecutor, signal: AbortSignal): Promise<void> {
   await executor.query('SELECT pg_advisory_xact_lock(hashtext($1))', [ADVISORY_LOCK_NAME], signal)
 }
 
+/**
+ * 按顺序执行一条迁移某个方向的全部语句，并给失败补上「哪条迁移、哪个方向」的上下文。
+ *
+ * 这里不吞异常也不做部分重试：失败会向上冒泡给事务，由事务整体回滚，避免留下半跑的 schema。
+ * @param executor - 事务内的执行器；所有语句都必须共用它，否则会跑到事务之外
+ * @param migrationItem - 要执行的迁移，函数内只读它的语句数组
+ * @param direction - 执行正向还是回滚，决定取 up 还是 down
+ * @param signal - 取消信号，透传给每条语句的查询
+ */
 async function runMigrationStatements(
   executor: SqlExecutor,
   migrationItem: Migration,

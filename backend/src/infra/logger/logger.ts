@@ -8,26 +8,61 @@ export type LogFields = Readonly<Record<string, unknown>>
 
 /** 输出目标；抽成接口是为了让测试断言写出的行，而不必去抓 stdout。 */
 export interface LogDestination {
+  /**
+   * 写入一行已格式化的日志；实现只负责落盘或落终端，不再做格式加工。
+   * @param line - 已含结尾换行的整行文本
+   */
   write(line: string): void
 }
 
 /** 构造选项；`destination` 与 `now` 可注入，测试因此不依赖真实时钟与终端。 */
 export interface LoggerOptions {
+  /** 输出格式文本；只识别 `json`，其余值一律按 `text` 处理。 */
   readonly format: string
+  /** 级别下限文本；由 `parseLogLevel` 归一化，无法识别时收敛为 `info`。 */
   readonly level: string
+  /** 输出目标；缺省写 stdout，注入后测试即可捕获写出的行。 */
   readonly destination?: LogDestination
+  /** 时钟；缺省用系统时间，注入后测试可得到稳定时间戳。 */
   readonly now?: () => Date
 }
 
 /** 应用内统一的日志入口；请求级字段用 `child` 派生，不要共享实例就地改状态。 */
 export interface Logger {
+  /**
+   * 派生一个叠加了额外字段的子 logger；原实例状态不变。
+   * 请求级字段因此按继承向下传递，而不是往共享实例上就地累加。
+   * @param fields - 追加到当前字段之上的结构化字段，同名键以新值覆盖
+   * @returns 新实例；原实例与其已派生的兄弟互不影响
+   */
   child(fields: LogFields): Logger
+  /**
+   * 记录 debug 级日志；低于当前级别下限时整条调用被丢弃。
+   * @param message - 日志正文
+   * @param fields - 本次调用附带的结构化字段
+   */
   debug(message: string, fields?: LogFields): void
+  /**
+   * 记录 info 级日志；低于当前级别下限时整条调用被丢弃。
+   * @param message - 日志正文
+   * @param fields - 本次调用附带的结构化字段
+   */
   info(message: string, fields?: LogFields): void
+  /**
+   * 记录 warn 级日志；低于当前级别下限时整条调用被丢弃。
+   * @param message - 日志正文
+   * @param fields - 本次调用附带的结构化字段
+   */
   warn(message: string, fields?: LogFields): void
+  /**
+   * 记录 error 级日志；低于当前级别下限时整条调用被丢弃。
+   * @param message - 日志正文
+   * @param fields - 本次调用附带的结构化字段
+   */
   error(message: string, fields?: LogFields): void
 }
 
+/** 级别权重表；数值本身无意义，只用于比大小，`#emit` 据此丢弃低于下限的调用。 */
 const LEVEL_WEIGHT: Readonly<Record<LogLevel, number>> = Object.freeze({
   debug: 10,
   info: 20,
@@ -35,6 +70,7 @@ const LEVEL_WEIGHT: Readonly<Record<LogLevel, number>> = Object.freeze({
   error: 40,
 })
 
+/** 默认输出目标：直接写进程 stdout，作为未注入 `destination` 时的兜底去向。 */
 const stdoutDestination: LogDestination = {
   write(line: string): void {
     process.stdout.write(`${line}\n`)
@@ -51,10 +87,15 @@ const stdoutDestination: LogDestination = {
  * 而不是往一个共享对象上 set。
  */
 class StructuredLogger implements Logger {
+  /** 已归一化的输出格式；构造时把非 `json` 的输入统一收敛为 `text`。 */
   readonly #format: 'json' | 'text'
+  /** 归一化后的级别下限；每条日志与它比较，低于即丢弃。 */
   readonly #minimumLevel: LogLevel
+  /** 实际输出目标；未注入时为 stdout。 */
   readonly #destination: LogDestination
+  /** 时间源；每写完一条记录取一次当前时间。 */
   readonly #now: () => Date
+  /** 本实例绑定的结构化字段；`child` 派生的实例在此基础上叠加。 */
   readonly #fields: LogFields
 
   public constructor(options: LoggerOptions, fields: LogFields = {}) {
@@ -65,6 +106,11 @@ class StructuredLogger implements Logger {
     this.#fields = fields
   }
 
+  /**
+   * 派生一个叠加了额外字段的子 logger，用于把请求级字段向下继承。
+   * @param fields - 追加到当前字段之上的结构化字段，同名键以新值覆盖
+   * @returns 新实例；原实例字段不变，兄弟上下文也看不到
+   */
   public child(fields: LogFields): Logger {
     return new StructuredLogger(
       {
@@ -77,22 +123,48 @@ class StructuredLogger implements Logger {
     )
   }
 
+  /**
+   * 记录 debug 级日志；低于当前级别下限时直接丢弃，不产生任何输出。
+   * @param message - 日志正文
+   * @param fields - 本次调用附带的结构化字段
+   */
   public debug(message: string, fields: LogFields = {}): void {
     this.#emit('debug', message, fields)
   }
 
+  /**
+   * 记录 info 级日志；低于当前级别下限时直接丢弃，不产生任何输出。
+   * @param message - 日志正文
+   * @param fields - 本次调用附带的结构化字段
+   */
   public info(message: string, fields: LogFields = {}): void {
     this.#emit('info', message, fields)
   }
 
+  /**
+   * 记录 warn 级日志；低于当前级别下限时直接丢弃，不产生任何输出。
+   * @param message - 日志正文
+   * @param fields - 本次调用附带的结构化字段
+   */
   public warn(message: string, fields: LogFields = {}): void {
     this.#emit('warn', message, fields)
   }
 
+  /**
+   * 记录 error 级日志；低于当前级别下限时直接丢弃，不产生任何输出。
+   * @param message - 日志正文
+   * @param fields - 本次调用附带的结构化字段
+   */
   public error(message: string, fields: LogFields = {}): void {
     this.#emit('error', message, fields)
   }
 
+  /**
+   * 组装并输出一条记录；唯一写出口，级别过滤与格式选择都在此收口。
+   * @param level - 本条日志的级别，先与下限比较决定是否丢弃
+   * @param message - 日志正文
+   * @param fields - 与实例字段合并后的本次字段
+   */
   #emit(level: LogLevel, message: string, fields: LogFields): void {
     if (LEVEL_WEIGHT[level] < LEVEL_WEIGHT[this.#minimumLevel]) return
     const record: LogFields = {
@@ -110,7 +182,9 @@ class StructuredLogger implements Logger {
 
 /** 显式传递请求级 logger；每个应用实例独立持有。 */
 export class LoggerContext {
+  /** 承载当前执行上下文 logger 的异步存储；无绑定时 `current` 回退到默认实例。 */
   readonly #storage = new AsyncLocalStorage<Logger>()
+  /** 未处于任何绑定上下文时的兜底 logger；由 `setDefault` 在组装期替换。 */
   #defaultLogger: Logger
 
   public constructor(defaultLogger: Logger) {
@@ -176,6 +250,11 @@ export function parseLogLevel(value: string): LogLevel {
   return 'info'
 }
 
+/**
+ * 把结构化记录渲染成 `key=value` 单行文本，供 text 格式直接输出。
+ * @param record - 已含 time、level、msg 的完整记录
+ * @returns 以空格分隔的 `key=value` 串
+ */
 function formatTextRecord(record: LogFields): string {
   return Object.entries(record)
     .map(([key, value]): string => `${key}=${formatTextValue(value)}`)
@@ -185,6 +264,8 @@ function formatTextRecord(record: LogFields): string {
 /**
  * 文本格式下的取值：含空白或 `=` 的字符串必须加引号。
  * 不加的话 `msg=hello world user=alice` 就没法区分边界，靠肉眼解析这类日志很容易读错。
+ * @param value - 待渲染的字段值，字符串与非字符串走不同分支
+ * @returns 可直接拼进 `key=value` 的文本；结构值复用 JSON 序列化
  */
 function formatTextValue(value: unknown): string {
   if (typeof value === 'string') return /[\s=]/u.test(value) ? JSON.stringify(value) : value
@@ -193,11 +274,21 @@ function formatTextValue(value: unknown): string {
   return serialized ?? String(value)
 }
 
-/** Error 的关键字段默认不可枚举，必须显式投影后才能进入结构化日志。 */
+/**
+ * Error 的关键字段默认不可枚举，必须显式投影后才能进入结构化日志。
+ * @param _key - JSON.stringify 传入的键名，这里不使用
+ * @param value - 当前待序列化的值，只有 Error 才会被展开
+ * @returns 展开后的普通对象，非 Error 的值原样返回
+ */
 function errorJsonReplacer(_key: string, value: unknown): unknown {
   return value instanceof Error ? serializeError(value) : value
 }
 
+/**
+ * 把 Error 投影成可枚举的普通对象，让 name、message、stack、cause 与 errors 能进入日志。
+ * @param error - 待展开的错误对象
+ * @returns 只含关键字段的普通对象；可选字段缺失时对应键不出现
+ */
 function serializeError(error: Error): Readonly<Record<string, unknown>> {
   return {
     name: error.name,

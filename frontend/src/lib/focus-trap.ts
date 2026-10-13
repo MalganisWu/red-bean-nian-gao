@@ -6,8 +6,11 @@
  * {key, shiftKey, preventDefault}，调用方（onKeyDown）无需转换。
  */
 export interface TabKeyEvent {
+  /** 按下的键名；仅 "Tab" 会被拦截。 */
   key: string
+  /** 是否按住 Shift；决定回绕方向（Shift+Tab 反向）。 */
   shiftKey: boolean
+  /** 阻止事件默认行为；回绕焦点时调用，避免浏览器再走一遍原生 Tab。 */
   preventDefault(): void
 }
 

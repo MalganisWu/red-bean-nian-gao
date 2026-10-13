@@ -5,6 +5,12 @@ import { Menu } from '@/components/Menu'
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
+/**
+ * 菜单触发器按钮的类名，供本页所有 `Menu.Trigger` 复用。
+ *
+ * 移动端保持 44px 触控高度，桌面收到 36px 贴合紧凑工具栏；边框与文字取语义令牌，
+ * 因此同一串类名在 Light / Dark 下都成立。
+ */
 const triggerClassName =
   'flex min-h-11 min-w-48 cursor-pointer items-center justify-between rounded-md border border-border-strong bg-background px-3 font-sans text-xs font-medium text-foreground-body hover:border-foreground-faint hover:text-foreground sm:min-h-9'
 

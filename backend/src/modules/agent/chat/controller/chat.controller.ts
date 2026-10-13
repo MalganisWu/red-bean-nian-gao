@@ -18,6 +18,7 @@ import { conflictError, validationError } from '../../../../shared/http/error-ma
  * 请求解包、SSE 传输投影（帧流输出、断连清理）与成功信封由 `chat.routes.ts` 承担。
  */
 export class ChatController {
+  /** Chat 入站用例；本层只做输入语义校验与错误翻译，实际运行由它负责。 */
   readonly #chat: ChatUseCasePort
 
   public constructor(chat: ChatUseCasePort) {
@@ -85,6 +86,10 @@ export class ChatController {
   /**
    * 组装发起命令：认证上下文的三个字段显式写出，可选字段按 wire 语义映射。
    * 命令字段一次给全——调用点读方法名即知传的是什么，不必回翻 `ChatRequestContext` 来源。
+   *
+   * @param input - 已通过契约校验的新建/续聊请求 DTO。
+   * @param context - 认证与链路上下文；userId/signal/traceId 直接透传。
+   * @returns 组装好的发起命令，交给应用层选消息与补默认标识。
    */
   #startCommand(input: ChatRequestDto, context: ChatRequestContext): StartChatCommand {
     return {
@@ -97,7 +102,12 @@ export class ChatController {
     }
   }
 
-  /** 组装回答命令：`sessionId` 与 `interactionId` 必填，其余可选字段按 wire 语义映射。 */
+  /**
+   * 组装回答命令：`sessionId` 与 `interactionId` 必填，其余可选字段按 wire 语义映射。
+   * @param input 已校验的回答请求 DTO；session_id 与 interaction_id 必填
+   * @param context 认证与链路上下文，字段含义同 `start`
+   * @returns 组装好的回答命令，交给应用层走 resume 语义
+   */
   #answerCommand(input: AnswerRequestDto, context: ChatRequestContext): AnswerChatCommand {
     return {
       userId: context.userId,

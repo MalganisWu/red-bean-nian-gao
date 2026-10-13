@@ -19,12 +19,19 @@ import { registerUserRoutes, type UserRouteDependencies } from '../modules/ident
 
 /** 各 Module 输出的路由依赖绑定表；这里只出现 Port 与路由依赖类型，不出现任何实现类。 */
 export interface ApplicationRouteDependencies {
+  /** 健康检查服务端口，供存活/就绪探针路由查询依赖状态。 */
   readonly health: HealthServicePort
+  /** 聊天模块的路由依赖（用例 + 认证服务）；这里只出现 Port，不出现实现类。 */
   readonly chat: ChatRouteDependencies
+  /** 会话查询模块的路由依赖（查询用例 + 认证服务）。 */
   readonly sessions: SessionRouteDependencies
+  /** 轨迹模块的路由依赖（轨迹用例 + 认证服务）。 */
   readonly trajectories: TrajectoryRouteDependencies
+  /** 存储模块的路由依赖（存储服务 + 认证服务）。 */
   readonly storage: StorageRouteDependencies
+  /** 定时任务模块的路由依赖（查询/命令用例 + 认证服务）。 */
   readonly tasks: TaskRouteDependencies
+  /** 用户模块的路由依赖（注册/资料用例 + 认证服务）。 */
   readonly users: UserRouteDependencies
 }
 

@@ -17,7 +17,14 @@ import { useTrajectoryStore, type LiveTurn } from '@/stores/trajectory-store'
 
 import { mapSessionTrajectory, type SessionTrajectoryView } from './trajectory-mapper'
 
+/**
+ * 会话轨迹子视图的组件属性。
+ *
+ * 页面所需的会话、实时轮次与轨迹数据都从各自 store 读取，父级无从提供，故这里
+ * 只保留返回动作；把数据留在这一个来源，避免同一份状态在父级与 store 之间漂移。
+ */
 interface SessionTrajectoryViewProps {
+  /** 点击返回时触发。 */
   onBack: () => void
 }
 
@@ -27,6 +34,10 @@ interface SessionTrajectoryViewProps {
  * 必须在 `displayTurns`（历史 + 实时）上查找，而不是只在持久化的 `view.turns` 上：
  * 流式进行中，实时轮次只存在于 store 的 `liveTurns` 里、**不在 `view` 里**，
  * 用 `view` 查找会让点击任何一行都解析不到 → `inspectorOpen` 恒为 false → 界面毫无反应。
+ *
+ * @param turns - 要在其中检索的展示轮次集合（历史 + 实时投影）。
+ * @param id - 被选中行的记录 id；为空表示当前无选中，直接判为未命中。
+ * @returns 命中的记录（含其展开的子记录）；未找到或 id 为空时返回 undefined。
  */
 function findRecord(
   turns: readonly TrajectoryTurn[],
@@ -42,6 +53,16 @@ function findRecord(
   return undefined
 }
 
+/**
+ * 在展示轮次里按 id 查找请求（尝试）明细，供检查器解析被选中请求行。
+ *
+ * 只下探到记录的直接 `attempts`：请求始终挂在所属记录之下，层级与子记录无关，
+ * 多下探一层只会在同名 id 出现时先命中错误的对象。
+ *
+ * @param turns - 要在其中检索的展示轮次集合（历史 + 实时投影）。
+ * @param id - 被选中行的请求 id；为空表示当前无选中，直接判为未命中。
+ * @returns 命中的请求明细；未找到或 id 为空时返回 undefined。
+ */
 function findRequest(
   turns: readonly TrajectoryTurn[],
   id: string | undefined
@@ -55,6 +76,16 @@ function findRequest(
   return undefined
 }
 
+/**
+ * 反查某条选中行（记录 / 子记录 / 请求）所属的轮次，供检查器标题显示「轮次 N」。
+ *
+ * 三类 id 在界面上共用一套选中态，所以逐个比对，命中即返回；找不到时不编造标签，
+ * 交由调用方退化为不显示轮次。
+ *
+ * @param turns - 要在其中检索的展示轮次集合（历史 + 实时投影）。
+ * @param id - 被选中行的 id，可能是记录、子记录或请求；为空时返回 undefined。
+ * @returns 形如「轮次 N」的标签；未命中或 id 为空时返回 undefined。
+ */
 function turnLabelOf(turns: readonly TrajectoryTurn[], id: string | undefined): string | undefined {
   if (!id) return undefined
   for (const turn of turns) {
@@ -69,6 +100,14 @@ function turnLabelOf(turns: readonly TrajectoryTurn[], id: string | undefined): 
   return undefined
 }
 
+/**
+ * 取出会话轨迹视图里的压缩（compaction）信息，供检查器渲染被选中的压缩行。
+ *
+ * 视图可能尚未加载完成（为 null），此时一律视为没有压缩信息，而不是抛错。
+ *
+ * @param view - 当前持久化轨迹视图；尚未加载时为 null。
+ * @returns 压缩信息；视图为空或该会话没有压缩时返回 undefined。
+ */
 function findCompaction(view: SessionTrajectoryView | null): TrajectoryCompaction | undefined {
   return view?.compaction
 }
@@ -77,6 +116,12 @@ function findCompaction(view: SessionTrajectoryView | null): TrajectoryCompactio
  * 实时投影轮次 → 组件轮次模型（剥掉客户端计时的 startedAtMs）。
  * 轮次号与记录序号都续接已终结的历史投影：两个投影消费同一条事件流，序号必须连续，
  * 否则记录表里会出现重复的轮次号与重复的 #序号。
+ *
+ * @param t - store 里的实时轮次，含只用于客户端计时的 startedAtMs。
+ * @param nowMs - 最近一次跳秒的毫秒时间戳；为 0（尚未跳秒）时耗时按 0 显示，不虚构。
+ * @param turnNo - 分配给该实时轮次的展示轮次号，续接已终结的历史轮次数。
+ * @param seqStart - 此前已消费的最大记录序号，本轮的记录与请求序号从这里继续递增。
+ * @returns 组件可直接渲染的轮次模型，耗时已换算为 durationMs。
  */
 function liveTurnToTurn(
   t: LiveTurn,
@@ -113,12 +158,20 @@ function liveTurnToTurn(
 /**
  * 实时投影只续接在"已终结轮次"之后：历史里最后一轮若尚未终结，它就是正在流式的同一个 run
  * （run 容器在运行开始即落库），必须由实时轮次取代，而不是在记录表里并排出现两次。
+ *
+ * @param turns - 历史投影得到的轮次集合，其末轮可能仍在运行中。
+ * @returns 去掉尾部未终结轮次后的集合；末轮已终结时原样返回。
  */
 function settledTurnsOf(turns: readonly TrajectoryTurn[]): TrajectoryTurn[] {
   return turns.filter((turn, index) => index !== turns.length - 1 || turn.endState !== undefined)
 }
 
-/** 单条记录与其请求子记录中的最大序号。 */
+/**
+ * 单条记录与其请求子记录中的最大序号。
+ *
+ * @param record - 目标记录；其 attempts 可能为空或尚未展开。
+ * @returns 该记录自身与其请求子记录中的最大 seq；两者都没有序号时为 0。
+ */
 function maxSeqOfRecord(record: TrajectoryRecord): number {
   let max = record.seq ?? 0
   for (const request of record.attempts ?? []) {
@@ -127,7 +180,12 @@ function maxSeqOfRecord(record: TrajectoryRecord): number {
   return max
 }
 
-/** 单个轮次内全部记录（含展开的请求子记录）的最大序号。 */
+/**
+ * 单个轮次内全部记录（含展开的请求子记录）的最大序号。
+ *
+ * @param turn - 目标轮次；空轮次返回 0，由调用方决定如何取基准。
+ * @returns 该轮次内所有记录与请求子记录中的最大 seq。
+ */
 function maxSeqOfTurn(turn: TrajectoryTurn): number {
   let max = 0
   for (const record of turn.records) {
@@ -136,7 +194,12 @@ function maxSeqOfTurn(turn: TrajectoryTurn): number {
   return max
 }
 
-/** 轮次集合里的最大记录序号（含展开的请求子记录）。 */
+/**
+ * 轮次集合里的最大记录序号（含展开的请求子记录）。
+ *
+ * @param turns - 待统计的轮次集合；实时轮次的序号要从此值往后续接。
+ * @returns 集合内所有记录的最大 seq；集合为空时为 0，使首条实时记录从 1 起算。
+ */
 function maxRecordSeq(turns: readonly TrajectoryTurn[]): number {
   let max = 0
   for (const turn of turns) {
@@ -145,7 +208,12 @@ function maxRecordSeq(turns: readonly TrajectoryTurn[]): number {
   return max
 }
 
-/** 轮次在展示上的记录条数（含请求子记录），用于给后续实时轮次推移序号。 */
+/**
+ * 轮次在展示上的记录条数（含请求子记录），用于给后续实时轮次推移序号。
+ *
+ * @param turn - 实时轮次；未展开 attempts 的记录按 1 条计。
+ * @returns 该轮次在记录表里占用的行数，即下一条实时轮次的序号要跳过的步长。
+ */
 function liveRecordCount(turn: LiveTurn): number {
   return turn.records.reduce((n, record) => n + 1 + (record.attempts?.length ?? 0), 0)
 }
@@ -153,6 +221,12 @@ function liveRecordCount(turn: LiveTurn): number {
 /**
  * 展示轮次 = 已终结的历史轮次 + 实时轮次的续接投影。
  * 有实时轮次时（流式进行中，或流刚结束但持久化重拉尚未落地）才叠加，否则直接用历史。
+ *
+ * @param view - 持久化轨迹视图；尚未加载完成时为 null，按空历史处理。
+ * @param hasLiveTurn - 是否存在属于当前会话、可展示的实时轮次；为 false 时直接返回历史。
+ * @param liveTurns - store 里的实时轮次列表，按发生顺序排列。
+ * @param nowTick - 最近一次跳秒的时间戳，用于换算实时轮次的耗时。
+ * @returns 记录表要渲染的轮次集合：已终结历史 + 续接编号后的实时投影。
  */
 function buildDisplayTurns(
   view: SessionTrajectoryView | null,
@@ -177,6 +251,11 @@ function buildDisplayTurns(
 /**
  * 应用拉取到的持久化轨迹：更新视图，并按轮次位置决定是否丢弃实时轮次、对齐轮次号。
  * 实时轮次交接判定见 `load` 上方的注释。
+ *
+ * @param dto - 服务端返回的持久化轨迹原始数据。
+ * @param sessionId - 本次加载对应的会话 id，用于记录「已为哪个会话加载成功」。
+ * @param setView - 写入映射后视图的状态更新函数。
+ * @param setLoadedFor - 标记加载来源会话的状态更新函数，加载态的推导依赖它。
  */
 function applyLoadedTrajectory(
   dto: SessionTrajectoryDto,

@@ -9,7 +9,9 @@ import type {
 import type { Session, SessionSummary } from '../../model/session.js'
 import { optionalField } from '../../../../../shared/object/optional-field.js'
 
+/** card 的宽松结构；`data` 保留为 JSON 对象，具体形状由展示层按 `type` 决定。 */
 const cardSchema = z.object({ type: z.string(), data: z.record(z.string(), z.json()) })
+/** 定时任务展示元数据的结构，字段按下划线命名对齐持久化格式。 */
 const scheduledTaskMetaSchema = z.object({
   task_id: z.string(),
   task_name: z.string(),
@@ -18,10 +20,12 @@ const scheduledTaskMetaSchema = z.object({
   scheduled_at: z.number().finite(),
   completed_at: z.number().finite(),
 })
+/** 消息元数据的结构；两类字段都可缺省，缺席表示这条消息不带对应信息。 */
 const messageMetaSchema = z.object({
   scheduled_task: scheduledTaskMetaSchema.optional(),
   run_started_at: z.number().finite().optional(),
 })
+/** 展示消息的结构；除 role 与 timestamp 外均可缺省，容纳不同消息类型的形状差异。 */
 const displayMessageSchema = z.object({
   role: z.string(),
   content: z.string().optional(),
@@ -31,7 +35,8 @@ const displayMessageSchema = z.object({
   meta: messageMetaSchema.optional(),
   timestamp: z.number().finite(),
 })
-/*
+/**
+ * 会话表行的结构，与 `SESSION_COLUMNS` 的列一一对应；是 PostgreSQL 信任边界的校验入口。
  * revision / fencing_token 接受三种形态不是随手放宽：`pg` 默认把 BIGINT 以字符串返回
  * （超出 JS 安全整数范围，不能用 number），但驱动配置不同或走了别的路径时也可能是 number 或 bigint。
  * 与其假设驱动行为，不如在边界上把三种都收下来再统一转成 bigint（见 toBigInt）。
@@ -45,18 +50,24 @@ const sessionRowSchema = z.object({
   fencing_token: z.union([z.string(), z.number().int(), z.bigint()]),
   updated_at: z.date(),
 })
+/** 会话所有权投影行的结构；只用于归属判断，两个版本字段可缺省。 */
 const sessionOwnerSchema = z.object({
   user_id: z.string(),
   revision: z.union([z.string(), z.number().int(), z.bigint()]).optional(),
   fencing_token: z.union([z.string(), z.number().int(), z.bigint()]).optional(),
 })
+/** 单列 `revision` 的行结构，用于 `RETURNING revision` 结果的校验。 */
 const revisionSchema = z.object({ revision: z.union([z.string(), z.number().int(), z.bigint()]) })
+/** 单列 `token` 的行结构，用于 `nextval(...) AS token` 结果的校验。 */
 const tokenSchema = z.object({ token: z.union([z.string(), z.number().int(), z.bigint()]) })
 
 /** 会话所有权行的最小投影；`revision`/`fencing_token` 可缺省，只看归属的调用方不必读版本号。 */
 export interface SessionOwnerRow {
+  /** 记录归属的用户 id；归属判断的唯一依据。 */
   readonly user_id: string
+  /** 当前乐观并发版本号；只做归属判断时无需读取，故可缺省。 */
   readonly revision?: string | number | bigint | undefined
+  /** 当前 fencing 令牌；同样只做归属判断时可缺省。 */
   readonly fencing_token?: string | number | bigint | undefined
 }
 
@@ -153,6 +164,13 @@ export function toBigInt(value: string | number | bigint, name: string): bigint 
   }
 }
 
+/**
+ * 把校验过的持久化行映射回领域展示消息；可选字段用 `optionalField` 收口，
+ * 使「缺席」与「显式 undefined」在结果里是同一种表示。
+ *
+ * @param value - 已经过 Schema 校验的展示消息行。
+ * @returns 领域展示消息。
+ */
 function toDisplayMessage(value: z.infer<typeof displayMessageSchema>): DisplayMessage {
   const cards: readonly Card[] | undefined = value.cards?.map((card): Card => ({
     type: card.type,
@@ -170,6 +188,12 @@ function toDisplayMessage(value: z.infer<typeof displayMessageSchema>): DisplayM
   }
 }
 
+/**
+ * 把校验过的元数据行映射回领域结构，并按需把下划线字段改名成驼峰。
+ *
+ * @param value - 已经过 Schema 校验的元数据行。
+ * @returns 领域消息元数据。
+ */
 function toMessageMeta(value: z.infer<typeof messageMetaSchema>): MessageMeta {
   return {
     ...(value.scheduled_task === undefined
@@ -188,7 +212,12 @@ function toMessageMeta(value: z.infer<typeof messageMetaSchema>): MessageMeta {
   }
 }
 
-/** 取首条用户消息作为标题；`Array.from` 按码点切，避免把 emoji 或星形平面汉字截成半个。 */
+/**
+ * 取首条用户消息作为标题；`Array.from` 按码点切，避免把 emoji 或星形平面汉字截成半个。
+ *
+ * @param messages - 会话的展示消息列表，按时间顺序。
+ * @returns 截断后的标题；没有可用用户消息时为空串。
+ */
 function extractTitle(messages: readonly DisplayMessage[]): string {
   for (const message of messages) {
     if (message.role !== 'user' || message.content === undefined) continue

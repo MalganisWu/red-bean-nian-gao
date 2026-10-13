@@ -10,6 +10,13 @@ import type { ButtonHTMLAttributes } from 'react'
 
 import { cn } from '../lib/utils'
 
+/**
+ * 按钮的变体与尺寸表：把「主按钮长什么样」收敛到这一处，调用方只选组合。
+ *
+ * 变体负责语义与配色（如 `destructive` 与 `destructive-outline` 语义相同、视觉权重不同），
+ * 尺寸负责高度与内边距；移动端最小高度抬到 44px 满足触控目标，`sm:` 起回落桌面尺寸。
+ * 所有颜色取自语义 token，Light / Dark 下由 token 各自给出正确取值。
+ */
 const buttonVariants = cva(
   'inline-flex cursor-pointer items-center justify-center rounded-md border font-sans font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-40',
   {

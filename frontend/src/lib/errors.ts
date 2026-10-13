@@ -6,8 +6,11 @@ import { API_ERROR_CODES } from '@red-bean/api-contract'
 
 /** 后端统一错误格式：{code, message, data: null} */
 export interface ApiError {
+  /** 后端业务码（4001-5000），与 HTTP status 解耦。 */
   code: number
+  /** 可直接展示的错误消息。 */
   message: string
+  /** 附加数据；本错误格式约定为 null，缺省表示无。 */
   data?: unknown
 }
 

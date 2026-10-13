@@ -7,12 +7,23 @@ import { Toaster } from '@/components/Sonner'
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
+/**
+ * 三种预览通知的固定 id。
+ *
+ * 固定 id 让重复触发替换同一条通知而不是层层堆叠；卸载时也用同一组 id
+ * 精确关闭，避免误伤页面上的其它 Toast。
+ */
 const PREVIEW_IDS = {
   notice: 'design-system-toast-notice',
   success: 'design-system-toast-success',
   error: 'design-system-toast-error',
 }
 
+/**
+ * 展示普通通知：灰阶样式，无状态色，操作为「撤销」。
+ *
+ * `duration: Infinity` 让它常驻，方便在展示页慢慢看；关闭交给操作或页面卸载。
+ */
 function showNoticeToast(): void {
   toast('草稿已保存', {
     id: PREVIEW_IDS.notice,
@@ -22,6 +33,11 @@ function showNoticeToast(): void {
   })
 }
 
+/**
+ * 展示成功通知：仅状态图标用成功绿，容器仍是灰阶，操作为「关闭」。
+ *
+ * 「关闭」直接调用 `toast.dismiss` 撤销本条目，是三种通知里唯一自带退场动作的。
+ */
 function showSuccessToast(): void {
   toast.success('保存成功', {
     id: PREVIEW_IDS.success,
@@ -31,6 +47,11 @@ function showSuccessToast(): void {
   })
 }
 
+/**
+ * 展示失败通知：仅状态图标用失败红，容器仍是灰阶，操作为「查看」。
+ *
+ * 文案给出可行动的下一步（检查连接后重试），不靠颜色单独表达错误。
+ */
 function showErrorToast(): void {
   toast.error('执行失败', {
     id: PREVIEW_IDS.error,
@@ -47,7 +68,13 @@ function showAllPreviewToasts(): void {
   showErrorToast()
 }
 
-/** 进入页面后延迟展示三种预览通知；返回清理函数，撤销定时器并关闭残留通知。 */
+/**
+ * 进入页面后延迟展示三种预览通知；返回清理函数，撤销定时器并关闭残留通知。
+ *
+ * 延迟是为了等 Toaster 挂载完成，避免首帧就丢通知。
+ *
+ * @returns 卸载用的清理函数：先撤销未到期的定时器，再按固定 id 关闭三条预览通知。
+ */
 function mountPreviewToasts(): () => void {
   const previewTimer = window.setTimeout(showAllPreviewToasts, 400)
 

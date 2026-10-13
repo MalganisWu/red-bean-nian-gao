@@ -6,13 +6,22 @@ import { toAgentJsonValue } from '../../serialization/json-value-normalizer.js'
 import type { DisplayMessage } from '../../presentation/model/display-message.js'
 import type { AnswerMarker } from '../model/session.js'
 
+/**
+ * 中断工具调用的占位结果：缺 tool result 的 tool call 会让模型上下文非法，
+ * 补一条显式错误结果让历史保持可继续。文案沿用与 OpenAI 兼容协议的既有英文，
+ * 它只进模型上下文、不进用户可见界面。
+ */
 const INTERRUPTED_TOOL_RESULT = '{"error":"tool call interrupted, result unavailable"}'
 
 /** 从展示 section 里读出的卡片状态；`answers` 只在已作答的卡片上出现。 */
 export interface AskCardData {
+  /** 卡片对应的交互标识；与 ask 工具调用 id 一致，用于把作答匹配回这张卡。 */
   readonly interactionId: string
+  /** 卡片当前状态；pending 表示尚未处理，answered / refused 表示已处理过。 */
   readonly status: string
+  /** 提问工具的原始问题载荷；作答回传时原样带回给模型，不要重写。 */
   readonly questions: AgentJsonValue
+  /** 用户已给出的答案；只在已作答的卡片上出现，pending 与拒答均缺省。 */
   readonly answers?: AgentJsonValue
 }
 
@@ -183,7 +192,13 @@ export function resolveCard(
   return messages.map((message): DisplayMessage => resolveCardInMessage(message, marker))
 }
 
-/** 处理单条消息：无 section 或未命中卡片时原样返回，命中时重写该 section 的卡片状态。 */
+/**
+ * 处理单条消息：无 section 或未命中卡片时原样返回，命中时重写该 section 的卡片状态。
+ *
+ * @param message - 待处理的展示消息。
+ * @param marker - 用户作答标记，决定把卡片置为 answered 还是 refused。
+ * @returns 命中时是改写后的新消息；未命中时返回同一引用，未涉及的消息不产生多余拷贝。
+ */
 function resolveCardInMessage(message: DisplayMessage, marker: AnswerMarker): DisplayMessage {
   const sections = sectionsFrom(message)
   if (sections.length === 0) return message
@@ -280,10 +295,24 @@ export function appendWithoutOverlap(
   return [...existing, ...recovered]
 }
 
+/**
+ * 读取展示消息上的 sections；持久化的是宽松 JSON，它可能缺失或不是数组，
+ * 此时返回空数组而不抛错，让投影与卡片查询对脏数据保持容错。
+ *
+ * @param message - 会话的展示消息。
+ * @returns section 数组；缺失或非数组时为空数组。
+ */
 function sectionsFrom(message: DisplayMessage): AgentJsonValue[] {
   return Array.isArray(message.sections) ? message.sections : []
 }
 
+/**
+ * 从 section 里读出卡片数据；不是 card 段、或关键字段类型不符时返回 undefined。
+ * status 原样透出，pending / answered / refused 的判定交给调用方。
+ *
+ * @param section - 展示消息里的单个 section。
+ * @returns 卡片数据；不是合法卡片段时为 undefined。
+ */
 function cardFromSection(section: AgentJsonValue): AskCardData | undefined {
   if (!isJsonObject(section) || section['type'] !== 'card') return undefined
   const card = section['card']
@@ -300,10 +329,22 @@ function cardFromSection(section: AgentJsonValue): AskCardData | undefined {
     : { interactionId, status, questions, answers }
 }
 
+/**
+ * 判定未知值是否为普通 JSON 对象，用于把宽松持久化数据收窄成 `AgentJsonObject`。
+ *
+ * @param value - 待判定的未知值。
+ * @returns 是对象时为 true，并把类型收窄为 `AgentJsonObject`。
+ */
 function isJsonObject(value: unknown): value is AgentJsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/**
+ * 判定未知值是否为普通对象，用于把宽松持久化数据收窄成可按下标访问的记录。
+ *
+ * @param value - 待判定的未知值。
+ * @returns 是对象时为 true，并把类型收窄为 `Record<string, unknown>`。
+ */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

@@ -14,12 +14,17 @@ import type { TraceContextExtractorPort } from '../../shared/http/fastify-http-b
 
 /** 从 `traceparent` / `tracestate` 解析出的上下文；`traceFlags` 已转成数字。 */
 export interface ExtractedW3CTraceContext {
+  /** 上游链路的 trace ID；32 位十六进制，透传给下游时不再改动。 */
   readonly traceId: string
+  /** 上游父 span 的 ID；16 位十六进制，本进程的 span 据此挂到远端父之下。 */
   readonly parentSpanId: string
+  /** 采样等标志位；已由传播器的十六进制串转成数字，便于按位判断。 */
   readonly traceFlags: number
+  /** 上游透传的 `tracestate` 序列化串；缺失时整个字段不出现，而不是留空串。 */
   readonly traceState?: string | undefined
 }
 
+/** 供传播器读入站 header 的适配器；查找前统一转小写，因为 Node 的 header 名大小写不敏感。 */
 const headerGetter: TextMapGetter<IncomingHttpHeaders> = {
   keys(carrier: IncomingHttpHeaders): string[] {
     return Object.keys(carrier)
@@ -29,6 +34,7 @@ const headerGetter: TextMapGetter<IncomingHttpHeaders> = {
   },
 }
 
+/** 供传播器写出站 header 的适配器；写入前统一转小写，避免同一键出现大小写两份。 */
 const headerSetter: TextMapSetter<Record<string, string>> = {
   set(carrier: Record<string, string>, key: string, value: string): void {
     carrier[key.toLowerCase()] = value
@@ -37,6 +43,7 @@ const headerSetter: TextMapSetter<Record<string, string>> = {
 
 /** `TraceContextExtractorPort` 的 W3C 实现；只校验传播格式，不把 Trace 身份当作授权凭证。 */
 export class W3CTraceContextExtractor implements TraceContextExtractorPort {
+  /** W3C trace context 传播器；提取与注入都经它，本类只在其上叠加「必须远端 / 必须本地」的判据。 */
   readonly #propagator = new core.W3CTraceContextPropagator()
 
   /**

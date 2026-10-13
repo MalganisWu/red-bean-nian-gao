@@ -1,13 +1,24 @@
 import { useState } from 'react'
 import './ColorPage.css'
 
+/** 单个语义色 token 的展示数据：一套 Light / Dark 取值与用途说明。 */
 interface ThemeColor {
+  /** 语义 token 名（含别名时用 ` / ` 连接，如 `--foreground / --card-foreground`），是组件唯一可引用的色名。 */
   token: string
+  /** Light 主题下的取值；多为 Hex，分类色的软底可能写成对 indicator 的混色描述。 */
   light: string
+  /** Dark 主题下的取值；与 Light 同语义、不同明度，保证两套主题都成立。 */
   dark: string
+  /** 该 token 的适用场景与边界：写明它表达什么、不该拿来做什么。 */
   use: string
 }
 
+/**
+ * 表面与边界色组：页面、侧栏、卡片、浮层等承载内容的底色，以及分隔线。
+ *
+ * Light 用近白到浅灰的层级，Dark 用近黑到深灰的层级；两套取值语义与层级关系一一对应，
+ * 组件只引用 token、不必感知当前主题。
+ */
 const SURFACES: readonly ThemeColor[] = [
   { token: '--background', light: '#FFFFFF', dark: '#0B0B0C', use: '页面、Agent 正文阅读面' },
   { token: '--sidebar', light: '#F6F6F5', dark: '#111112', use: '导航与固定侧栏' },
@@ -33,6 +44,12 @@ const SURFACES: readonly ThemeColor[] = [
   { token: '--ink', light: '#0B0B0C', dark: '#050506', use: '最高对比墨色与实体控件' },
 ] as const
 
+/**
+ * 文字与工具信息色组：从最高对比的前景到最弱提示的文字，以及过程节点与机器数据。
+ *
+ * 层级靠灰度而非字号堆叠——标题、正文、辅助、元信息逐级降低对比；Light 与 Dark 各自映射
+ * 一套灰度，保证两套主题下都读出相同的层级顺序与可读性下限。
+ */
 const TEXT_AND_TOOLS: readonly ThemeColor[] = [
   {
     token: '--foreground / --card-foreground',
@@ -85,6 +102,12 @@ const TEXT_AND_TOOLS: readonly ThemeColor[] = [
   { token: '--code-inline-fg', light: '#34363B', dark: '#D9D5D0', use: '行内代码文字' },
 ] as const
 
+/**
+ * 品牌与交互色组：豆沙红的文字、图形、焦点环与高亮底色。
+ *
+ * 豆沙红只表达品牌、选择与确认，不兼任容器层级或状态色；Light 取较深的豆沙以保对比，
+ * Dark 提亮同色相，两套主题都满足对比度要求。
+ */
 const BRAND_AND_INTERACTION: readonly ThemeColor[] = [
   {
     token: '--brand-text / --primary / --action-confirm / --accent',
@@ -131,6 +154,12 @@ const BRAND_AND_INTERACTION: readonly ThemeColor[] = [
   { token: '--highlight-fg', light: '#793E39', dark: '#DF948D', use: '品牌高亮文字' },
 ] as const
 
+/**
+ * 状态反馈色组：成功、失败、警告与中性信息的文字、指示与柔和背景。
+ *
+ * 颜色只是辅助，每个状态都必须同时给出文字或图标；成功绿、失败鲜红的取值在 Light 与 Dark
+ * 下分别调整明度，确保状态在两套主题下同样醒目且可辨。
+ */
 const STATE: readonly ThemeColor[] = [
   {
     token: '--success-text / --success',
@@ -170,6 +199,12 @@ const STATE: readonly ThemeColor[] = [
   { token: '--info-bg', light: '#F2F4F5', dark: '#1D1D1F', use: '中性信息背景' },
 ] as const
 
+/**
+ * 审计分类色组：按「工具 / 子 Agent / 压缩」三种轨迹分类区分的文字、指示与软底。
+ *
+ * 分类色只在审计轨迹的 chip 与节点上使用，不参与通用语义；每类给 indicator 及同源 soft，
+ * Light 用浅底深字、Dark 用 indicator 约 16% 的混色软底，两套主题保持同色相可追溯。
+ */
 const CATEGORY: readonly ThemeColor[] = [
   {
     token: '--cat-tool-text',
@@ -227,6 +262,12 @@ const CATEGORY: readonly ThemeColor[] = [
   },
 ] as const
 
+/**
+ * 使用场景对照表：`[颜色家族, 该用在哪, 不要用在哪]`。
+ *
+ * 逐条给出正反用例，回答「这个颜色到底什么时候用」；写成对照表是为了让评审能直接对照实现，
+ * 而不是靠个人理解解释语义色的边界。
+ */
 const USAGE = [
   [
     '豆沙红',
@@ -243,7 +284,15 @@ const USAGE = [
   ],
 ] as const
 
-function ThemeSwatch({ color }: { color: ThemeColor }) {
+/**
+ * 单个语义色的展示卡：Light / Dark 两个色块可点击复制，下方给出 token、用途与取值。
+ *
+ * 仅供颜色页内部使用；点击色块把对应取值写入剪贴板，并在 1.2 秒内回显「已复制」。
+ *
+ * @param props - 组件属性；`color` 为该卡片要展示的语义 token 数据。
+ */
+function ThemeSwatch(props: { color: ThemeColor }) {
+  const { color } = props
   const [copied, setCopied] = useState<'light' | 'dark' | null>(null)
 
   function copy(value: string, mode: 'light' | 'dark') {
@@ -284,7 +333,15 @@ function ThemeSwatch({ color }: { color: ThemeColor }) {
   )
 }
 
-function ColorGroup({ title, colors }: { title: string; colors: readonly ThemeColor[] }) {
+/**
+ * 一组颜色色块：带标题地渲染若干 `ThemeSwatch`。
+ *
+ * 把色表按语义分组（表面、文字、品牌、状态、分类），便于在长页面里分区阅读与比对。
+ *
+ * @param props - 组件属性；`title` 为分组标题，`colors` 为该组内的语义 token 列表。
+ */
+function ColorGroup(props: { title: string; colors: readonly ThemeColor[] }) {
+  const { title, colors } = props
   return (
     <section>
       <h2 className="color-section-title">{title}</h2>

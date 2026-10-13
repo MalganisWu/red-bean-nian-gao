@@ -4,7 +4,16 @@ import { ProcessFold, type ProcessStep } from '@/components/ProcessFold'
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
-function DelegationExample({ status }: { status: DelegationStatus }) {
+/**
+ * 单个委派状态的展示样例：把状态映射为时长、摘要、工具行与结论。
+ *
+ * `awaiting_user` / `cancelled` / `incomplete` 三种非终态各自走独立分支，
+ * 因此这里用互斥布尔量而不是查表，避免新增状态时静默落到 default。
+ *
+ * @param props - 组件属性；`status` 为要演示的委派状态。
+ */
+function DelegationExample(props: { status: DelegationStatus }) {
+  const { status } = props
   const failed = status === 'failed'
   const running = status === 'running'
   const awaiting = status === 'awaiting_user'
@@ -52,7 +61,17 @@ function DelegationExample({ status }: { status: DelegationStatus }) {
   )
 }
 
-function DelegationStep({ status }: { status: DelegationStatus }): ProcessStep {
+/**
+ * 把某一委派状态组装成一条 `ProcessFold` 工具步骤，并把委派行挂在它的子节点上。
+ *
+ * 这是展示站的演示夹具：状态到步骤状态的映射只服务于「一层嵌套」的展示，
+ * 不承担真实投影职责。
+ *
+ * @param props - 组件属性；`status` 为要演示的委派状态。
+ * @returns 供 `ProcessFold` 渲染的工具步骤，其 tool 状态与结果均由 `status` 推导。
+ */
+function DelegationStep(props: { status: DelegationStatus }): ProcessStep {
+  const { status } = props
   const active = status === 'running' || status === 'awaiting_user'
 
   return {

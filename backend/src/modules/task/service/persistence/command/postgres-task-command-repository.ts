@@ -23,7 +23,9 @@ import {
 export class PostgresTaskCommandRepository
   implements TaskCommandRepository, ScheduledTaskManagementCommandRepository
 {
+  /** 支持事务的 SQL 执行器；写操作与 fencing 更新都经它落地。 */
   readonly #database: TransactionalSqlExecutor
+  /** 时钟注入点；租约与更新时间的取值统一走它，便于测试定时语义。 */
   readonly #now: () => Date
 
   public constructor(database: TransactionalSqlExecutor, now: () => Date = (): Date => new Date()) {
@@ -209,6 +211,12 @@ export class PostgresTaskCommandRepository
 /**
  * 事务内先按 fencing 条件更新任务行，再写入执行记录；
  * 任一步失败都让整个事务回滚，任务状态与执行记录不会只落一半。
+ *
+ * @param transaction - 事务内的 SQL 执行器，两步必须共用它才具备原子性。
+ * @param task - 任务更新值；只取 isActive/retryCount/nextRunAt 三字段。
+ * @param serialized - 已序列化的执行记录落库形态。
+ * @param fencingToken - 租约 token；给出时更新以 token 相等为条件，不匹配即抛 STALE_EXECUTION。
+ * @param signal - 取消信号，透传到事务内查询。
  */
 async function updateTaskRowAndInsertExecution(
   transaction: SqlExecutor,

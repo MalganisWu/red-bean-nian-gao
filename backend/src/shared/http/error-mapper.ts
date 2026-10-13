@@ -2,16 +2,23 @@ import { API_ERROR_CODES } from '@red-bean/api-contract'
 
 /** 构造 `AppError` 的入参；`message` 会进响应体，`logMessage`/`cause` 只进日志。 */
 export interface AppErrorOptions {
+  /** 返回给客户端的 HTTP 状态码，决定响应行。 */
   readonly httpStatus: number
+  /** 信封里的业务错误码，取自 `API_ERROR_CODES`，供前端按键分支。 */
   readonly code: number
+  /** 会原样进响应体的公开中文文案；不得携带内部实现细节。 */
   readonly message: string
+  /** 只进服务端日志的补充说明；缺省时错误日志回落到通用文案。 */
   readonly logMessage?: string
+  /** 原始错误，只进日志与排障、绝不进响应体；用于保留 cause 链。 */
   readonly cause?: unknown
 }
 
 /** 对外错误信封的形状；`data` 恒为 null，由 api-contract 固定。 */
 export interface ErrorEnvelope {
+  /** 响应行使用的 HTTP 状态码，由 `AppError.httpStatus` 映射而来。 */
   readonly status: number
+  /** 对外错误信封体；形状 `{code, message, data: null}` 由 api-contract 固定，三个字段都不能少。 */
   readonly body: {
     readonly code: number
     readonly message: string

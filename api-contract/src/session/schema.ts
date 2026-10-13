@@ -6,6 +6,11 @@ import { isPersistedDisplayMessage } from '../presentation/schema.js'
 /** 会话 ID 的路径参数校验。 */
 export const sessionParamsSchema = z.object({ id: z.string().min(1) })
 
+/**
+ * 会话摘要的守卫；`id`、`title`、`message_count`、`updated_at` 四字段缺一即判假。
+ * @param value - 待判定的会话摘要；四个字段缺一即判假。
+ * @returns 形状成立时为 true，否则 false。
+ */
 function isSessionSummary(value: unknown): value is SessionSummaryDto {
   return (
     isRecord(value) &&

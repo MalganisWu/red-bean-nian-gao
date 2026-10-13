@@ -18,17 +18,21 @@ import { registerTrajectoryRoutes as bindTrajectoryRoutes } from './trajectory/c
 
 /** Chat HTTP 驱动适配器的组装依赖；业务默认实现由 `agent.module.ts` 提供。 */
 export interface ChatRouteDependencies {
+  /** Chat 入站用例；路由在认证通过后把请求交给它。 */
   readonly chat: ChatUseCasePort
+  /** 认证服务；用来构造 authenticatedRequest 边界，路由不自行解析凭据。 */
   readonly authService: AuthServicePort
 }
 
 /** Session HTTP 驱动适配器的组装依赖；业务默认实现由 `agent.module.ts` 提供。 */
 export interface SessionRouteDependencies extends SessionControllerDependencies {
+  /** 认证服务；用来构造 authenticatedRequest 边界，路由不自行解析凭据。 */
   readonly authService: AuthServicePort
 }
 
 /** Trajectory HTTP 驱动适配器的组装依赖；业务默认实现由 `agent.module.ts` 提供。 */
 export interface TrajectoryRouteDependencies extends TrajectoryControllerDependencies {
+  /** 认证服务；用来构造 authenticatedRequest 边界，路由不自行解析凭据。 */
   readonly authService: AuthServicePort
 }
 

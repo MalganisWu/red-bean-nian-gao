@@ -17,12 +17,20 @@ import { projectTrajectory } from './trajectory-projector.js'
 
 /** 轨迹查询入参；必须带 userId，越权访问与不存在收敛到同一条 404。 */
 export interface GetTrajectoryQuery {
+  /** 目标会话标识，取自路径参数且已过契约校验。 */
   readonly sessionId: string
+  /** 当前登录用户，决定归属范围；越权与不存在收敛为同一 404。 */
   readonly userId: string
 }
 
 /** 事实日志降级时的诊断出口；生产默认实现为 infra Logger。 */
 export interface TrajectoryDegradationLogger {
+  /**
+   * 记录一条降级诊断；只在审计视图被迫回退投影时调用，不是常规日志出口。
+   *
+   * @param message - 人类可读的中文诊断信息，说明降级原因。
+   * @param fields - 附加上下文字段（如 session_id、reason）；缺省表示无额外上下文。
+   */
   warn(message: string, fields?: Readonly<Record<string, unknown>>): void
 }
 
@@ -38,9 +46,13 @@ export interface TrajectoryDegradationLogger {
  * 两条路径产出的 `SessionTrajectory` 形状一致，调用方无需分支。
  */
 export class DefaultTrajectoryService {
+  /** 会话仓储；提供会话存在性校验与展示消息，是两条投影路径的共同起点。 */
   readonly #sessions: SessionRepository
+  /** 子执行仓储；为子 Agent 段并入 token、耗时与结果。 */
   readonly #subExecutions: SubExecutionRepository
+  /** 事实日志仓储；有 run 记录时优先作为投影数据源。 */
   readonly #runFacts: RunFactRepository
+  /** 降级诊断出口；缺省时静默降级，不影响返回结果。 */
   readonly #logger: TrajectoryDegradationLogger | undefined
 
   public constructor(

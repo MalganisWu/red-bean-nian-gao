@@ -19,8 +19,10 @@ import type {
 
 /** PostgreSQL task rows 的运行时校验与领域映射；不负责执行 SQL。 */
 const nullableDateSchema = z.date().nullable()
+/** 可空文本列；NULL 是合法值，映射时再折叠成字段缺省而非 `null`。 */
 const nullableStringSchema = z.string().nullable()
 
+/** `scheduled_tasks` 单行的校验 schema；列清单见 `task-sql.ts` 的 TASK_COLUMNS。 */
 const scheduledTaskRowSchema = z.object({
   scheduled_task_id: z.string(),
   session_id: z.string(),
@@ -36,11 +38,13 @@ const scheduledTaskRowSchema = z.object({
   created_at: z.date(),
 })
 
+/** 展示消息内嵌卡片：`type` 为卡片类型，`data` 为自由形状的 JSON 负载。 */
 const cardSchema = z.object({
   type: z.string(),
   data: z.record(z.string(), z.json()),
 })
 
+/** 展示消息 meta 里定时任务来源的快照；时间字段为毫秒时间戳。 */
 const scheduledTaskMetaSchema = z.object({
   task_id: z.string(),
   task_name: z.string(),
@@ -50,11 +54,13 @@ const scheduledTaskMetaSchema = z.object({
   completed_at: z.number().finite(),
 })
 
+/** 展示消息 meta：定时任务来源与运行开始时刻都可缺省，非定时任务消息两者皆无。 */
 const messageMetaSchema = z.object({
   scheduled_task: scheduledTaskMetaSchema.optional(),
   run_started_at: z.number().finite().optional(),
 })
 
+/** 落库展示消息的结构：`role` 与 `timestamp` 必填，正文、卡片、来源、meta 依消息种类可缺省。 */
 const displayMessageSchema = z.object({
   role: z.string(),
   content: z.string().optional(),
@@ -65,6 +71,7 @@ const displayMessageSchema = z.object({
   timestamp: z.number().finite(),
 })
 
+/** `agent_task_executions` 单行的校验 schema；列清单见 `task-sql.ts` 的 EXECUTION_COLUMNS。 */
 const executionRowSchema = z.object({
   execution_id: z.string(),
   task_id: z.string(),
@@ -81,6 +88,7 @@ const executionRowSchema = z.object({
   created_at: z.date(),
 })
 
+/** 列表联表查询的单行结构：任务本体外附会话标题与 `latest_*` 一组最近执行字段。 */
 const taskListRowSchema = scheduledTaskRowSchema.extend({
   session_title: z.string(),
   latest_execution_id: nullableStringSchema,
@@ -92,6 +100,7 @@ const taskListRowSchema = scheduledTaskRowSchema.extend({
   latest_error_message: nullableStringSchema,
 })
 
+/** 视图状态单行结构；`seen_at`/`collapsed_override`/`updated_at` 为 NULL 均表示用户未设置。 */
 const viewStateRowSchema = z.object({
   execution_id: z.string(),
   seen_at: nullableDateSchema,
@@ -101,8 +110,11 @@ const viewStateRowSchema = z.object({
 
 /** 只取 `retry_count` 的行 schema；重试路径只需要这一个字段，不必拉整行。 */
 export const retryCountRowSchema = z.object({ retry_count: z.number().int().nonnegative() })
+/** 键集分页游标的两段内容：创建时间与任务 ID，二者一起唯一确定下一页的边界。 */
 interface TaskListCursor {
+  /** 本页末条的创建时间；作为下一页 `created_at` 的上界。 */
   readonly createdAt: Date
+  /** 本页末条的任务 ID；用于打破同一毫秒内多条记录的时间歧义。 */
   readonly taskId: string
 }
 
@@ -233,6 +245,13 @@ export function mapViewStateRow(value: unknown): ExecutionViewState {
     ...optionalField('updatedAt', parsed.data.updated_at),
   }
 }
+/**
+ * 把已校验的 `scheduled_tasks` 行投影成领域任务定义：列名 snake_case → 字段 camelCase，
+ * 可空时间列的 NULL 折叠成字段缺省，`schedule_type` 为空时回退到 `is_recurring` 布尔。
+ *
+ * @param row - 已通过 scheduledTaskRowSchema 校验的原始行。
+ * @returns 领域任务定义。
+ */
 function toTaskDefinition(row: z.infer<typeof scheduledTaskRowSchema>): AgentTaskDefinition {
   return {
     taskId: row.scheduled_task_id,
@@ -248,6 +267,12 @@ function toTaskDefinition(row: z.infer<typeof scheduledTaskRowSchema>): AgentTas
   }
 }
 
+/**
+ * 把已校验的展示消息行投影成领域消息：所有可缺省字段经 `optionalField` 折叠为字段缺失而非 `null`。
+ *
+ * @param row - 已通过 displayMessageSchema 校验的原始行。
+ * @returns 领域展示消息。
+ */
 function toDisplayMessage(row: z.infer<typeof displayMessageSchema>): DisplayMessage {
   return {
     role: row.role,
@@ -260,10 +285,22 @@ function toDisplayMessage(row: z.infer<typeof displayMessageSchema>): DisplayMes
   }
 }
 
+/**
+ * 把已校验的卡片行投影成领域卡片；`data` 原样透传，不在映射层二次校验。
+ *
+ * @param row - 已通过 cardSchema 校验的原始行。
+ * @returns 领域卡片。
+ */
 function toCard(row: z.infer<typeof cardSchema>): Card {
   return { type: row.type, data: row.data }
 }
 
+/**
+ * 把已校验的消息 meta 行投影成领域 meta：定时任务来源缺失时不带该字段。
+ *
+ * @param row - 已通过 messageMetaSchema 校验的原始行。
+ * @returns 领域消息 meta。
+ */
 function toMessageMeta(row: z.infer<typeof messageMetaSchema>): MessageMeta {
   return {
     ...optionalField(
@@ -334,21 +371,48 @@ export function executionPage(
   }
 }
 
-/** 校验单条执行记录行；任一行非法即抛错，坏行不会被静默跳过。 */
+/**
+ * 校验单条执行记录行；任一行非法即抛错，坏行不会被静默跳过。
+ *
+ * @param row - 数据库原始行；形状不可信，先过执行记录 Schema。
+ * @returns 通过校验的原始行；不符 Schema 时抛错。
+ */
 function parseExecutionRow(row: unknown): z.infer<typeof executionRowSchema> {
   const result = executionRowSchema.safeParse(row)
   if (!result.success) throw new Error('执行记录行数据无效', { cause: result.error })
   return result.data
 }
 
+/**
+ * 截断可空文本：NULL 映射为 `undefined`（字段缺省），其余按码点截断并追加省略号，
+ * 保证列表接口不被单条超长文本撑大。
+ *
+ * @param value - 待截断的文本；null 表示该列缺省。
+ * @param maxLength - 保留的最大码点数。
+ * @returns 截断后的文本；输入为 null 时返回 `undefined`。
+ */
 function truncateOptionalText(value: string | null, maxLength: number): string | undefined {
   return value === null ? undefined : truncateCodePoints(value, maxLength)
 }
+/**
+ * 判定游标串是否为该字节内容的规范 base64url 编码，挡掉「同一串字节的多种写法」，
+ * 保证游标可直接按字符串比较。
+ *
+ * @param encoded - 客户端回传的原始游标串。
+ * @param decoded - 由该串解码出的明文字符串。
+ * @returns 以同一编码重新编码后与原串一致时为 true。
+ */
 function isCanonicalBase64Url(encoded: string, decoded: string): boolean {
   return Buffer.from(decoded, 'utf8').toString('base64url') === encoded
 }
 
-/** schedule_type 为空是历史写入的兼容回退：旧实现只维护 is_recurring 布尔。 */
+/**
+ * schedule_type 为空是历史写入的兼容回退：旧实现只维护 is_recurring 布尔。
+ *
+ * @param scheduleType - 行里的 schedule_type；空串表示旧数据缺该列。
+ * @param isRecurring - 旧布尔列；仅在 scheduleType 为空时作为回退判据。
+ * @returns 归一后的调度类型，非空时原样返回 scheduleType。
+ */
 function taskScheduleType(
   scheduleType: '' | 'once' | 'recurring',
   isRecurring: boolean
@@ -356,7 +420,12 @@ function taskScheduleType(
   return scheduleType === '' ? (isRecurring ? 'recurring' : 'once') : scheduleType
 }
 
-/** 展示消息中的定时任务来源信息；字段名从行快照映射到产品模型。 */
+/**
+ * 展示消息中的定时任务来源信息；字段名从行快照映射到产品模型。
+ *
+ * @param row - 已通过 scheduledTaskMetaSchema 校验的原始行。
+ * @returns 领域侧的定时任务来源信息。
+ */
 function toScheduledTaskMeta(row: z.infer<typeof scheduledTaskMetaSchema>): ScheduledTaskMeta {
   return {
     taskId: row.task_id,

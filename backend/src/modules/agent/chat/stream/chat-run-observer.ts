@@ -10,6 +10,11 @@ import type { MessageBufferGeneration } from '../../session/message-buffer/port/
 import type { AgentMessage } from '../../model/agent-message.js'
 import type { AgentRuntimeEvent } from '../../run/model/agent-runtime-event.js'
 
+/**
+ * 增量写入恢复缓冲的超时（5000ms）。
+ * 缓冲是尽力而为的中间态，最终提交点在 Session 保存，所以给一个不长不短的兜底：
+ * 卡住超时即放弃本次追加，不让慢缓冲拖住整轮运行。
+ */
 const BUFFER_TIMEOUT_MILLISECONDS = 5_000
 
 /**
@@ -17,11 +22,17 @@ const BUFFER_TIMEOUT_MILLISECONDS = 5_000
  * 该适配器只处理一次运行，不拥有 Session 的最终提交。
  */
 export class ChatRunObserver implements AgentExecutionEventSink, AgentExecutionMessageObserver {
+  /** 本次运行的 Checkpoint 标识；恢复缓冲与展示投影都以它为键。 */
   readonly #checkpointId: string
+  /** 消息缓冲的代数；同一 Checkpoint 下用来隔离不同代次的增量。 */
   readonly #generation: MessageBufferGeneration
+  /** 事件分段收集器；把运行时事件累积成展示 section。 */
   readonly #sections: SectionCollector
+  /** 展示消息收集器；把已提交消息投影为展示层消息。 */
   readonly #display: DisplayMessageCollector
+  /** SSE 事件队列的写入端；事件经它流向前端。 */
   readonly #queue: { push(event: ProductStreamEvent): void }
+  /** 恢复缓冲；增量写入尽力而为，最终提交点在 Session 保存。 */
   readonly #messageBuffer: MessageBuffer
   /** 已提交消息的附加观察者（如事实日志写入器）；先于展示投影调用。 */
   readonly #onMessage: ((message: AgentMessage) => void) | undefined
@@ -78,6 +89,11 @@ export class ChatRunObserver implements AgentExecutionEventSink, AgentExecutionM
     await this.#display.collectMessage(this.#checkpointId, message, signal)
   }
 
+  /**
+   * 尽力把一条消息增量写入恢复缓冲；超时或失败都只吞掉，不抛出。
+   * 缓冲是尽力而为的中间态，最终 Session 保存才是本轮运行的事实提交点。
+   * @param message 待增量写入的领域消息；user 消息不会走到这里
+   */
   async #appendBuffer(message: AgentMessage): Promise<void> {
     try {
       await this.#messageBuffer.appendGeneration(

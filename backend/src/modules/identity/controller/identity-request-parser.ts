@@ -76,12 +76,31 @@ export function parseUserPagination(value: unknown): {
   return { offset, limit: requestedLimit <= 0 || requestedLimit > 100 ? 20 : requestedLimit }
 }
 
+/**
+ * 把查询串里的十进制字符串解析成非负整数，非法输入回退到 `fallback`。
+ *
+ * 查询串的值一律是字符串，且分页是**非关键参数**：这里与 `parseUserPagination` 同一取向，
+ * 宁可回退到安全默认也不抛错，避免一个手改的 `?offset=x` 让整个列表接口 400。
+ *
+ * @param value - 未经信任的查询串取值；非字符串、非纯数字或超出安全整数范围都走回退
+ * @param fallback - 解析失败时返回的默认值，由调用方按字段语义给定
+ * @returns 解析成功的非负整数，或原样返回的 `fallback`
+ */
 function nonNegativeInteger(value: unknown, fallback: number): number {
   if (typeof value !== 'string' || !/^\d+$/u.test(value)) return fallback
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) ? parsed : fallback
 }
 
+/**
+ * 判断值是否为「非数组的普通对象」，用于收紧来自 `request.query` 的未知值。
+ *
+ * 只做形状收窄、不校验字段；刻意排除数组，因为查询串里的重复键在 Fastify 下可能解析成
+ * 数组，那不是分页解析期望的形态。
+ *
+ * @param value - 任意未经信任的输入
+ * @returns 为对象、非 null 且非数组时为 `true`，此时可按下标安全读取字段
+ */
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

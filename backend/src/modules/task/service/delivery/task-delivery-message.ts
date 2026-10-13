@@ -1,6 +1,7 @@
 import type { DisplayMessage, MessageMeta, ScheduledTaskMeta } from './../../../agent/public-api.js'
 import type { AgentTaskDefinition, AgentTaskExecution } from './../../model/task.js'
 
+/** 展示消息的来源标记；前端据此把这类消息渲染成定时任务卡片而非普通助手消息。 */
 const SCHEDULED_TASK_SOURCE = 'scheduled_task'
 
 /**
@@ -38,6 +39,14 @@ export function buildDeliveryDisplayMessages(
   ]
 }
 
+/**
+ * 组装写入展示消息的定时任务元数据：任务名复用 taskInput，状态与时刻来自执行记录快照。
+ *
+ * @param execution - 执行记录，提供状态、计划与完成时刻。
+ * @param task - 任务定义，提供任务 ID 与任务名。
+ * @param executionId - 执行记录标识，写入元数据供前端回跳详情。
+ * @returns 挂到消息上的 meta，仅含定时任务一组字段。
+ */
 function buildTaskMeta(
   execution: AgentTaskExecution,
   task: AgentTaskDefinition,

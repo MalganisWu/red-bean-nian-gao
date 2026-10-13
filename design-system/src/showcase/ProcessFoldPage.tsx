@@ -3,6 +3,12 @@ import { ProcessFold, type ProcessStep } from '@/components/ProcessFold'
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
+/**
+ * 「已完成」场景的过程步骤夹具：先思考、再改配置、最后跑测试，三步均为 complete。
+ *
+ * 它专门用来演示 completed 态默认折叠、展开后仍是完整时间线这一行为，
+ * 与 Running / Failed 两个内联步骤数组区分开。
+ */
 const COMPLETED_STEPS: ProcessStep[] = [
   { kind: 'think', content: '确认配置范围和依赖。', state: 'complete' },
   {

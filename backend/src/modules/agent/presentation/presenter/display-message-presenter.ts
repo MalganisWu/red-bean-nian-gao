@@ -22,6 +22,11 @@ export function serializeDisplayMessage(message: DisplayMessage): AgentJsonObjec
   return payload
 }
 
+/**
+ * 只投影 meta 里确实存在的可选键：缺失即不写键，避免把 undefined 塞进落库 JSON 破坏投影稳定性。
+ * @param meta 展示消息附带的元数据；scheduledTask 与 runStartedAt 任一缺失时对应键整体省略
+ * @returns 可直接落库的 JSON 对象（键名沿用 snake_case）
+ */
 function serializeMessageMeta(meta: MessageMeta): AgentJsonObject {
   const payload: Record<string, AgentJsonValue> = {}
   if (meta.scheduledTask !== undefined) {

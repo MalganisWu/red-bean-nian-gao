@@ -4,10 +4,15 @@ import { PostgresMigrator, type DatabaseMigrationGatePort } from '../infra/datab
 import type { Logger } from '../infra/logger/logger.js'
 import type { SqlExecutor, TransactionalSqlExecutor } from '../infra/database/postgres.js'
 
+/** 默认 OpenAI 凭据的固定主键；播种靠固定 ID 才能让 `ON CONFLICT DO NOTHING` 幂等重跑。 */
 const DEFAULT_CREDENTIAL_ID = 'CRED_default_001'
+/** 默认对话模型配置的固定主键，与默认凭据配套播种，缺一不可。 */
 const DEFAULT_LLM_CONFIG_ID = 'LLMC_default_001'
+/** 默认对话模型配置的名称；Agent 靠这个名字（而非 ID）引用 LLM 配置。 */
 const DEFAULT_LLM_CONFIG_NAME = 'default'
+/** 默认助手 Agent 的固定主键；启动播种与工具白名单更新都以它定位。 */
 const DEFAULT_AGENT_ID = 'default'
+/** 开发账号的固定主键；仅在配置里同时给了开发用户名与口令时才用于播种。 */
 const DEFAULT_USER_ID = 'USER_default_001'
 /**
  * 默认助手（`default`）默认启用的系统工具。
@@ -29,11 +34,17 @@ const DEFAULT_AGENT_TOOL_IDS = Object.freeze([
 
 /** 播种所需的依赖；`migrator` 可缺省，缺省时按传入的数据库连接自建一个。 */
 export interface DatabaseBootstrapOptions {
+  /** 已校验的应用配置；`database.autoMigrate` 决定跑迁移还是只做只读校验。 */
   readonly config: AppConfig
+  /** 事务型 SQL 执行器，迁移与播种的读写都经它完成。 */
   readonly database: TransactionalSqlExecutor
+  /** 密码散列实现；建开发账号时复用 Identity Module 的那一份，避免各处自带一套算法。 */
   readonly passwordHasher: PasswordHasher
+  /** 启动日志出口，用于汇报迁移结果与播种完成。 */
   readonly logger: Logger
+  /** 启动期取消信号，透传给迁移与查询；中止时尚未完成的操作被取消。 */
   readonly signal: AbortSignal
+  /** 迁移门禁实现；缺省时按 `database` 自建 `PostgresMigrator`，测试可注入替身。 */
   readonly migrator?: DatabaseMigrationGatePort | undefined
 }
 
@@ -83,6 +94,11 @@ export async function bootstrapDatabase(options: DatabaseBootstrapOptions): Prom
  *
  * 幂等靠的是 ID 固定而不是「先查再插」——后者在并发启动时会两个实例都查到不存在、都去插。
  * 不在冲突时更新也是有意的：用户在界面上改过的默认配置不该被每次重启重置。
+ * @param database - 目标数据库执行器，所有播种写入都经它执行
+ * @param config - 应用配置，提供默认 LLM 凭据与连接信息
+ * @param passwordHasher - 密码散列实现，建开发账号时使用
+ * @param logger - 日志出口，播种完成后记录一条信息
+ * @param signal - 启动期取消信号，透传给每条 SQL
  */
 async function seedDefaults(
   database: SqlExecutor,
@@ -170,6 +186,10 @@ async function seedDefaults(
  * 建开发账号，仅在配置里同时给了用户名与密码时。
  * 已存在就**直接返回**而不是更新：重置密码会覆盖使用者自己改过的口令，
  * 而每次重启都把口令变回配置值是一种很难排查的困扰。
+ * @param database - 目标数据库执行器，用于查询账号是否存在并写入新账号
+ * @param config - 应用配置，从中取开发用户名、口令、邮箱与显示名
+ * @param passwordHasher - 密码散列实现，口令不明文入库
+ * @param signal - 启动期取消信号，透传给查询与写入
  */
 async function seedDefaultUser(
   database: SqlExecutor,

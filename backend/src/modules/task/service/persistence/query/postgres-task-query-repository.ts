@@ -27,6 +27,7 @@ import {
 export class PostgresTaskQueryRepository
   implements TaskQueryRepository, PendingTaskRepository, ScheduledTaskManagementQueryRepository
 {
+  /** 支持事务的 SQL 执行器；只读查询直接用它，不参与事务编排。 */
   readonly #database: TransactionalSqlExecutor
 
   public constructor(database: TransactionalSqlExecutor) {
@@ -219,6 +220,11 @@ export class PostgresTaskQueryRepository
  * 组装"按 created_at 游标"分页的 SQL 片段与绑定参数。
  * 有游标时在 owner 参数后追加游标并启用 created_at 上界；无游标退化为纯 limit 查询。
  * 每页多取一条用于 hasMore 判定，具体分页逻辑由下游 `taskPage`/`executionPage` 处理。
+ *
+ * @param owner - 归属过滤值（用户 ID 或任务 ID），绑定为第一个参数。
+ * @param cursor - 上一页末条的时间戳游标；空串表示取首页、不追加游标条件。
+ * @param limit - 本页最大条数；内部按 limit + 1 绑定以支持多取一条。
+ * @returns 游标 SQL 片段、limit 占位符序号与完整绑定参数列表。
  */
 function cursorPagination(
   owner: string,

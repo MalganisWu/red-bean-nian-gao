@@ -25,10 +25,15 @@ export type ChildStreamFactory = (
 export class ChildExecutionObserver
   implements AgentExecutionEventSink, AgentExecutionMessageObserver
 {
+  /** 本次观察的子执行标识；增量消息落库时用它定位记录。 */
   readonly #executionId: string
+  /** 观察开始时记录的持久化版本；随增量消息一并写入以参与 CAS。 */
   readonly #persistenceRevision: bigint
+  /** 子执行自己的展示收集器；缺省表示不收集展示 section。 */
   readonly #sections: ChildSectionCollector | undefined
+  /** 父流的事件出口；缺省表示不把子执行进展转发给父运行。 */
   readonly #eventSink: ((event: AgentRuntimeEvent) => void) | undefined
+  /** 增量消息落库回调；缺省表示不持久化中间消息，观察器退化为纯转发。 */
   readonly #messageSink: ChildMessageSink | undefined
 
   public constructor(

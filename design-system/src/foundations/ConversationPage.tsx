@@ -10,6 +10,12 @@ import {
 
 import './ConversationPage.css'
 
+/**
+ * Process 状态模型：`[状态, 初始折叠, 规则]`。
+ *
+ * 规定每种过程状态默认展开还是折叠，以及该状态下时间线的行为（节点呼吸、确认节点常显、
+ * 保留已完成步骤等）。初始开合只是缺省值，用户手动调整后在活跃回合内保持不变。
+ */
 const PROCESS_STATES = [
   ['无过程', '不渲染', '直接显示最终回答'],
   ['执行中', '默认展开', '当前节点轻微呼吸；用户手动折叠后保持选择'],
@@ -19,6 +25,12 @@ const PROCESS_STATES = [
   ['已停止 / 中断', '默认折叠 / 展开', '保留已完成步骤，未返回工具标记“未完成”'],
 ] as const
 
+/**
+ * Tool 状态模型：`[状态, 视觉, 必须提供]`。
+ *
+ * 与 Process 状态彼此独立——工具失败不等于回合失败，只有回合终态决定 Process 结果；
+ * 每条都要求同时给出文字或图标，颜色不能是唯一线索。
+ */
 const TOOL_STATES = [
   ['等待中', '中性灰', '名称、目标'],
   ['正在运行', '中性灰 + 当前节点呼吸', 'elapsed，不显示伪造完成耗时'],
@@ -28,19 +40,27 @@ const TOOL_STATES = [
   ['未完成', '中性灰 + “未完成”', '刷新恢复或重试入口'],
 ] as const
 
+/**
+ * 确认动作的短文案映射：以选项原文为 key，取更精简的确认按钮文字。
+ *
+ * 确认按钮空间有限，长选项（如整句「仅修复已定位的重复写入，并运行测试」）需要压成动词短语；
+ * 未命中的选项回退到「确认并继续」，因此这里只放需要特殊收敛的条目。
+ */
 const CONFIRM_LABELS: Record<string, string> = {
   '仅修复已定位的重复写入，并运行测试': '确认：仅修复并测试',
   同时整理订单状态的生命周期: '确认：一并整理',
   '只生成补丁，不运行测试': '确认：只生成补丁',
 }
 
-function SpecTable({
-  headers,
-  rows,
-}: {
-  headers: readonly string[]
-  rows: readonly (readonly string[])[]
-}) {
+/**
+ * 状态表通用渲染件：把「状态 / 呈现 / 规则」这类表头与逐行数据渲染成规范表。
+ *
+ * 仅服务于本页的 Process 与 Tool 状态模型，故不抽到 components；行首单元格用作 React key。
+ *
+ * @param props - 组件属性；`headers` 为列标题，`rows` 为逐行的单元格文本。
+ */
+function SpecTable(props: { headers: readonly string[]; rows: readonly (readonly string[])[] }) {
+  const { headers, rows } = props
   return (
     <div className="conversation-spec__table-wrap">
       <table className="conversation-spec__table">

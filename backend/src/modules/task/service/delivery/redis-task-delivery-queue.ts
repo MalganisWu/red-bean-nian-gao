@@ -3,6 +3,7 @@ import type { DeliveryQueueStore } from './port/delivery-queue.port.js'
 
 /** DeliveryQueue 所需原子列表操作的 Redis 实现。 */
 export class RedisDeliveryQueueStore implements DeliveryQueueStore {
+  /** Redis 连接；本存储依赖其提供的原子列表搬运原语。 */
   readonly #redis: RedisConnection
 
   public constructor(redis: RedisConnection) {

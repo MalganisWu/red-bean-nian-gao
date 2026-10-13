@@ -2,10 +2,15 @@ import { MoreHorizontal } from 'lucide-react'
 
 import { Menu } from '@/components/retroui/Menu'
 
+/** 任务操作菜单属性：标题用于确认文案，删除走二次确认，删除进行中时整体禁用交互。 */
 interface TaskActionsMenuProps {
+  /** 任务标题；用于二次确认文案，让用户确认删的是哪一条。 */
   taskTitle: string
+  /** 是否处于删除二次确认态；为 true 时展示确认项。 */
   confirmingDelete?: boolean
+  /** 删除请求是否进行中；为 true 时禁用整个菜单交互。 */
   deleting?: boolean
+  /** 确认删除时触发；实际删除由调用方执行。 */
   onDelete: () => void
 }
 

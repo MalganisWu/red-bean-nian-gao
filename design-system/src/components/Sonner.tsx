@@ -2,10 +2,21 @@
 
 import { Toaster as Sonner } from 'sonner'
 
+/** 透传给 Sonner 的 Toaster 属性：本组件只覆写 `toastOptions`，其余原样转发。 */
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
-/** 通知浮层出口：装配 Quiet Tool 的通知样式并透传其余 Toaster 属性。 */
-function Toaster({ ...props }: ToasterProps): React.ReactElement {
+/**
+ * 通知浮层出口：装配 Quiet Tool 的通知样式并透传其余 Toaster 属性。
+ *
+ * 样式走 `unstyled` 模式：颜色与边框一律用语义 token（`bg-popover` / `border-border-strong`
+ * / `text-foreground`），因此 Light/Dark 两套主题各自成立；成功、失败图标分别用
+ * `success-indicator` / `danger-indicator` 着色，与其它状态色的取色口径一致。
+ *
+ * @param props - 透传给 Sonner 的属性；此处只以 `toastOptions` 覆盖各部件类名，其余原样转发。
+ * @returns 挂载后即渲染通知区域的 React 元素。
+ */
+function Toaster(props: ToasterProps): React.ReactElement {
+  const { ...rest } = props
   return (
     <Sonner
       toastOptions={{
@@ -27,7 +38,7 @@ function Toaster({ ...props }: ToasterProps): React.ReactElement {
         },
         unstyled: true,
       }}
-      {...props}
+      {...rest}
     />
   )
 }

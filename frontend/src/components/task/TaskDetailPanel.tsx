@@ -17,13 +17,21 @@ import {
 } from './scheduledTaskPresentation'
 import { TaskActionsMenu } from './TaskActionsMenu'
 
+/** 任务详情容器属性：任务与页签状态，以及返回、切页签、删除完成、查看执行四项回调。 */
 interface TaskDetailPanelProps {
+  /** 当前任务 id；变化时重新拉取详情与执行列表。 */
   taskId: string
+  /** 当前选中的页签（详情 / 执行历史）。 */
   activeTab: ScheduledTaskDetailTab
+  /** 返回入口的文案，由调用方给出上一层的名称。 */
   backLabel: string
+  /** 点击返回时触发。 */
   onBack: () => void
+  /** 切换页签时触发，由调用方更新并透传 activeTab。 */
   onTabChange: (tab: ScheduledTaskDetailTab) => void
+  /** 任务删除成功后触发，供调用方做返回等收尾。 */
   onDeleted: () => void
+  /** 查看某次执行详情时触发，携带执行 id。 */
   onViewExecution: (executionId: string) => void
 }
 

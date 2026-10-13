@@ -7,6 +7,10 @@
  * 或转移存储客户端所有权，底层资源生命周期始终由 Storage Module 管理。
  */
 export interface StorageHealthPort {
-  /** 探测当前对象存储是否可用；失败或取消时 reject，不把异常折叠为布尔值。 */
+  /**
+   * 探测当前对象存储是否可用；失败或取消时 reject，不把异常折叠为布尔值。
+   *
+   * @param signal - 由健康检查调用方提供的取消信号，超时或关停时中断探测
+   */
   check(signal: AbortSignal): Promise<void>
 }

@@ -17,6 +17,10 @@ import {
   type SessionOwnerRow,
 } from '../persistence/session-row-mapper.js'
 
+/**
+ * 查询会话时统一选出的列清单；`parseSession` 与 `parseSessionSummary` 共用同一份 Schema。
+ * 抽成常量是为了让所有查询选同一组列，避免某处漏列导致解析在运行时才失败。
+ */
 const SESSION_COLUMNS = `
   session_id,
   user_id,
@@ -38,6 +42,7 @@ const SESSION_COLUMNS = `
  * - **每次失败的写入都要给出可区分的错误**：见 `#throwSaveConflict`。
  */
 export class PostgresSessionRepository implements FencedSessionRepository {
+  /** 注入的 SQL 执行器；全部读写都经它下发，取消信号一并透传。 */
   readonly #database: SqlExecutor
   public constructor(database: SqlExecutor) {
     this.#database = database
@@ -245,6 +250,14 @@ export class PostgresSessionRepository implements FencedSessionRepository {
     return parseFencingToken(result.rows[0])
   }
 
+  /**
+   * 按会话与归属读取聚合并解析；查询强制带 `user_id`，越权与不存在等价。
+   *
+   * @param sessionId - 目标会话标识。
+   * @param userId - 归属校验依据；不匹配即视为查不到。
+   * @param signal - 取消信号，透传到 SQL。
+   * @returns 解析出的会话聚合；不存在或不属于该用户时返回 undefined。
+   */
   async #findOwned(
     sessionId: string,
     userId: string,
@@ -266,6 +279,13 @@ export class PostgresSessionRepository implements FencedSessionRepository {
     return parseSession(result.rows[0])
   }
 
+  /**
+   * 只取归属与版本列，不读全量聚合；用于冲突判定与所有权校验的轻量路径。
+   *
+   * @param sessionId - 目标会话标识。
+   * @param signal - 取消信号，透传到 SQL。
+   * @returns 所有权投影行；行不存在时返回 undefined。
+   */
   async #owner(sessionId: string, signal: AbortSignal): Promise<SessionOwnerRow | undefined> {
     let result: Awaited<ReturnType<SqlExecutor['query']>>
     try {
@@ -288,6 +308,9 @@ export class PostgresSessionRepository implements FencedSessionRepository {
    * 3. 其余情况 → `REVISION_CONFLICT`（并发写，重读最新版本后可以重试）。
    *
    * 顺序不能调换：fencing 陈旧时若先报版本冲突，调用方会去重试一个它已经无权执行的操作。
+   *
+   * @param session - 刚才尝试保存的快照，用其 id 与 userId 重新核对所有者。
+   * @param signal - 取消信号，透传到归属查询。
    */
   async #throwSaveConflict(session: Session, signal: AbortSignal): Promise<never> {
     const current = await this.#owner(session.id, signal)
@@ -303,6 +326,14 @@ export class PostgresSessionRepository implements FencedSessionRepository {
   }
 }
 
+/**
+ * 构造新会话的初始聚合：空消息列表，revision 与 fencing_token 均为 0。
+ * 只在确认 INSERT 成功（rowCount > 0）后使用，避免拿着假状态去覆盖别人的并发创建。
+ *
+ * @param sessionId - 新会话标识。
+ * @param userId - 会话归属用户。
+ * @returns 刚建出的空会话。
+ */
 function emptySession(sessionId: string, userId: string): Session {
   return {
     id: sessionId,
@@ -313,6 +344,13 @@ function emptySession(sessionId: string, userId: string): Session {
   }
 }
 
+/**
+ * 把列表游标解析成时间。空串表示首页，返回 undefined 让调用方省掉 `updated_at <` 条件；
+ * 非空但不是合法时间戳时直接抛错，不静默兜底成首页——那会让翻页悄悄从头再来。
+ *
+ * @param cursor - 上一页末条的 `updated_at` ISO 串，或空串。
+ * @returns 首页时为 undefined，否则为解析出的时间点。
+ */
 function parseCursor(cursor: string): Date | undefined {
   if (cursor === '') return undefined
   const timestamp = Date.parse(cursor)
@@ -320,10 +358,23 @@ function parseCursor(cursor: string): Date | undefined {
   return new Date(timestamp)
 }
 
+/**
+ * 构造会话不存在的领域错误；越权与真的不存在共用它，避免暴露会话归属。
+ *
+ * @returns `NOT_FOUND` 类型的 SessionStoreError。
+ */
 function sessionNotFound(): SessionStoreError {
   return new SessionStoreError(SESSION_STORE_ERROR_CODES.NOT_FOUND, 'session not found')
 }
 
+/**
+ * 给底层失败补上中文上下文再抛出，并保留 cause 链——
+ * 只取 message 重抛会让日志与观测断链，原始错误必须留在 cause 里。
+ *
+ * @param context - 中文上下文前缀，说明这次操作在做什么。
+ * @param cause - 被包装的原始错误，可能是任意抛出物。
+ * @returns 带上下文与 cause 的错误。
+ */
 function contextualError(context: string, cause: unknown): Error {
   return new Error(`${context}: ${cause instanceof Error ? cause.message : String(cause)}`, {
     cause,

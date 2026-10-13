@@ -30,6 +30,10 @@ import {
   type ChildStreamFactory,
 } from './child-execution-observer.js'
 
+/**
+ * 子运行的状态取值；与 Runtime 契约 `AgentChildRunResult['status']` 同域。
+ * switch 分支必须引用这里的成员而非字符串字面量，避免与父运行状态域混用同一字面量。
+ */
 const CHILD_RUN_STATUSES = Object.freeze({
   COMPLETED: 'completed',
   SUSPENDED: 'suspended',
@@ -37,22 +41,36 @@ const CHILD_RUN_STATUSES = Object.freeze({
   CANCELLED: 'cancelled',
   EXHAUSTED: 'exhausted',
 } as const)
+/** 子运行的状态联合；直接取自 Runtime 契约，本模块不另立同义状态。 */
 type ChildRunStatus = AgentChildRunResult['status']
 
 /** 子运行执行器的依赖；除 `executor`/`adapter`/`dispatcher` 外均可缺省，缺省即关闭对应能力。 */
 export interface RuntimeChildRunnerOptions {
+  /** 执行器；与主运行共用同一条执行链路，子运行只是换定义与身份。 */
   readonly executor: AgentExecutionPort
+  /** 新建子执行时的 ID 前缀；缺省用 `SAEX`，仅影响可读性。 */
   readonly executionPrefix?: string | undefined
+  /** ID 生成器；新建子执行且未带 executionId 时必须有，否则直接报错。 */
   readonly idGenerator?: IdGenerator | undefined
+  /** 模型适配器；作为子运行执行定义的一部分。 */
   readonly adapter: AgentModelAdapter
+  /** 可暴露给子 Agent 的工具 schema；缺省表示不给任何工具。 */
   readonly tools?: readonly AgentToolSchema[] | undefined
+  /** 工具分发器；执行子 Agent 的工具调用。 */
   readonly dispatcher: AgentToolDispatcher
+  /** 子 Agent 系统提示词；缺省为空串。 */
   readonly systemPrompt?: string | undefined
+  /** 模型参数；缺省为空对象。 */
   readonly modelParams?: AgentModelParams | undefined
+  /** 运行时配置；缺省为空对象。 */
   readonly runtimeConfig?: AgentRuntimeConfig | undefined
+  /** 增量消息落库回调；缺省表示不持久化中间消息。 */
   readonly onMessage?: ChildMessageSink | undefined
+  /** 子执行生命周期；缺省表示不做持久化加载与保存。 */
   readonly lifecycle?: ChildExecutionLifecycle | undefined
+  /** 展示收集器工厂；缺省表示不收集展示 section。 */
   readonly createSectionCollector?: (() => ChildSectionCollector) | undefined
+  /** 子运行事件出口工厂；缺省表示不向父流转发子执行进展。 */
   readonly stream?: ChildStreamFactory | undefined
 }
 
@@ -65,6 +83,7 @@ export interface RuntimeChildRunnerOptions {
  * （见 `childRunIdentity`），这样子执行的事实能独立成篇，又能被父运行关联到。
  */
 export class RuntimeChildRunner implements AgentChildRunner {
+  /** 构造时固定的依赖集合；运行器自身无状态，每次 runChild 独立组装。 */
   readonly #options: RuntimeChildRunnerOptions
 
   public constructor(options: RuntimeChildRunnerOptions) {
@@ -236,6 +255,12 @@ export class RuntimeChildRunner implements AgentChildRunner {
     return { status: CHILD_RUN_STATUSES.COMPLETED, executionId, output }
   }
 
+  /**
+   * 决定本次子执行的 id：请求带了就复用（续跑），否则用生成器新建。
+   *
+   * @param request - 父 Agent 的委派请求；非空 executionId 表示续跑，直接沿用。
+   * @returns 本次子执行的标识。
+   */
   private executionId(request: AgentChildRunRequest): string {
     if (request.executionId !== '') return request.executionId
     if (this.#options.idGenerator === undefined) {
@@ -246,7 +271,14 @@ export class RuntimeChildRunner implements AgentChildRunner {
   }
 }
 
-/** 子执行 ID 是子 Agent 自身 run ID，父请求 ID 只通过 parentRunId 保留。 */
+/**
+ * 子执行 ID 是子 Agent 自身 run ID，父请求 ID 只通过 parentRunId 保留。
+ * 这样父子两次运行各自成篇、可独立排障，父运行又能顺着 parentRunId 关联到子执行。
+ *
+ * @param identity - 子执行身份；其 executionId 直接作为 runId。
+ * @param traceId - 父运行透传的链路标识，用于把父子执行串在同一 trace 下。
+ * @returns Runtime 运行身份。
+ */
 function childRunIdentity(identity: ChildExecutionIdentity, traceId: string): AgentRunIdentity {
   return {
     runId: identity.executionId,
@@ -257,6 +289,14 @@ function childRunIdentity(identity: ChildExecutionIdentity, traceId: string): Ag
   }
 }
 
+/**
+ * 把父 Agent 的委派请求拼成子运行的首条 user 消息。
+ * 续跑只回一句「继续完成任务」（首轮指令已在历史里），新建才拼接上下文与期望格式，
+ * 避免续跑时把整段指令重复喂给模型。
+ *
+ * @param request - 父 Agent 的委派请求。
+ * @returns 子运行的首条用户消息文本。
+ */
 function buildDelegationUserMessage(request: AgentChildRunRequest): string {
   if (request.executionId !== '') {
     return request.instruction !== '' ? request.instruction : '请继续完成任务。'
@@ -267,6 +307,16 @@ function buildDelegationUserMessage(request: AgentChildRunRequest): string {
   return message
 }
 
+/**
+ * 组装失败/取消类的子运行结果，并把已有部分输出一并带上。
+ * `partialOutput` 只在确有正文时出现，让父 Agent 能拿到半成品，而不是只收到一个错误码。
+ *
+ * @param status - 失败结局（cancelled / failed / exhausted）。
+ * @param executionId - 子执行 id，父运行据此续跑或排障。
+ * @param reason - 面向父 Agent 的失败原因文案。
+ * @param outcome - Runtime 的执行结果，用于提取部分输出；未执行时为 undefined。
+ * @returns 子运行结果。
+ */
 function failedResult(
   status: ChildRunStatus,
   executionId: string,
@@ -276,6 +326,13 @@ function failedResult(
   return { status, executionId, error: reason, ...partialOutput(outcome) }
 }
 
+/**
+ * 提取执行结果里已有的助手正文作为 `partialOutput`；没有正文时返回空对象，
+ * 让这个可选字段在上层按「有则带、无则省」处理，不产生 value 为 undefined 的字段。
+ *
+ * @param outcome - Runtime 的执行结果；为 undefined 时视为无输出。
+ * @returns 含 `partialOutput` 的对象；无正文时为空对象。
+ */
 function partialOutput(outcome: AgentExecutionOutcome | undefined): {
   readonly partialOutput?: string | undefined
 } {
@@ -283,6 +340,13 @@ function partialOutput(outcome: AgentExecutionOutcome | undefined): {
   return output === '' ? {} : { partialOutput: output }
 }
 
+/**
+ * 把子运行状态翻译成面向父 Agent 的中文失败原因。
+ * 各终态给不同措辞，让父 Agent 与排障者能区分「被取消」「LLM 失败」「耗尽迭代」这些失败机理。
+ *
+ * @param status - 子运行的失败结局。
+ * @returns 对应的中文失败原因。
+ */
 function delegationFailureReason(status: ChildRunStatus): string {
   switch (status) {
     case CHILD_RUN_STATUSES.CANCELLED:
@@ -297,7 +361,13 @@ function delegationFailureReason(status: ChildRunStatus): string {
   }
 }
 
-/** 取最后一条有正文的 assistant 消息；末条可能是工具轮次（content 为 null）或工具结果。 */
+/**
+ * 取最后一条有正文的 assistant 消息；末条可能是工具轮次（content 为 null）或工具结果。
+ * 倒着找第一条有正文的助手消息，作为子运行的最终输出。
+ *
+ * @param messages - 子运行的完整消息历史。
+ * @returns 最后一条有正文的助手内容；找不到时返回空串。
+ */
 function lastAssistantContent(messages: readonly AgentMessage[]): string {
   for (const message of messages.toReversed()) {
     if (message.role === 'assistant' && message.content !== null && message.content !== '') {

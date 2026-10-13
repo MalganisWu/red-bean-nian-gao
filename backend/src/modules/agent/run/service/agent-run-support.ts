@@ -13,11 +13,17 @@ import type { CardEvent } from '../model/agent-run.js'
 
 /** 执行阶段必需的完整配置：把 `AgentBuildConfig` 的可选字段收窄为必填。 */
 export interface ExecutableAgentConfig extends AgentBuildConfig {
+  /** 执行时使用的模型适配器（已由 Loader 保证存在）。 */
   readonly llmAdapter: AgentModelAdapter
+  /** 工具分派器（已由 Loader 保证存在）。 */
   readonly toolDispatcher: AgentToolDispatcher
+  /** 可用工具 schema 列表；未配置时为空数组。 */
   readonly tools: readonly AgentToolSchema[]
+  /** 系统提示词；未配置时为空串。 */
   readonly systemPrompt: string
+  /** 模型参数（温度、上下文窗口等）；未配置时为空对象。 */
   readonly modelParams: AgentModelParams
+  /** Runtime 运行配置；未配置时为空对象。 */
   readonly runtimeConfig: AgentRuntimeConfig
 }
 
@@ -107,6 +113,16 @@ export function executionError(outcome: AgentExecutionOutcome): Error | undefine
   }
 }
 
+/**
+ * 判断外部输入是否为可索引的纯对象，排除 `null` 与数组。
+ *
+ * 工具参数与中断 `arguments` 都是 Runtime 传回的外部数据，`typeof x === 'object'` 对 `null`
+ * 和数组同样成立；不先窄化就直接取字段，会在 `null` 上抛错、在数组上读到意外值，
+ * 因此统一用这条守卫收窄后再按键索引。
+ *
+ * @param value - 待判定的外部输入
+ * @returns 是否为非 null、非数组的记录
+ */
 function isRecord(value: unknown): value is Readonly<Record<string, AgentJsonValue>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

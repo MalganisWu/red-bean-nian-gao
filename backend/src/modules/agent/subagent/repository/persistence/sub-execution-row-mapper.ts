@@ -5,14 +5,21 @@ import type { AgentMessage, AgentToolCall } from '../../../model/agent-message.j
 import { SUB_EXECUTION_STATUSES, type SubExecutionRecord } from '../../model/sub-execution.js'
 import { optionalField } from '../../../../../shared/object/optional-field.js'
 
+/** 数据库可空文本列的 schema；缺值统一落成 `null`，不用 undefined 表达「无值」。 */
 const nullableStringSchema = z.string().nullable()
+/** 数据库可空时间列的 schema，如 completed_at；子执行尚未完成时为 null。 */
 const nullableDateSchema = z.date().nullable()
+/** 恢复消息里单条工具调用的 schema；字段用 snake_case 与 OpenAI 兼容协议保持一致。 */
 const toolCallSchema = z.object({
   index: z.number().int().optional(),
   id: z.string(),
   type: z.string(),
   function: z.object({ name: z.string(), arguments: z.string() }),
 })
+/**
+ * 恢复缓冲消息的 schema；role / content 只做宽松字符串校验，
+ * 目的仅是保证结构能被领域层安全消费，不在这里收紧业务语义。
+ */
 const recoveryMessageSchema = z.object({
   role: z.string(),
   content: z.string().nullable(),
@@ -20,6 +27,10 @@ const recoveryMessageSchema = z.object({
   tool_call_id: z.string().optional(),
   name: z.string().optional(),
 })
+/**
+ * 子执行行 schema：数据库 unknown 行进入领域前的唯一结构校验点。
+ * 列名用 snake_case 与表结构一一对应，`status` 用枚举约束到已知子执行状态。
+ */
 const subExecutionRowSchema = z.object({
   execution_id: z.string(),
   session_id: z.string(),
@@ -132,6 +143,13 @@ export function mapSubExecutionRow(value: unknown): SubExecutionRecord {
   }
 }
 
+/**
+ * 把领域消息序列化为 OpenAI 兼容的 snake_case 行；缺省字段直接省略而不是写 null，
+ * 让读回的 `optionalField` 能区分「未提供」与「显式为 null」。
+ *
+ * @param message - 待序列化的领域消息。
+ * @returns 可写入 JSONB 列的载荷；toolCalls / toolCallId / name 缺失时不出现该键。
+ */
 function serializeRecoveryMessage(message: AgentMessage): unknown {
   return {
     role: message.role,
@@ -151,6 +169,12 @@ function serializeRecoveryMessage(message: AgentMessage): unknown {
   }
 }
 
+/**
+ * 把已通过 schema 校验的恢复消息行转回领域消息，命名从 snake_case 还原为 camelCase。
+ *
+ * @param message - 通过 `recoveryMessageSchema` 校验的行数据。
+ * @returns 领域消息；可选字段按「有则带、无则省」重建。
+ */
 function mapRecoveryMessage(message: z.infer<typeof recoveryMessageSchema>): AgentMessage {
   const toolCalls: readonly AgentToolCall[] | undefined = message.tool_calls?.map(
     (call): AgentToolCall => ({

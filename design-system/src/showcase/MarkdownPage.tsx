@@ -3,6 +3,13 @@ import { MarkdownRenderer } from '@/components/MarkdownRenderer'
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
+/**
+ * 主样例：一段典型的最终回答，混合普通段落、二三级标题、无序列表、表格、
+ * 引用块、带语言标签的代码围栏与外部链接。
+ *
+ * 它对应 `MarkdownAnswer`（整篇回答裸排、无外框），用来验证「只有代码围栏
+ * 才形成独立容器」这条排版约定；正文颜色由语义令牌决定，Light / Dark 共用。
+ */
 const SAMPLE = `同步策略已经更新，普通正文直接进入阅读流，不额外套整篇容器。
 
 ## 本次变更
@@ -29,6 +36,12 @@ retry:
 
 详情见 [同步策略说明](https://example.com)。`
 
+/**
+ * 边界样例：任务列表、删除线，以及一段不含空格的长连续标识符。
+ *
+ * 它对应 `MarkdownRenderer`（嵌进 Process / Delegation 的内容），专门压测
+ * 长串字符是否在内容区内换行而不是撑出横向滚动。
+ */
 const EDGE_SAMPLE = `## 边界内容
 
 - [x] 已完成构建

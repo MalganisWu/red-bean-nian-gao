@@ -43,10 +43,12 @@ const CHINESE_CHARACTER = /[㐀-鿿]/u;
  *
  * `record` 的字段见 `architecture-syntax.mjs#collectDocumentables`：
  * `{ symbolPath, kind, exported, jsdocText, params, hasDestructuredParam, returnTypeText }`。
- * 返回 `[{ rule, param? }]`，**不含文件名** —— 文件名由入口脚本补齐后进基线。
+ * 返回 `[{ rule, param? }]`，**不含文件名** —— 文件名由入口脚本在报告时补齐。
  */
 export function documentableViolations(record) {
-  if (record.exported !== true) return [];
+  // 不对 `record.exported` 过滤：判据是**可见范围是否跨过函数体边界**，与是否导出无关
+  // （见共享规范「注释 · 谁必须有注释」）。语法层仍产出 `exported` 作为事实字段，此处不用。
+  //
   // 构造函数整体豁免：它既不是方法也不是访问器或属性，而它的契约（依赖清单）在
   // 组装入口比在类里更可读。参考实现同样豁免构造器。语法层仍然产出 ctor 记录，
   // 保留未来收紧的余地 —— 豁免是策略，属于本文件；产出事实是语法层的职责。
@@ -135,15 +137,25 @@ function isSetter(record) {
   return record.kind === "accessor" && record.symbolPath.endsWith("#set");
 }
 
-/** `void` / `never` 及其 `Promise<>` 包装视为无返回值。 */
+/**
+ * `void` / `never` / `undefined` 及其 `Promise<>` 包装视为无返回值。
+ *
+ * 按 `|` 拆开逐个判定，这样 `Promise<void> | void` 这类联合也算 void —— 只精确匹配四个
+ * 字符串会把它们判成「有返回值」，逼作者给一个语义为空的函数补 `@returns`，那正是
+ * 门禁自己制造低信息量 tag 的方式。
+ */
 function isVoidLike(returnTypeText) {
-  const text = returnTypeText.replace(/\s+/gu, "");
-  return (
-    text === "void" ||
-    text === "never" ||
-    text === "Promise<void>" ||
-    text === "Promise<never>"
-  );
+  return returnTypeText.replace(/\s+/gu, "").split("|").every(isVoidAtom);
+}
+
+function isVoidAtom(atom) {
+  // `asserts x is T` 是断言签名：它没有返回值（不是 `x is T` 那种返回 boolean 的类型谓词）。
+  if (atom.startsWith("asserts ")) return true;
+  const inner =
+    atom.startsWith("Promise<") && atom.endsWith(">")
+      ? atom.slice(8, -1)
+      : atom;
+  return inner === "void" || inner === "never" || inner === "undefined";
 }
 
 /**

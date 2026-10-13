@@ -19,8 +19,20 @@ import type {
 import { SpecPageHeader } from './SpecPageHeader'
 import './conversation-showcase.css'
 
+/**
+ * 本页当前展示的视图：列表、详情页签（概览 / 历史）或单次执行记录。
+ *
+ * 它只是展示站的视图开关，不是组件的公开状态机。
+ */
 type DemoView = 'list' | ScheduledTaskDetailTab | 'execution'
 
+/**
+ * 任务列表夹具：六条任务各自代表一种状态组合。
+ *
+ * 依次覆盖「最近执行失败且未读」「成功」「周期成功」「暂停」四种已定型状态，
+ * 加一条「正在执行」和一条「已结束」，让列表页在同一屏里能同时看到
+ * 生命周期（active / paused / ended）与最近执行结果（failed / running / completed）两套状态。
+ */
 const TASKS: ScheduledTaskListItemData[] = [
   {
     id: 'order-sync',
@@ -106,6 +118,12 @@ const TASKS: ScheduledTaskListItemData[] = [
   },
 ]
 
+/**
+ * 各筛选器下的任务条数，供列表的筛选标签显示角标。
+ *
+ * 直接从 `TASKS` 派生而非硬编码，保证筛选结果与角标始终一致；
+ * `attention` 是派生态（最近一次执行失败），不是任务的独立生命周期。
+ */
 const TASK_COUNTS: Record<ScheduledTaskFilter, number> = {
   all: TASKS.length,
   active: TASKS.filter((task) => task.lifecycle === 'active').length,
@@ -114,6 +132,12 @@ const TASK_COUNTS: Record<ScheduledTaskFilter, number> = {
   ended: TASKS.filter((task) => task.lifecycle === 'ended').length,
 }
 
+/**
+ * 执行记录夹具：四条历史，覆盖成功、失败与未读，并按「今天 / 更早」分组。
+ *
+ * 前两条带 `groupLabel: '今天'`、后两条为「更早」，用来演示历史视图的日期分组；
+ * 其中「今天 02:00」那条为失败，与列表里需要关注的订单同步任务对应。
+ */
 const HISTORY: ScheduledTaskRunSummary[] = [
   {
     id: 'run-success',
@@ -154,14 +178,33 @@ const HISTORY: ScheduledTaskRunSummary[] = [
   },
 ]
 
+/**
+ * 取一个必定存在的示例值，否则抛出带标签的错误。
+ *
+ * 索引访问在类型上可能为 `undefined`；示例数据写死时它实际不会缺，
+ * 用它把「缺了就是夹具坏了」这件事变成即时失败，而不是渲染出空白页面。
+ *
+ * @param value - 待取用的示例值；为 `undefined` 时抛错。
+ * @param label - 出错信息里的人类可读标签，指明缺的是哪一项。
+ * @returns 已确定为非空的同一个值。
+ */
 function requiredExample<TValue>(value: TValue | undefined, label: string): TValue {
   if (value === undefined) throw new Error(`定时任务示例缺少${label}`)
   return value
 }
 
+/** 详情视图的初始任务：取「每日数据质量摘要」，避免首屏就落在失败态上。 */
 const DEFAULT_TASK = requiredExample(TASKS[1], '默认任务')
+
+/** 执行记录视图的兜底记录：取历史里第一条成功记录，供找不到对应 run 时回退。 */
 const DEFAULT_RUN = requiredExample(HISTORY[0], '默认执行记录')
 
+/**
+ * 单次执行的过程步骤夹具：叙述与工具交替，四步全部完成。
+ *
+ * 执行视图在失败时会临时把最后一步的工具状态改成 failed，因此这里的
+ * 末项固定是那个可失败的 `compare_baseline`，成功与失败两条分支共用同一份步骤。
+ */
 const PROCESS_STEPS: ProcessStep[] = [
   {
     kind: 'narration',
@@ -195,6 +238,11 @@ const PROCESS_STEPS: ProcessStep[] = [
   },
 ]
 
+/**
+ * 执行成功的结论 Markdown：数据质量摘要，含加粗、三级标题与列表。
+ *
+ * 与 `FAILURE_ANSWER` 成对，由执行视图按该次执行的状态二选一渲染。
+ */
 const SUCCESS_ANSWER = `## 今日数据质量整体稳定
 
 过去 24 小时共检查 **126,840** 条记录，完整率与及时性均处于正常区间。
@@ -207,13 +255,26 @@ const SUCCESS_ANSWER = `## 今日数据质量整体稳定
 
 目前不需要暂停下游任务；如果明日重复率仍高于 2%，再升级为告警。`
 
+/**
+ * 执行失败的结论 Markdown：说明重试后仍未取到数据，并给出下一步建议。
+ *
+ * 与 `SUCCESS_ANSWER` 成对，只在对应的执行记录为失败时渲染。
+ */
 const FAILURE_ANSWER = `## 本次执行失败
 
 订单同步源连续超时。系统已完成 2 次重试，但仍未取得可用数据，因此没有生成质量摘要。
 
 建议先检查订单同步服务和网络状态，恢复后手动重新执行。`
 
-function TaskActions({ active, title }: { active: boolean; title: string }) {
+/**
+ * 任务行的「更多操作」菜单：按生命周期切换暂停 / 启用，并始终提供删除。
+ *
+ * 删除项用失败红；两项都只是展示用的占位交互，不触发真实请求。
+ *
+ * @param props - 组件属性；`active` 决定显示暂停还是启用，`title` 用于拼装无障碍标签。
+ */
+function TaskActions(props: { active: boolean; title: string }) {
+  const { active, title } = props
   return (
     <Menu>
       <Menu.Trigger

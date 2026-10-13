@@ -15,6 +15,7 @@ import type { UploadObjectCommand } from '../service/application/storage-service
 import type { StorageController } from './storage.controller.js'
 import { parseObjectPath, parsePresignRequest } from './storage-request-parser.js'
 
+/** 单次上传的字节上限，20 MiB；同时交给 multipart 解析器与解析后的二次校验使用。 */
 const MAX_UPLOAD_BYTES = 20 << 20
 
 /**
@@ -70,7 +71,13 @@ export function registerStorageRoutes(
   })
 }
 
-/** POST /api/storage/upload：解析 multipart 文件并写入对象存储。 */
+/**
+ * POST /api/storage/upload：解析 multipart 文件并写入对象存储。
+ *
+ * @param controller - 已组装的用例控制器，上传业务由它执行
+ * @param request - Fastify 请求对象，文件从 multipart 体中读取并在此校验大小
+ * @param reply - Fastify 响应对象，成功信封由 `sendOk` 写出
+ */
 async function uploadObject(
   controller: StorageController,
   request: FastifyRequest,
@@ -88,7 +95,16 @@ async function uploadObject(
   )
 }
 
-/** GET /api/storage/download/*：取回对象并把字节流投影为 HTTP 响应。 */
+/**
+ * GET /api/storage/download/*：取回对象并把字节流投影为 HTTP 响应。
+ *
+ * 这里不套成功信封，直接把对象字节流写进响应；流的所有权在 `reply.send` 之后交给 Fastify，
+ * 因此不在此关闭，断连由取消信号传导到底层销毁。
+ *
+ * @param controller - 已组装的用例控制器，返回未消费的下载流与元信息
+ * @param request - Fastify 请求对象，对象 key 从通配路径参数解析
+ * @param reply - Fastify 响应对象，内容类型、长度与 etag 由元信息回填后直接发送字节流
+ */
 async function downloadObject(
   controller: StorageController,
   request: FastifyRequest,
@@ -105,7 +121,13 @@ async function downloadObject(
   await reply.status(200).send(download.body)
 }
 
-/** DELETE /api/storage/objects/*：删除当前用户拥有的对象。 */
+/**
+ * DELETE /api/storage/objects/*：删除当前用户拥有的对象。
+ *
+ * @param controller - 已组装的用例控制器，删除业务由它执行
+ * @param request - Fastify 请求对象，对象 key 从通配路径参数解析
+ * @param reply - Fastify 响应对象，成功信封由 `sendOk` 写出
+ */
 async function deleteObject(
   controller: StorageController,
   request: FastifyRequest,
@@ -123,7 +145,13 @@ async function deleteObject(
   )
 }
 
-/** POST /api/storage/presign/get：签发下载预签名 URL。 */
+/**
+ * POST /api/storage/presign/get：签发下载预签名 URL。
+ *
+ * @param controller - 已组装的用例控制器，签名由它委托应用层完成
+ * @param request - Fastify 请求对象，有效期等参数从 `request.body` 解析
+ * @param reply - Fastify 响应对象，成功信封由 `sendOk` 写出
+ */
 async function presignObjectGet(
   controller: StorageController,
   request: FastifyRequest,
@@ -143,7 +171,13 @@ async function presignObjectGet(
   )
 }
 
-/** POST /api/storage/presign/put：签发上传预签名 URL。 */
+/**
+ * POST /api/storage/presign/put：签发上传预签名 URL。
+ *
+ * @param controller - 已组装的用例控制器，签名由它委托应用层完成
+ * @param request - Fastify 请求对象，有效期等参数从 `request.body` 解析
+ * @param reply - Fastify 响应对象，成功信封由 `sendOk` 写出
+ */
 async function presignObjectPut(
   controller: StorageController,
   request: FastifyRequest,
@@ -163,7 +197,16 @@ async function presignObjectPut(
   )
 }
 
-/** 读取并校验 multipart 上传文件；对象归属与 size 限制属于传输层约束。 */
+/**
+ * 读取并校验 multipart 上传文件；对象归属与 size 限制属于传输层约束。
+ *
+ * 三重判据都会落到同一条 400：`request.file` 因超限直接抛出、读取过程中抛错、
+ * 以及读取完成但 `truncated`（或长度超限）——任一都说明文件不完整，不能交给应用层。
+ * 内容类型缺失时回退到 `application/octet-stream`，保证下游始终拿得到合法值。
+ *
+ * @param request - Fastify 请求对象，multipart 体在此解析并受 `MAX_UPLOAD_BYTES` 限制
+ * @returns 上传命令中除归属用户外的部分：文件名、字节内容与内容类型
+ */
 async function parseUploadFile(
   request: FastifyRequest
 ): Promise<Omit<UploadObjectCommand, 'userId'>> {

@@ -6,5 +6,11 @@
  * Agent 调用方只负责在进入新回合前请求排空，不得直接操作队列存储。
  */
 export interface TaskResultDeliveryPort {
+  /**
+   * 在进入新回合前排空该会话的待投递结果；确认、重试与去重语义由 Task 侧实现。
+   *
+   * @param sessionId - 要排空的会话标识。
+   * @param signal - 中止信号，透传给排空过程。
+   */
   drain(sessionId: string, signal: AbortSignal): Promise<void>
 }

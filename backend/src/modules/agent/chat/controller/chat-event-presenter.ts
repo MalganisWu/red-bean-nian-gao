@@ -74,6 +74,12 @@ export function serializeSseEvent(event: ProductStreamEvent): string {
   return `event: ${localized.type}\ndata: ${JSON.stringify(eventPayload(localized))}\n\n`
 }
 
+/**
+ * 按事件类型把产品事件投影为 SSE 帧的 `data` 负载。
+ * 键名保持下划线序列化，是给前端消费的线上格式；`agent_event` 信封的内层事件递归投影。
+ * @param event 待投影的产品事件
+ * @returns 可直接 JSON 序列化的负载对象，键名遵循线上约定
+ */
 function eventPayload(event: ProductStreamEvent): AgentJsonObject {
   switch (event.type) {
     case STREAM_EVENT_TYPES.START:
@@ -124,6 +130,14 @@ function eventPayload(event: ProductStreamEvent): AgentJsonObject {
   }
 }
 
+/**
+ * 把运行时状态事件换算为面向用户的本地化文案。
+ *
+ * 重试次数在这里减 1：runtime 的 attempt/maxAttempts 把首次尝试也算在内，
+ * 而用户看到的「第 N 次重试」不含首次；两侧都取 max(…, 1) 兜底，避免出现「第 0 次」。
+ * @param event 状态事件；`code` 决定文案，缺省 code 回落到「处理中...」
+ * @returns 带 `content` 的本地化状态事件；attempt/maxAttempts 缺省时不写入
+ */
 function localizedStatus(event: AgentStatusEvent | LocalizedStatusEvent): LocalizedStatusEvent {
   const attempt = event.attempt ?? 0
   const maxAttempts = event.maxAttempts ?? 0
@@ -155,6 +169,11 @@ function localizedStatus(event: AgentStatusEvent | LocalizedStatusEvent): Locali
   }
 }
 
+/**
+ * 把非 status 的运行时事件投影为 `data` 负载，同样采用下划线键名。
+ * @param event 已排除 status 的运行时事件
+ * @returns 可直接 JSON 序列化的负载对象
+ */
 function serializeAgentRuntimeEvent(
   event: Exclude<AgentRuntimeEvent, AgentStatusEvent>
 ): AgentJsonObject {

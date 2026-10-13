@@ -29,22 +29,40 @@ import {
 
 /** resume 租期与心跳；心跳取租期的 1/3，连续两次续租失败后仍有 1/3 租期可用。 */
 const RESUME_LEASE_MILLISECONDS = 30 * 60 * 1_000
+/**
+ * resume 心跳间隔（10 分钟），取 resume 租期的三分之一：
+ * 连续两次续租失败后仍留有三分之一租期可用，避免单次抖动就丢租。
+ * 可经 `SubExecutionLifecycleOptions.resumeHeartbeatMilliseconds` 覆盖。
+ */
 const RESUME_HEARTBEAT_MILLISECONDS = 10 * 60 * 1_000
 
 /** 把子执行的展示数据交给父运行的回调；父运行据此把子结果折进自己的展示流。 */
 export interface SubExecutionDisplayPublisher {
+  /**
+   * 发布一次子执行的展示载荷，交由父运行折进自己的展示流。
+   *
+   * @param data - 落库用的子执行展示载荷。
+   */
   publish(data: AgentJsonObject): void
 }
 
 /** 生命周期选项；`now` 与租期/心跳均可注入，测试因此不必真等满 30 分钟。 */
 export interface SubExecutionLifecycleOptions {
+  /** 子 Agent 定义标识；写入新建记录。 */
   readonly agentId: string
+  /** 子 Agent 展示名；写入记录并用于渲染分区标题。 */
   readonly agentName: string
+  /** 实际使用的模型名；空串或缺省表示不写该字段。 */
   readonly modelName?: string | undefined
+  /** 子 Agent 系统提示词；空串或缺省表示不写该字段。 */
   readonly systemPrompt?: string | undefined
+  /** 取当前时间的函数；缺省用真实时钟，测试可注入固定值以免真等满租期。 */
   readonly now?: (() => Date) | undefined
+  /** resume 租期毫秒数；缺省用 `RESUME_LEASE_MILLISECONDS`。 */
   readonly resumeLeaseMilliseconds?: number | undefined
+  /** resume 心跳间隔毫秒数；必须小于租期，缺省用 `RESUME_HEARTBEAT_MILLISECONDS`。 */
   readonly resumeHeartbeatMilliseconds?: number | undefined
+  /** 展示发布回调；缺省表示不向父运行发布子执行展示。 */
   readonly displayPublisher?: SubExecutionDisplayPublisher | undefined
 }
 
@@ -53,8 +71,11 @@ export interface SubExecutionLifecycleOptions {
  * 它只编排恢复、终态映射和持久化；SQL 与 row 转换由 Repository Adapter 独占。
  */
 export class SubExecutionLifecycle implements ChildExecutionLifecycle {
+  /** 子执行仓储；负责 CAS 认领、续租与终态写入。 */
   readonly #repository: SubExecutionRepository
+  /** 组装时固定的选项；含 Agent 元信息与可注入的租期/时钟。 */
   readonly #options: SubExecutionLifecycleOptions
+  /** 取当前时间的函数；已按选项兜底为真实时钟。 */
   readonly #now: () => Date
 
   public constructor(repository: SubExecutionRepository, options: SubExecutionLifecycleOptions) {
@@ -216,6 +237,13 @@ export class SubExecutionLifecycle implements ChildExecutionLifecycle {
     }
   }
 
+  /**
+   * 构造一条全新的 pending 子执行记录；只填最小必需字段，终态由后续 update 补齐。
+   *
+   * @param identity - 子执行身份，提供 id、归属与首条用户消息。
+   * @param now - 创建时刻，同时写入 createdAt / updatedAt / completedAt。
+   * @returns 可落库的新记录快照。
+   */
   #newRecord(identity: ChildExecutionIdentity, now: Date): SubExecutionRecord {
     const record: SubExecutionRecord = {
       executionId: identity.executionId,
@@ -246,6 +274,15 @@ export class SubExecutionLifecycle implements ChildExecutionLifecycle {
       : { ...record, parentCallId: identity.parentCallId }
   }
 
+  /**
+   * 组装并发布子执行的展示载荷；缺父调用标识、缺 section 或 section 非法时返回 undefined。
+   *
+   * @param identity - 子执行身份；parentCallId 为空串时不发布展示。
+   * @param sections - 累积的展示 section；undefined 或非 JSON 值时视为不可用。
+   * @param status - 映射后的产品状态，写入展示载荷。
+   * @param resultSummary - 结果摘要；空串表示不写该字段。
+   * @returns 落库用的展示载荷；不可用时为 undefined。
+   */
   #display(
     identity: ChildExecutionIdentity,
     sections: AgentJsonValue | undefined,

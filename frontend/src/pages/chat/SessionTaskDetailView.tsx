@@ -1,11 +1,17 @@
 import { TaskDetailPanel } from '@/components/task/TaskDetailPanel'
 import type { ScheduledTaskDetailTab } from '@/components/retroui/scheduledTaskTypes'
 
+/** 会话内任务详情视图属性：任务与页签状态，以及返回、切页签、查看执行三项回调。 */
 interface SessionTaskDetailViewProps {
+  /** 要展示的任务 id。 */
   taskId: string
+  /** 当前选中的页签（详情 / 执行历史）。 */
   activeTab: ScheduledTaskDetailTab
+  /** 点击返回时触发。 */
   onBack: () => void
+  /** 切换页签时触发，由调用方更新并透传 activeTab。 */
   onTabChange: (tab: ScheduledTaskDetailTab) => void
+  /** 查看某次执行详情时触发，携带执行 id。 */
   onViewExecution: (executionId: string) => void
 }
 

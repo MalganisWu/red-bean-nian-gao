@@ -11,20 +11,30 @@ import type { QuestionCardAnswer } from '@/components/retroui/QuestionCard'
 import type { ErrorEvent } from '@/types/events'
 import { findCardMergeTarget, mergeContinuation } from '@/lib/card-merge'
 
+/** 消息区组件的属性契约：消息与流式态之外，还承载错误横幅回调与卡片提交回调。 */
 interface ChatMessagesProps {
+  /** 已定稿的消息列表（按时间序渲染）。 */
   messages: DisplayMessage[]
+  /** 是否仍处于流式接收中。 */
   isStreaming: boolean
+  /** 本轮流式开始时刻（毫秒）；0 表示无进行中的流。 */
   streamingStartedAt: number
   /** 前端发起本轮请求的时刻（流式总耗时锚点，含连接/鉴权等待） */
   sentAt: number
+  /** 最近一次流式错误；非空时渲染可关闭的错误横幅。 */
   error: ErrorEvent | null
+  /** 关闭错误横幅时回调。 */
   onDismissError: () => void
   /** 失败重试（重发上一请求）；不传则错误横幅只提供关闭 */
   onRetry?: (() => void) | undefined
+  /** 流式在途分段（思考、工具、卡片等），追加在消息列表末尾。 */
   pendingSections?: MessageSection[] | undefined
+  /** pending 卡片确认回调；用户提交答案时触发。 */
   onCardConfirm?:
     ((interactionId: string, answers: Record<string, QuestionCardAnswer>) => void) | undefined
+  /** pending 卡片拒绝回调；用户拒绝作答时触发。 */
   onCardRefuse?: ((interactionId: string) => void) | undefined
+  /** 当前卡片的提交态；非空时卡片按 submitting/error 等状态渲染。 */
   cardSubmission?: CardSubmissionState | null | undefined
 }
 
@@ -238,19 +248,32 @@ export function ChatMessages(props: ChatMessagesProps) {
 
 /** 排期锚点：任务 id / 执行 id / 计划时间。 */
 interface ScheduledExecution {
+  /** 任务 id。 */
   taskID: string
+  /** 该次排期的执行 id。 */
   executionID: string
+  /** 计划执行时间（epoch 毫秒）；用于按任务取最近一次。 */
   scheduledAt: number
 }
 
-/** 单条消息携带的排期锚点（无 scheduled_task 元信息则为空）。 */
+/**
+ * 单条消息携带的排期锚点（无 scheduled_task 元信息则为空）。
+ *
+ * @param message - 待解析的历史消息，读取其 meta.scheduled_task。
+ * @returns 该消息的排期锚点列表；无排期元信息时返回空数组。
+ */
 function scheduledExecutionsOf(message: DisplayMessage): ScheduledExecution[] {
   const meta = message.meta?.scheduled_task
   if (!meta) return []
   return [{ taskID: meta.task_id, executionID: meta.execution_id, scheduledAt: meta.scheduled_at }]
 }
 
-/** 每个任务最近一次排期执行（按 scheduledAt 取最大）。 */
+/**
+ * 每个任务最近一次排期执行（按 scheduledAt 取最大）。
+ *
+ * @param executions - 全部排期锚点，来自历史与流式消息的汇总。
+ * @returns 以 taskID 为键、该任务最近一次排期执行为值的映射。
+ */
 function latestExecutionsByTask(executions: ScheduledExecution[]): Map<string, ScheduledExecution> {
   const latest = new Map<string, ScheduledExecution>()
   for (const execution of executions) {
@@ -262,11 +285,23 @@ function latestExecutionsByTask(executions: ScheduledExecution[]): Map<string, S
   return latest
 }
 
+/**
+ * 摘要卡内容截断：按字符数粗略截断，仅用于悬停预览，不做语义边界对齐（超出部分以省略号提示）。
+ *
+ * @param s - 原始文本。
+ * @param n - 保留的最大字符数。
+ * @returns 未超长时返回原文；超长时返回前 n 个字符并追加省略号。
+ */
 // 摘要卡内容截断（粗略定位，多余省略）
 const cut = (s: string, n: number) => (s.length > n ? s.slice(0, n) + '…' : s)
 
-/** 悬停摘要卡：用户原话 60 字 + 最终回答 110 字 + 回合元信息。 */
-function RoundNavPreview({ item, ordinal }: { item: RoundNavItem; ordinal: number }) {
+/**
+ * 悬停摘要卡：用户原话 60 字 + 最终回答 110 字 + 回合元信息。
+ *
+ * @param props - 组件属性：当前轮次的导航项，以及它在时间线上的序号（用于展示「第 N 轮」）。
+ */
+function RoundNavPreview(props: { item: RoundNavItem; ordinal: number }) {
+  const { item, ordinal } = props
   const meta = [
     item.totalDuration,
     item.toolCount ? `${item.toolCount} 次工具调用` : null,

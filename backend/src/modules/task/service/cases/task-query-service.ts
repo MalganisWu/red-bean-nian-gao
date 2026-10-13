@@ -18,13 +18,17 @@ import {
 
 /** 查询用例依赖：任务详情、任务列表与已读/折叠偏好三个仓储。 */
 export interface TaskQueryServiceDependencies {
+  /** 任务详情与执行记录仓储；详情、执行历史路径走它。 */
   readonly taskRepository: TaskQueryRepository
+  /** 任务列表读模型；列表与会话任务路径走它，避免逐条回查。 */
   readonly taskListRepository: TaskListRepository
+  /** 已读/折叠偏好仓储；仅用于批量读取视图状态。 */
   readonly viewStateRepository: ExecutionViewStateRepository
 }
 
 /** Task 查询用例默认实现：集中处理资源所有权与 Repository 失败语义。 */
 export class TaskQueryService {
+  /** 查询用例依赖；由构造器注入，服务本身不创建仓储。 */
   readonly #dependencies: TaskQueryServiceDependencies
 
   public constructor(dependencies: TaskQueryServiceDependencies) {
@@ -191,6 +195,13 @@ export class TaskQueryService {
     }
   }
 
+  /**
+   * 按 ID 读取任务并把「不存在」翻译为 NOT_FOUND 应用错误，其余仓储异常收敛为基础设施失败。
+   *
+   * @param taskId - 目标任务标识。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 任务定义；不存在时抛 NOT_FOUND。
+   */
   private async findTask(taskId: string, signal: AbortSignal): Promise<AgentTaskDefinition> {
     try {
       return await this.#dependencies.taskRepository.getTask(taskId, signal)

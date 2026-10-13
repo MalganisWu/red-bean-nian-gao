@@ -6,11 +6,16 @@ import { validateAndFix } from '../../../session/service/ask-card.js'
 import { SUB_EXECUTION_STATUSES, type SubExecutionRecord } from '../../model/sub-execution.js'
 import type { SubExecutionRepository } from '../../repository/port/sub-execution-repository.port.js'
 
+/**
+ * 提问工具名；恢复时据此识别滞留子执行里悬挂的提问调用，必须与 `AskUserTool.name` 保持一致。
+ */
 const ASK_USER_TOOL_NAME = 'sys_ask_user'
 
 /** 在主 Agent 运行前收束滞留的 pending 子执行；单项失败不会阻断其余恢复。 */
 export class SubExecutionRecovery implements AgentRunPreparation {
+  /** 子执行仓储；认领 pending 记录并以 CAS 写回收束结果。 */
   readonly #repository: SubExecutionRepository
+  /** 运行时状态追加器；把补齐后的消息并入子执行的 runtimeState。 */
   readonly #runtimeState: RuntimeStateAppender
 
   public constructor(repository: SubExecutionRepository, runtimeState: RuntimeStateAppender) {
@@ -39,6 +44,13 @@ export class SubExecutionRecovery implements AgentRunPreparation {
     }
   }
 
+  /**
+   * 收束单条滞留子执行：先原子认领，再把恢复缓冲补齐成中断 / 等待用户态并写回。
+   * 认领会递增 revision，从而让仍在别处运行的旧 owner 追加恢复日志失败。
+   *
+   * @param record - 待收束的 pending 记录快照，其 revision 作为认领基准。
+   * @param signal - 中止信号，透传到仓储读写。
+   */
   async #recoverOne(record: SubExecutionRecord, signal: AbortSignal): Promise<void> {
     const claimed = await this.#repository.claimPending(record.executionId, record.revision, signal)
     const buffered = claimed.recoveryMessages
@@ -57,6 +69,14 @@ export class SubExecutionRecovery implements AgentRunPreparation {
   }
 }
 
+/**
+ * 找子执行残留消息里悬挂的提问调用：有 tool call 无对应 tool result 的调用即悬挂。
+ * 从后往前取第一个未闭合的调用，供恢复时按卡片语义校验与修补。
+ *
+ * @param messages - 子执行残留在恢复缓冲里的消息。
+ * @param toolName - 目标工具名，通常是提问工具。
+ * @returns 悬挂调用的 call id；没有悬挂调用时返回空串。
+ */
 function danglingInterruptCallId(messages: readonly AgentMessage[], toolName: string): string {
   const completed = new Set(
     messages

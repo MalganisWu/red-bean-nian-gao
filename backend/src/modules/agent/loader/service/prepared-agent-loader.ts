@@ -10,7 +10,9 @@ import type {
  * 数据库 Loader 只读取定义；恢复策略由 `agent.module.ts` 显式选择并注入。
  */
 export class PreparedAgentLoader implements AgentLoader {
+  /** 被装饰的源 Loader；只读取定义本身，不附加宿主步骤。 */
   readonly #source: AgentLoader
+  /** 宿主运行准备步骤；加载时挂到配置上，交给 Runtime 执行。 */
   readonly #preparation: AgentRunPreparation
 
   public constructor(source: AgentLoader, preparation: AgentRunPreparation) {

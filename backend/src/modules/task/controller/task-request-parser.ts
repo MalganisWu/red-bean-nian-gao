@@ -102,6 +102,13 @@ export function parseTaskPagination(value: unknown): {
   return { cursor, limit }
 }
 
+/**
+ * 判定未知值是否为非数组的普通对象：作为查询参数访问前的窄化闸门，数组与 null 都按「不是对象」
+ * 处理，避免把数组当映射取值。
+ *
+ * @param value - 待判定的未知值，可能来自 query 解包。
+ * @returns 为真时 value 可安全按 Record 索引。
+ */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

@@ -12,6 +12,7 @@ import { requirePositiveLimit, TASK_LIST_SELECT } from './../task-sql.js'
 
 /** PostgreSQL 任务列表只读模型；这里是 Task 与 Session 标题 JOIN 的唯一位置。 */
 export class PostgresTaskListReadModel implements TaskListRepository {
+  /** 支持事务的 SQL 执行器；本模型只读，不开启事务。 */
   readonly #database: TransactionalSqlExecutor
 
   public constructor(database: TransactionalSqlExecutor) {

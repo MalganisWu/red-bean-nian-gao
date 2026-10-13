@@ -1,7 +1,10 @@
 /** HTTP method 与路径模板共同构成稳定的公开路由标识。 */
 export interface ApiRouteDefinition {
+  /** HTTP 方法；与 `path` 共同构成路由的稳定标识。 */
   readonly method: 'DELETE' | 'GET' | 'POST' | 'PUT'
+  /** 路径模板，Fastify 原生语法（`:param` 占位、`*` 通配），不出现 `{xxx}`。 */
   readonly path: string
+  /** 是否需要认证；`bindRoute` 据此断言认证钩子必须存在（或必须缺失），不一致即启动期失败。 */
   readonly authenticated: boolean
 }
 

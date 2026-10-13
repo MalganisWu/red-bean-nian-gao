@@ -12,6 +12,7 @@ import type {
   TaskListItem,
 } from '@/types/task'
 
+/** cron 星期字段（0-7）到中文单字的映射；0 与 7 都指周日，故重复列出。 */
 const WEEKDAY_LABELS: Record<string, string> = {
   '0': '日',
   '1': '一',
@@ -23,10 +24,22 @@ const WEEKDAY_LABELS: Record<string, string> = {
   '7': '日',
 }
 
+/**
+ * 把时间字段补零到两位，供 `HH:mm` 文案拼接。
+ *
+ * @param value - cron 中解析出的时或分数字字符串。
+ * @returns 左侧补 `0` 到两位的字符串；已是两位时原样返回。
+ */
 function padTimePart(value: string): string {
   return value.padStart(2, '0')
 }
 
+/**
+ * 把结果或错误文本压成单行纯文本摘要，供列表一行展示。
+ *
+ * @param value - 原始 Markdown 文本；空值直接判为无摘要。
+ * @returns 去除代码块、图片、链接与 Markdown 标记并截断到 72 字以内的摘要；清洗后为空则返回 `undefined`。
+ */
 function plainSummary(value: string | null | undefined): string | undefined {
   if (!value) return undefined
   const plain = value
@@ -42,6 +55,12 @@ function plainSummary(value: string | null | undefined): string | undefined {
   return plain.length > 72 ? `${plain.slice(0, 71)}…` : plain
 }
 
+/**
+ * 把可空时间字符串解析为 `Date`；缺值、占位值与非法值统一判为不可用。
+ *
+ * @param value - ISO 时间字符串；`null`/`undefined` 或占位时间视为不可用。
+ * @returns 可用的 `Date`；无法解析时返回 `undefined`，由调用方决定是否隐藏。
+ */
 function validDate(value: string | null | undefined): Date | undefined {
   if (!value || isAbsentTime(value)) return undefined
   const date = new Date(value)

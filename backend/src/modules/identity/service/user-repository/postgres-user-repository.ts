@@ -4,6 +4,12 @@ import type { SqlExecutor } from '../../../../infra/database/postgres.js'
 import type { User, UserPage } from '../../model/user.js'
 import { UserRepositoryConflictError, type UserRepository } from './port/user-repository.port.js'
 
+/**
+ * `users` 表单行的形状校验：库列名保持蛇形，与领域实体的驼峰在 `toUser` 处翻译。
+ *
+ * `avatar` 显式允许 `null`（库中未设置为 NULL，实体里是 `undefined`）；时间列声明为 `date`，
+ * 因为驱动已把 `timestamptz` 解析成 `Date`。坏行一律抛错而非静默丢弃，避免错误数据被当成缺省。
+ */
 const userRowSchema = z.object({
   id: z.string(),
   username: z.string(),
@@ -16,12 +22,25 @@ const userRowSchema = z.object({
   updated_at: z.date(),
 })
 
+/**
+ * 窗口函数 `COUNT(*) OVER()` 结果的校验：接受数字或纯数字字符串。
+ *
+ * 两种形态都收，是因为不同驱动/配置下 `bigint` 可能以字符串返回；随后统一 `transform` 成数字，
+ * 并 `refine` 到安全整数范围，防止超过 `Number.MAX_SAFE_INTEGER` 的计数被静默截断。
+ */
 const totalCountSchema = z
   .union([z.number().int().nonnegative(), z.string().regex(/^\d+$/u).transform(Number)])
   .refine(Number.isSafeInteger, 'total_count must be a safe integer')
 
+/** 用户列表行的形状：在单行 Schema 上追加窗口函数带出的命中总数。 */
 const userListRowSchema = userRowSchema.extend({ total_count: totalCountSchema })
 
+/**
+ * 所有查询共用的列清单，保持与 `userRowSchema` 的字段一一对应。
+ *
+ * 抽成常量是为了让 SELECT 与行校验不至于各写各的而漂移；不含 `total_count`，
+ * 那是列表查询额外用窗口函数算出的派生列。
+ */
 const USER_COLUMNS = `
   id,
   username,
@@ -39,7 +58,9 @@ const USER_COLUMNS = `
  * 数据库唯一约束映射为仓储冲突；事务与连接所有权仍由注入的 SqlExecutor 管理。
  */
 export class PostgresUserRepository implements UserRepository {
+  /** SQL 执行器，构造时注入；本仓储不持有连接池，事务与连接所有权仍归执行器。 */
   readonly #database: SqlExecutor
+  /** 写入 `updated_at` 的时钟，构造时确定；默认取系统时钟，测试可注入固定实现。 */
   readonly #now: () => Date
 
   public constructor(database: SqlExecutor, now: () => Date = (): Date => new Date()) {
@@ -194,6 +215,18 @@ export class PostgresUserRepository implements UserRepository {
     }
   }
 
+  /**
+   * 按给定列做单值等值查询，取首个命中行并映射为实体，供三个 getByXxx 共用。
+   *
+   * 列名来自受限的枚举而非外部输入，因此可安全拼接进 SQL，值仍走参数化绑定；行经 Schema 校验，
+   * 坏行抛错；查询失败统一包上调用方给定的中文上下文，便于定位是哪个字段的查询出的问题。
+   *
+   * @param column - 查询所用的列名，只允许 `id` / `username` / `email` 三个
+   * @param value - 该列的目标值，走参数化绑定
+   * @param errorContext - 查询失败时包裹错误的上下文文案，由调用点按字段语义给出
+   * @param signal - 取消信号，透传给 SqlExecutor
+   * @returns 命中的领域用户实体；无命中时为 `undefined`
+   */
   async #findOne(
     column: 'id' | 'username' | 'email',
     value: string,
@@ -217,7 +250,15 @@ export class PostgresUserRepository implements UserRepository {
   }
 }
 
-/** 校验单条用户列表行；任一行不符合 schema 即抛错，坏行不会被静默丢弃。 */
+/**
+ * 校验单条用户列表行；任一行不符合 schema 即抛错，坏行不会被静默丢弃。
+ *
+ * 与 `#findOne` 内的行校验取向一致：宁可让整个列表请求失败也不返回缺字段或类型错的值，
+ * 否则分页结果里会混入难以察觉的坏数据。
+ *
+ * @param row - 数据库返回的单行原始值，类型未知
+ * @returns 通过 Schema 校验的列表行，字段已按声明类型收窄
+ */
 function parseUserListRow(row: unknown): z.infer<typeof userListRowSchema> {
   const validation = userListRowSchema.safeParse(row)
   if (!validation.success) {
@@ -226,10 +267,28 @@ function parseUserListRow(row: unknown): z.infer<typeof userListRowSchema> {
   return validation.data
 }
 
+/**
+ * 判定异常是否为 PostgreSQL 唯一约束冲突（SQLSTATE `23505`）。
+ *
+ * 驱动把错误码放在 `cause.code` 上而没有可 `instanceof` 的导出类型，因此只按码匹配；
+ * 非对象与缺码的情形一律返回 `false`，不误判为冲突。
+ *
+ * @param cause - 捕获到的未知异常
+ * @returns 是唯一约束冲突时为 `true`
+ */
 function isPostgresUniqueViolation(cause: unknown): boolean {
   return typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === '23505'
 }
 
+/**
+ * 把库行映射为领域用户实体，蛇形列名转驼峰，库中的 `NULL` 头像转成 `undefined`。
+ *
+ * 纯映射、不做校验（校验已在 `#findOne` / `parseUserListRow` 完成），失败只可能来自字段缺失，
+ * 那属于调用方漏传已校验的行。
+ *
+ * @param row - 已通过 Schema 校验的单行数据
+ * @returns 领域用户实体，字段名与可空性已对齐 `User`
+ */
 function toUser(row: z.infer<typeof userRowSchema>): User {
   return {
     id: row.id,
@@ -244,6 +303,16 @@ function toUser(row: z.infer<typeof userRowSchema>): User {
   }
 }
 
+/**
+ * 给底层异常包一层中文上下文，并保留原始 cause 以便排查。
+ *
+ * 非 Error 的抛出值（字符串、对象等）先归一成 Error 再取 message；`cause` 原样挂到新错误上，
+ * 堆栈与驱动信息不丢失。这里的 message 只进日志，不会作为响应体外泄。
+ *
+ * @param context - 描述本次操作的中文前缀，如「创建用户失败 (id=...)」
+ * @param cause - 被包裹的原始异常，类型未知
+ * @returns 带上下文与 cause 的新错误
+ */
 function contextualError(context: string, cause: unknown): Error {
   const error = cause instanceof Error ? cause : new Error(String(cause))
   return new Error(`${context}: ${error.message}`, { cause })

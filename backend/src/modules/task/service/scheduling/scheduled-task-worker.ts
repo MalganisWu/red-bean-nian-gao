@@ -7,10 +7,15 @@ import type { TaskSchedulerPort } from './port/task-scheduler.port.js'
  * Task Module 的进程级入站适配器：只负责定时触发扫描与停机，不承载调度业务规则。
  */
 export class ScheduledTaskWorker {
+  /** 调度 Port；本适配器只负责定时触发它，不承载调度规则。 */
   readonly #scheduler: TaskSchedulerPort
+  /** 日志出口；循环起停与失败都经它记录。 */
   readonly #logger: Logger
+  /** 扫描间隔（毫秒）；构造时校验为正整数。 */
   readonly #scanIntervalMilliseconds: number
+  /** 内部停止信号源；`stop` 中止它，并与父信号合并后中断循环。 */
   readonly #stopController = new AbortController()
+  /** 是否已启动过；循环只允许起一次，重复启动直接抛错。 */
   #started = false
 
   public constructor(

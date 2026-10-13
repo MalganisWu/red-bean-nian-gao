@@ -6,9 +6,11 @@ import { requestAbortSignal } from './fastify-http-boundary.js'
 
 /** 经认证后绑定到单次 HTTP 请求的稳定调用身份。 */
 export interface RequestPrincipal {
+  /** 已认证用户的 ID；由 Bearer token 校验结果得出，失败时不会有本对象。 */
   readonly userId: string
 }
 
+/** 请求 → 身份的绑定表；键是请求对象，请求结束后条目随 WeakMap 自动回收。 */
 const requestPrincipals = new WeakMap<FastifyRequest, RequestPrincipal>()
 
 /** 认证钩子选项；目前只有 Bearer 格式错误时的提示文案可定制。 */
@@ -33,7 +35,12 @@ export function authenticatedRequest(
   return (request): Promise<void> => authenticateRequest(authService, options, request)
 }
 
-/** 解析 Bearer 凭证并校验 token；成功后把身份绑定到当前请求，失败统一抛 401。 */
+/**
+ * 解析 Bearer 凭证并校验 token；成功后把身份绑定到当前请求，失败统一抛 401。
+ * @param authService - 校验 Bearer token 并返回 userId 的服务；校验失败由本函数统一映射为 401。
+ * @param options - 钩子选项；仅 Bearer 格式错误时的提示文案可定制。
+ * @param request - 当前 Fastify 请求；认证成功后身份会绑定到它上面。
+ */
 async function authenticateRequest(
   authService: TokenValidator,
   options: AuthenticationOptions,

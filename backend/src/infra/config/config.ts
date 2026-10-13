@@ -1,100 +1,149 @@
 /** `server` 段：监听地址、环境名与日志格式/级别。 */
 export interface ServerConfig {
+  /** 监听地址；默认 `0.0.0.0`，容器内需对外可达时不要改成回环地址。 */
   readonly host: string
+  /** 监听端口，以字符串保存，交由下游按文本处理而不做数值运算。 */
   readonly port: string
+  /** 环境名（如 `local` / `prod`）；`prod` 与 `production` 会触发生产加严校验。 */
   readonly env: string
+  /** 日志格式，取值 `text` 或 `json`；容器环境通常取 `json` 便于采集。 */
   readonly logFormat: string
+  /** 日志级别，如 `info` / `debug`；误配置只影响可观测性，不参与启动校验。 */
   readonly logLevel: string
 }
 
 /** `database` 段：连接串与是否在启动时自动迁移（生产必须关闭）。 */
 export interface DatabaseConfig {
+  /** 数据库连接串；必填，留空会在启动校验中抛错而不是降级为某个默认连接。 */
   readonly url: string
+  /** 是否在启动时自动迁移；生产必须为 false，多副本并发执行 DDL 会互相踩。 */
   readonly autoMigrate: boolean
 }
 
 /** `redis` 段：连接串。会话锁、取消注册表与投递队列共用这一个连接。 */
 export interface RedisConfig {
+  /** Redis 连接串；必填，会话锁、取消注册表与投递队列都复用这一个连接。 */
   readonly url: string
 }
 
 /** `jwt` 段：签发密钥。生产环境要求至少 32 字节。 */
 export interface JwtConfig {
+  /** 签发密钥；生产环境要求至少 32 字节，弱密钥可被离线爆破。 */
   readonly secret: string
 }
 
 /** `minio` 段：对象存储的端点、凭据与默认桶。 */
 export interface MinioConfig {
+  /** 对象存储端点；必填，缺失会在启动校验中抛错而非回退到公有云默认地址。 */
   readonly endpoint: string
+  /** 访问键；与密钥一同必填，二者缺一都会让对象存储不可用。 */
   readonly accessKey: string
+  /** 密钥；与访问键一同必填，生产环境不应使用示例值。 */
   readonly secretKey: string
+  /** 默认桶名；由使用方按需创建，此处只保存名字。 */
   readonly bucket: string
+  /** 是否启用 TLS；关闭时凭据与对象内容明文传输，仅限本地开发。 */
   readonly useSsl: boolean
+  /** 区域名；留空交由 SDK 自行推断。 */
   readonly region: string
 }
 
 /** `cors` 段：允许的来源，逗号分隔；单值 `*` 表示全部放行（仅限本地）。 */
 export interface CorsConfig {
+  /** 允许的来源，逗号分隔；单值 `*` 表示全部放行（仅限本地）。 */
   readonly origins: string
 }
 
 /** `llm` 段：默认 provider 凭据与模型名；仅用于播种默认记录，不是 Agent 实际使用的配置。 */
 export interface LlmConfig {
+  /** 默认 provider 的 API Key；仅用于播种默认记录，不是 Agent 实际使用的凭据。 */
   readonly apiKey: string
+  /** 默认 provider 的 base URL；同样仅用于播种默认记录。 */
   readonly baseUrl: string
+  /** 默认模型名，如 `gpt-4`；仅用于播种默认记录。 */
   readonly model: string
 }
 
 /** `dev_user` 段：本地开发账号；用户名或密码为空则不创建。 */
 export interface DevUserConfig {
+  /** 本地开发账号用户名；与被密码任一为空都不创建该账号。 */
   readonly username: string
+  /** 本地开发账号密码；与用户名任一为空都不创建该账号。 */
   readonly password: string
+  /** 本地开发账号展示名。 */
   readonly displayName: string
+  /** 本地开发账号邮箱。 */
   readonly email: string
 }
 
 /** `scheduled_task` 段：调度器的扫描节奏、并发上限、重试策略与超时预算。 */
 export interface ScheduledTaskConfig {
+  /** 单次执行失败后的最大重试次数；必须为大于 0 的整数，否则启动校验抛错。 */
   readonly maxRetries: number
+  /** 重试间隔的 duration 字面量，如 `5m`；0 或负数会被拒绝。 */
   readonly retryInterval: string
+  /** 调度时区名，如 `Asia/Shanghai`；无效名会在启动校验抛错。 */
   readonly timezone: string
+  /** 扫描节奏的 duration 字面量，如 `1m`；决定新任务被发现的延迟上限。 */
   readonly scanInterval: string
+  /** 单批取任务的数量；必须为大于 0 的整数。 */
   readonly batchSize: number
+  /** 并发执行上限；必须为大于 0 的整数，避免压垮下游。 */
   readonly maxConcurrent: number
+  /** 单次执行超时预算的 duration 字面量，如 `15m`；到点即中止该次执行。 */
   readonly executionTimeout: string
 }
 
 /** `observability` 段：tracing 后端（structured / otlp）、服务名与采样率。 */
 export interface ObservabilityConfig {
+  /** tracing 后端，取值 `structured` 或 `otlp`；其它取值会在启动校验抛错。 */
   readonly exporter: string
+  /** 服务名，用于在 trace 中标识本服务；留空会在启动校验抛错。 */
   readonly serviceName: string
+  /** 采样率，取值区间 (0, 1]；越界会在启动校验抛错而非被夹紧到边界。 */
   readonly sampleRatio: number
 }
 
 /** 应用配置全集；由 `config.yaml` 与环境变量合并而成，`loadConfig` 之后不再变化。 */
 export interface AppConfig {
+  /** 监听地址、环境名与日志格式/级别。 */
   readonly server: ServerConfig
+  /** 数据库连接串与自动迁移开关。 */
   readonly database: DatabaseConfig
+  /** Redis 连接串。 */
   readonly redis: RedisConfig
+  /** JWT 签发密钥。 */
   readonly jwt: JwtConfig
+  /** 对象存储端点、凭据与默认桶。 */
   readonly minio: MinioConfig
+  /** 允许的跨域来源。 */
   readonly cors: CorsConfig
+  /** 默认 provider 凭据与模型名。 */
   readonly llm: LlmConfig
+  /** 本地开发账号。 */
   readonly devUser: DevUserConfig
+  /** 调度器节奏、并发、重试与超时预算。 */
   readonly scheduledTask: ScheduledTaskConfig
+  /** tracing 后端、服务名与采样率。 */
   readonly observability: ObservabilityConfig
 }
 
+/** 环境变量来源的只读映射；值可能为 undefined，因此读取处一律做存在性判断。 */
 type Environment = Readonly<Record<string, string | undefined>>
+/** 未做类型假设的对象；承接 YAML 解析结果，各字段在取值时再逐项校验。 */
 type UnknownRecord = Record<string, unknown>
 
 /** 加载选项；两个字段都可注入，测试因此无需依赖真实文件系统与环境变量。 */
 export interface LoadConfigOptions {
+  /** 配置文件所在目录；缺省取进程当前工作目录。 */
   readonly directory?: string
+  /** 环境变量来源；缺省取 `process.env`，测试可注入伪环境。 */
   readonly environment?: Environment
 }
 
+/** duration 字面量中「数值 + 单位」的分段正则；全局匹配，供 `matchAll` 逐段消费。 */
 const DURATION_PART = /(\d+(?:\.\d+)?)(ns|us|µs|μs|ms|s|m|h)/gu
+/** 单位到毫秒的换算表；纳秒/微秒用小数表示，使毫秒成为统一的内部时长单位。 */
 const DURATION_UNITS: Readonly<Record<string, number>> = Object.freeze({
   ns: 0.000_001,
   us: 0.001,
@@ -328,6 +377,7 @@ export function parseDurationMilliseconds(value: string): number {
  *    `jwt.secret` 至少 32 字节（弱密钥可被离线爆破）。本地开发不受这两条限制。
  *
  * 这个分层刻意如此——测试与本地要的是「能起来」，生产要的是「起不来也别起错」。
+ * @param config - 已合并但尚未校验的配置全集；本函数只读不写，任一条不满足即抛错中断启动
  */
 function validateConfig(config: AppConfig): void {
   requireConfigured('database.url', config.database.url)
@@ -364,6 +414,11 @@ function validateConfig(config: AppConfig): void {
   }
 }
 
+/**
+ * 校验单个必填项非空且非占位符；失败即抛错，不做默认值兜底。
+ * @param name - 配置项的点分路径，仅用于拼装错误信息
+ * @param value - 待校验的原始取值；首尾空白会被忽略
+ */
 function requireConfigured(name: string, value: string): void {
   if (value.trim().length === 0) throw new Error(`${name} 未设置`)
   if (containsPlaceholder(value)) throw new Error(`${name} 仍为示例值`)
@@ -373,23 +428,40 @@ function requireConfigured(name: string, value: string): void {
  * 识别模板占位符。这条防线针对的失败模式很具体：`config.yaml` 里写着 `CHANGE_ME`，
  * 部署时忘了替换，服务照常启动、连接失败时报出一个毫无线索的错误。
  * 在这里拦住，错误信息就直接指向「你还是示例值」。
+ * @param value - 待检查的配置值；大小写与首尾空白不影响判定
+ * @returns 命中模板占位符时为 true；此处不抛错，交由调用方决定如何处理
  */
 function containsPlaceholder(value: string): boolean {
   const normalized = value.trim().toUpperCase()
   return normalized.includes('CHANGE_ME') || normalized === 'CHANGE-ME-TO-A-LONG-RANDOM-STRING'
 }
 
+/**
+ * 判断环境名是否属于生产；只认 `prod` 与 `production` 两个别名，其余（含空串）按非生产处理。
+ * @param environment - 环境名原始取值；比较前统一去空白并转小写
+ * @returns 是生产环境时为 true，决定是否启用加严校验
+ */
 function isProduction(environment: string): boolean {
   const normalized = environment.trim().toLowerCase()
   return normalized === 'prod' || normalized === 'production'
 }
 
+/**
+ * 校验正整数配置项；非整数或非正数即抛错。
+ * @param name - 配置项的点分路径，用于拼装错误信息
+ * @param value - 待校验的数值
+ */
 function positiveInteger(name: string, value: number): void {
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error(`${name} 必须是大于 0 的整数`)
   }
 }
 
+/**
+ * 校验 duration 配置项合法且为正；复用解析器，失败时改写成带路径的错误信息。
+ * @param name - 配置项的点分路径，用于拼装错误信息
+ * @param value - 待校验的 duration 字面量，如 `5m`
+ */
 function validateDuration(name: string, value: string): void {
   try {
     parseDurationMilliseconds(value)
@@ -401,6 +473,7 @@ function validateDuration(name: string, value: string): void {
 /**
  * 用 `Intl` 试构造一次来校验时区名，而不是维护一张时区清单——
  * 后者会随 tzdata 更新而过期，前者永远与运行时的实际能力一致。
+ * @param value - 待校验的时区名，如 `Asia/Shanghai`；构造失败即抛错
  */
 function validateTimezone(value: string): void {
   try {
@@ -410,6 +483,12 @@ function validateTimezone(value: string): void {
   }
 }
 
+/**
+ * 断言值为普通对象并复制其可枚举字段；数组与 null 都会被拒绝。
+ * 复制而非直接返回，是为切断对上游原始引用的共享，避免后续改动穿透进来。
+ * @param value - 待断言的原始值；非对象、null 与数组一律抛错
+ * @returns 复制得到的普通对象
+ */
 function record(value: unknown): UnknownRecord {
   if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
     return Object.fromEntries(Object.entries(value))
@@ -417,6 +496,11 @@ function record(value: unknown): UnknownRecord {
   throw new Error('configuration root must be an object')
 }
 
+/**
+ * 读取并解析 YAML 配置文件；文件缺失或解析失败都抛错，并把原始错误挂到 `cause`。
+ * @param path - 配置文件的完整路径
+ * @returns 解析结果；文件为空时返回空对象而不是 undefined
+ */
 async function readYamlConfig(path: string): Promise<unknown> {
   let source: string
   try {
@@ -433,15 +517,31 @@ async function readYamlConfig(path: string): Promise<unknown> {
   }
 }
 
+/**
+ * 从任意抛出值中提取可读消息；非 Error 值退化为字符串化结果。
+ * @param error - 捕获到的任意抛出值
+ * @returns 人类可读的错误消息文本
+ */
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+/**
+ * 从路径中取出文件名，仅用于错误信息展示；分隔符同时兼容正反斜杠。
+ * @param path - 任意文件路径
+ * @returns 路径末段的文件名；取不到时回退为原路径
+ */
 function configFileName(path: string): string {
   const parts = path.split(/[\\/]/u)
   return parts.at(-1) ?? path
 }
 
+/**
+ * 取出配置中的某个命名段；缺失时返回空对象，非对象值则抛错。
+ * @param root - 已确认是普通对象的配置根
+ * @param name - 段名，如 `server`
+ * @returns 该段的字段副本；段不存在时为空对象
+ */
 function section(root: UnknownRecord, name: string): UnknownRecord {
   const value = root[name]
   if (value === undefined || value === null) return {}
@@ -451,6 +551,14 @@ function section(root: UnknownRecord, name: string): UnknownRecord {
   return Object.fromEntries(Object.entries(value))
 }
 
+/**
+ * 按优先级取单个原始值：环境变量优先于 YAML，仅当环境变量为 undefined 时才回退到 YAML。
+ * @param source - 该段从 YAML 解析出的原始字段
+ * @param key - 在 YAML 段内的键名
+ * @param environment - 环境变量来源
+ * @param environmentName - 对应的环境变量名；未设置时返回 YAML 值
+ * @returns 命中的原始值，可能为 undefined
+ */
 function sourceValue(
   source: UnknownRecord,
   key: string,
@@ -461,6 +569,15 @@ function sourceValue(
   return environmentValue === undefined ? source[key] : environmentValue
 }
 
+/**
+ * 取字符串配置项：空串视为未设置而落到默认值，数值/布尔按文本转换，其余类型抛错。
+ * @param source - 该段从 YAML 解析出的原始字段
+ * @param key - 在 YAML 段内的键名
+ * @param environment - 环境变量来源
+ * @param environmentName - 对应的环境变量名
+ * @param fallback - 两个来源都未设置时使用的默认值
+ * @returns 最终生效的字符串值
+ */
 function stringValue(
   source: UnknownRecord,
   key: string,
@@ -475,6 +592,15 @@ function stringValue(
   throw new Error(`${environmentName} must be a string`)
 }
 
+/**
+ * 取数值配置项：空串视为未设置，字符串按数值解析，结果非有限数时抛错。
+ * @param source - 该段从 YAML 解析出的原始字段
+ * @param key - 在 YAML 段内的键名
+ * @param environment - 环境变量来源
+ * @param environmentName - 对应的环境变量名
+ * @param fallback - 两个来源都未设置时使用的默认值
+ * @returns 最终生效的数值
+ */
 function numberValue(
   source: UnknownRecord,
   key: string,
@@ -489,6 +615,15 @@ function numberValue(
   return parsed
 }
 
+/**
+ * 取布尔配置项：空串视为未设置，只接受布尔与 `true`/`1`/`false`/`0` 写法，其余抛错。
+ * @param source - 该段从 YAML 解析出的原始字段
+ * @param key - 在 YAML 段内的键名
+ * @param environment - 环境变量来源
+ * @param environmentName - 对应的环境变量名
+ * @param fallback - 两个来源都未设置时使用的默认值
+ * @returns 最终生效的布尔值
+ */
 function booleanValue(
   source: UnknownRecord,
   key: string,

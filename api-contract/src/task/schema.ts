@@ -32,7 +32,9 @@ export const taskParamsSchema = z.object({ id: z.string().min(1) })
 export const executionParamsSchema = z.object({ id: z.string().min(1), eid: z.string().min(1) })
 /** 更新任务请求体；只有 `is_active` 一个字段。 */
 export const updateTaskSchema: z.ZodType<UpdateTaskDto> = z.object({ is_active: z.boolean() })
-/** 偏好补丁校验；`mark_seen` 只接受字面量 `true`——它表达「执行标记为已读」这个动作，不是开关。 */
+/**
+ * 偏好补丁校验；`mark_seen` 只接受字面量 `true`——它表达「执行标记为已读」这个动作，不是开关。
+ */
 export const executionViewStatePatchSchema: z.ZodType<ExecutionViewStatePatchDto> = z
   .object({
     mark_seen: z.literal(true).optional(),
@@ -43,6 +45,11 @@ export const executionViewStatePatchSchema: z.ZodType<ExecutionViewStatePatchDto
     'empty patch'
   )
 
+/**
+ * 执行状态判据；四态之外一律判假。
+ * @param value - 待判定的状态值；四个已登记取值之外一律判假。
+ * @returns 取值合法时为 true，否则 false。
+ */
 function isTaskStatus(value: unknown): value is TaskExecutionStatus {
   return ['pending', 'running', 'completed', 'failed'].includes(String(value))
 }
@@ -69,6 +76,11 @@ export function isTask(value: unknown): value is TaskDto {
   return isOptional(value['RunAt'], isString) && isOptional(value['NextRunAt'], isString)
 }
 
+/**
+ * 执行摘要的守卫；全部字段必填，可空字段须为字符串或 null。
+ * @param value - 待判定的执行摘要；任一字段不合法即判假（可空字段接受 null，不接受 undefined）。
+ * @returns 形状成立时为 true，否则 false。
+ */
 function isTaskExecutionSummary(value: unknown): value is TaskExecutionSummaryDto {
   return (
     isRecord(value) &&

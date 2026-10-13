@@ -4,20 +4,30 @@ import { normalizeError } from '../../../../shared/errors/normalize-error.js'
 import type { RedisStore } from '../../../../infra/redis/redis.js'
 import type { CancelRegistryPort } from '../port/cancellation-registry.port.js'
 
+/** 取消键的默认存活时间（10 分钟）：与单次请求的最长运行时间同量级，覆盖在途请求又不长期占用 Redis。 */
 const DEFAULT_TIMEOUT_MILLISECONDS = 10 * 60 * 1_000
+/** 跨实例轮询取消键的默认间隔（500ms）：越小取消越及时、越大 Redis 压力越低，取值在取消延迟与查询量之间折中。 */
 const DEFAULT_POLL_INTERVAL_MILLISECONDS = 500
 
+/** 单个请求的本地登记项：持有中止控制器、超时定时器，以及上游父信号及其 abort 监听器。 */
 interface CancelEntry {
+  /** 本实例的中止控制器；本地取消与跨实例取消都汇聚到它的 signal。 */
   readonly controller: AbortController
+  /** 兜底超时定时器；到点即以 TimeoutError 中止，避免登记项永久滞留。 */
   readonly timeoutTimer: NodeJS.Timeout
+  /** 上游取消信号；其 abort 级联到本请求，undefined 表示无上游。 */
   readonly parent: AbortSignal | undefined
+  /** 上游 abort 监听器；注销时需用它移除监听，避免泄漏。 */
   readonly onParentAbort: (() => void) | undefined
+  /** 跨实例轮询定时器；每次查询后重排，形成自续的轮询链。 */
   pollTimer: NodeJS.Timeout | undefined
 }
 
 /** 取消注册表选项；前者是取消键的存活时间，后者是跨实例的轮询间隔。 */
 export interface RedisCancelRegistryOptions {
+  /** 取消键的存活时间（毫秒）；缺省 10 分钟，与单次请求最长运行时间同量级。 */
   readonly timeoutMilliseconds?: number
+  /** 跨实例轮询间隔（毫秒）；缺省 500ms，取值在取消延迟与查询量之间折中。 */
   readonly pollIntervalMilliseconds?: number
 }
 
@@ -35,9 +45,13 @@ export interface RedisCancelRegistryOptions {
  * 代价是取消延迟上界 = `pollIntervalMilliseconds`（默认 500ms），以及每个在途请求一份轮询定时器。
  */
 export class RedisCancelRegistry implements CancelRegistryPort {
+  /** Redis 连接；用来把取消键同步给其他实例。 */
   readonly #redis: RedisStore
+  /** 本地登记表；键为 requestId，未命中即表示请求不在本实例。 */
   readonly #entries = new Map<string, CancelEntry>()
+  /** 取消键存活时间（毫秒）；已校验为正的安全整数。 */
   readonly #timeoutMilliseconds: number
+  /** 跨实例轮询间隔（毫秒）；已校验为正的安全整数。 */
   readonly #pollIntervalMilliseconds: number
 
   public constructor(redis: RedisStore, options: RedisCancelRegistryOptions = {}) {
@@ -182,6 +196,9 @@ export class RedisCancelRegistry implements CancelRegistryPort {
    * 两重守卫：信号已中止就不必再查；`#entries.get(requestId) !== entry` 则保证
    * **旧的定时器不会作用到后来重新登记的同名请求上**——没有这一句，
    * 一次 deregister + 重新 wrap（同 requestId）会让旧定时器把新请求误判为已取消。
+   *
+   * @param requestId 请求唯一标识；用来确认表中该键仍指向 entry，避免旧定时器误伤新请求
+   * @param entry 当前登记项；其 signal 已中止或已不在表中时不再排下一次
    */
   #schedulePoll(requestId: string, entry: CancelEntry): void {
     if (entry.controller.signal.aborted || this.#entries.get(requestId) !== entry) return
@@ -194,6 +211,9 @@ export class RedisCancelRegistry implements CancelRegistryPort {
   /**
    * 查一次 Redis 看别的实例有没有取消这个请求；查完再排下一次，形成自续的轮询链。
    * Redis 瞬时错误只跳过本轮，不中断轮询——网络抖一下就让请求永远失去跨实例取消能力是不可接受的。
+   *
+   * @param requestId 请求唯一标识；用来查 Redis 键并确认登记项仍为最新
+   * @param entry 当前登记项；Redis 键为 cancelled 时据此中止本请求
    */
   async #poll(requestId: string, entry: CancelEntry): Promise<void> {
     if (entry.controller.signal.aborted || this.#entries.get(requestId) !== entry) return
@@ -210,7 +230,11 @@ export class RedisCancelRegistry implements CancelRegistryPort {
     this.#schedulePoll(requestId, entry)
   }
 
-  /** 撤销本地登记；删除前的同一性检查防止把重新登记后的新条目误删。 */
+  /**
+   * 撤销本地登记；删除前的同一性检查防止把重新登记后的新条目误删。
+   * @param requestId 请求唯一标识；仅当表中该键仍指向 entry 时才删除
+   * @param entry 待撤销的登记项；清其超时与轮询定时器并移除父信号监听
+   */
   #removeLocal(requestId: string, entry: CancelEntry): void {
     if (this.#entries.get(requestId) === entry) this.#entries.delete(requestId)
     clearTimeout(entry.timeoutTimer)
@@ -220,16 +244,32 @@ export class RedisCancelRegistry implements CancelRegistryPort {
     }
   }
 
+  /**
+   * 停止跨实例轮询：清除当前定时器并置空，重复调用安全。
+   * @param entry 待停止轮询的登记项；其 pollTimer 会被清掉
+   */
   #stopPolling(entry: CancelEntry): void {
     if (entry.pollTimer !== undefined) clearTimeout(entry.pollTimer)
     entry.pollTimer = undefined
   }
 
+  /**
+   * 由 requestId 拼出 Redis 取消键；注册、查询与删除共用同一算法。
+   * @param requestId 请求唯一标识
+   * @returns 形如 `agent:cancel:<requestId>` 的 Redis 键
+   */
   #key(requestId: string): string {
     return `agent:cancel:${requestId}`
   }
 }
 
+/**
+ * 校验定时器毫秒数必须是正的安全整数。
+ * `NaN` / 负数会让定时器退化成「立即触发」或永不触发，属于配置错误，宁可启动即报错。
+ * @param value 待校验的毫秒值
+ * @param name 用于错误消息的字段名，便于定位是哪个选项配错
+ * @returns 校验通过的原值
+ */
 function positiveMilliseconds(value: number, name: string): number {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new RangeError(`${name} must be a positive safe integer`)
@@ -237,6 +277,10 @@ function positiveMilliseconds(value: number, name: string): number {
   return value
 }
 
+/**
+ * 返回一个永不中止的信号，供无需取消约束的 Redis 读写复用，省去每处新建 AbortController。
+ * @returns 新建的、不会被中止的 AbortSignal
+ */
 function liveSignal(): AbortSignal {
   return new AbortController().signal
 }

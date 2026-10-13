@@ -16,13 +16,17 @@ import {
 
 /** 造展示载荷的入参；在 section 数据之上补一个领域状态（`SubAgentSectionData.status` 是裸字符串）。 */
 export interface BuildSubExecutionDisplayRequest extends SubAgentSectionData {
+  /** 领域状态；覆盖 section 数据里的裸字符串 status，落库前由它决定展示状态。 */
   readonly status: SubExecutionStatus
 }
 
 /** 终态写入时的展示字段；空串与 `undefined` 一律按「未提供」处理，不会写进记录。 */
 export interface SubExecutionCompletionOptions {
+  /** 子 Agent 展示名；写入终态记录，供父会话渲染分区标题。 */
   readonly agentName: string
+  /** 实际使用的模型名；空串按未提供处理，不写进记录。 */
   readonly modelName?: string | undefined
+  /** 子 Agent 系统提示词；空串按未提供处理，不写进记录。 */
   readonly systemPrompt?: string | undefined
 }
 
@@ -176,6 +180,13 @@ export function isJsonValue(value: unknown): value is AgentJsonValue {
   return typeof value === 'object' && value !== null && Object.values(value).every(isJsonValue)
 }
 
+/**
+ * 把空串归一为 `undefined`：可选展示字段（modelName / systemPrompt / 摘要等）里，
+ * 「没填」与「填了空串」语义相同，统一按未提供处理，避免记录里出现无意义的空串。
+ *
+ * @param value - 原始字符串；undefined 或空串都视为未提供。
+ * @returns 非空字符串原样返回，否则 undefined。
+ */
 function emptyToUndefined(value: string | undefined): string | undefined {
   return value === undefined || value === '' ? undefined : value
 }

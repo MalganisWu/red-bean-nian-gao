@@ -6,7 +6,9 @@ import { MinioObjectStorage } from './service/object-storage/minio-object-storag
 
 /** Storage Module 的输出面：对象用例服务与健康探针。 */
 export interface StorageModule {
+  /** 对象用例服务；跨 Module 只经它读写对象，MinIO 具体类不外泄。 */
   readonly storageService: StorageService
+  /** 健康探针 Port；供应用 readiness 检查对象存储连通性。 */
   readonly health: StorageHealthPort
 }
 

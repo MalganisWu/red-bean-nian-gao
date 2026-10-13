@@ -18,6 +18,10 @@ import type { ScheduledTaskDetailTab } from '@/components/retroui/scheduledTaskT
 import { trapTabFocus } from '@/lib/focus-trap'
 
 // awaiting 的最大确认等待：超过即视为连接异常，强制复位（见 handleSend 下方兜底 effect）
+/**
+ * 「已发出、待 START 确认」等待窗的上限（毫秒）；超时即视为连接异常并强制复位，
+ * 避免连接半开时输入框被永久锁死。
+ */
 const AWAITING_TIMEOUT_MS = 30_000
 
 /** 对话主页面：串起输入区、流式状态与消息区，并持有「已发出、待 START 确认」的输入锁。 */
@@ -335,7 +339,12 @@ export function ChatPage() {
   )
 }
 
-/** 扫描已加载消息，取第一张待回答卡片（刷新/跨端恢复据此重建卡片状态）。 */
+/**
+ * 扫描已加载消息，取第一张待回答卡片（刷新/跨端恢复据此重建卡片状态）。
+ *
+ * @param messages - 已加载的展示消息列表，按先后顺序扫描其中的 sections。
+ * @returns 首个 `status === 'pending'` 的卡片数据；不存在待答卡片时返回 `null`。
+ */
 function findPendingCard(messages: DisplayMessage[]): CardSectionData | null {
   for (const message of messages) {
     const card = (message.sections ?? []).find(

@@ -13,6 +13,11 @@ import { extendTailwindMerge } from 'tailwind-merge'
  */
 const CUSTOM_FONT_SIZES = ['label'] as const
 
+/**
+ * 本仓专用的合并器：在 tailwind-merge 默认配置上补齐自定义 `--text-*` 字号后再交给 `cn`。
+ * 只有登记进 `font-size` 组的字号才会与文字颜色分开裁决，未被登记的会在同组冲突里被
+ * **静默丢弃**——这正是上面那段注释记录的坑。
+ */
 const twMerge = extendTailwindMerge({
   extend: {
     classGroups: {

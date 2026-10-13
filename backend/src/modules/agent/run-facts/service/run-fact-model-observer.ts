@@ -13,7 +13,9 @@ import type { RunFactRecorder } from './run-fact-recorder.js'
  * 因此子执行的内部 LLM 调用不会混入父 run 的事实（ADR：子执行步骤进子执行自己的 run 记录）。
  */
 export class RunFactModelObserver implements AgentModelAdapter {
+  /** 事实写入器；把每次请求的起止、usage 与错误归到 attempt 上。 */
   readonly #recorder: RunFactRecorder
+  /** 被装饰的内层模型 adapter，请求原样透传给它。 */
   readonly #inner: AgentModelAdapter
 
   public constructor(recorder: RunFactRecorder, inner: AgentModelAdapter) {
@@ -52,6 +54,9 @@ export class RunFactModelObserver implements AgentModelAdapter {
    * 装饰器必须**完全透明**：`yield chunk` 原样透传，不合并、不改造、不吞异常。
    * 一旦这里改了流的内容或时序，主流程收到的就不再是 adapter 的原始输出，
    * 而观察者本应只是旁观者。
+   *
+   * @param iterable - 内层 adapter 返回的 chunk 流，逐块透传
+   * @returns 原样透传同一批 chunk 的生成器，仅旁路观察 usage 与错误
    */
   async *#watch(iterable: AsyncIterable<AgentModelChunk>): AsyncGenerator<AgentModelChunk> {
     try {

@@ -8,6 +8,7 @@ import type {
  * 返回裸响应体，HTTP 状态码由 `health.routes.ts` 决定。
  */
 export class HealthController {
+  /** 探针能力 Port；由构造器注入，控制器只做用例编排、不持有其生命周期。 */
   readonly #health: HealthServicePort
 
   public constructor(health: HealthServicePort) {

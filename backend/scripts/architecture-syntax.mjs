@@ -150,6 +150,32 @@ function collectStatement(statement, sourceFile, source, records, usedPaths) {
     }
     return
   }
+  if (ts.isInterfaceDeclaration(statement)) {
+    const interfaceName = statement.name?.text ?? 'default'
+    const exported = hasExportModifier(statement)
+    pushRecord(records, usedPaths, {
+      symbolPath: interfaceName,
+      kind: 'interface',
+      exported,
+      jsdocText: leadingJsDoc(source, statement, sourceFile),
+      line: lineOf(statement, sourceFile),
+      params: [],
+      hasDestructuredParam: false,
+      returnTypeText: undefined,
+    })
+    for (const member of statement.members) {
+      collectInterfaceMember(
+        member,
+        sourceFile,
+        source,
+        records,
+        usedPaths,
+        interfaceName,
+        exported
+      )
+    }
+    return
+  }
   const simpleKind = simpleDeclarationKindOf(statement)
   if (simpleKind !== undefined) {
     pushRecord(records, usedPaths, {
@@ -165,9 +191,8 @@ function collectStatement(statement, sourceFile, source, records, usedPaths) {
   }
 }
 
-/** 只需描述正文、不需要 tag 的声明种类。 */
+/** 只需描述正文、不需要 tag 的声明种类（接口已在 collectStatement 单独处理）。 */
 function simpleDeclarationKindOf(statement) {
-  if (ts.isInterfaceDeclaration(statement)) return 'interface'
   if (ts.isTypeAliasDeclaration(statement)) return 'typeAlias'
   if (ts.isEnumDeclaration(statement)) return 'enum'
   if (ts.isModuleDeclaration(statement)) return 'module'
@@ -175,7 +200,6 @@ function simpleDeclarationKindOf(statement) {
 }
 
 function collectClassMember(member, sourceFile, source, records, usedPaths, className, exported) {
-  if (isPrivateMember(member)) return
   const base = {
     exported,
     jsdocText: leadingJsDoc(source, member, sourceFile),
@@ -237,10 +261,70 @@ function collectClassMember(member, sourceFile, source, records, usedPaths, clas
   }
 }
 
-/** 只跳过 `private` 与 `#` 成员；`protected` 属于继承契约，仍纳入。 */
-function isPrivateMember(member) {
-  if (member.name !== undefined && ts.isPrivateIdentifier(member.name)) return true
-  return (ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Private) !== 0
+/**
+ * 接口成员。
+ *
+ * 接口与类的成员一视同仁：判据是「可见范围是否跨过函数体边界」，而接口成员正是消费方读到的
+ * 那份契约 —— 此前只采集类成员，导致同一个契约写在类里被要求注释、写在接口里就豁免。
+ * 调用签名与索引签名没有名字，构不成符号路径，跳过。
+ */
+function collectInterfaceMember(
+  member,
+  sourceFile,
+  source,
+  records,
+  usedPaths,
+  interfaceName,
+  exported
+) {
+  const name = memberNameOf(member)
+  if (name === undefined) return
+  const base = {
+    exported,
+    jsdocText: leadingJsDoc(source, member, sourceFile),
+    line: lineOf(member, sourceFile),
+    params: [],
+    hasDestructuredParam: false,
+    returnTypeText: undefined,
+  }
+  if (ts.isMethodSignature(member)) {
+    pushRecord(records, usedPaths, {
+      ...base,
+      symbolPath: `${interfaceName}.${name}`,
+      kind: 'method',
+      params: simpleParameterNames(member.parameters),
+      hasDestructuredParam: member.parameters.some(isDestructuredParameter),
+      returnTypeText: typeTextOf(member.type, sourceFile),
+    })
+    return
+  }
+  if (ts.isGetAccessorDeclaration(member)) {
+    pushRecord(records, usedPaths, {
+      ...base,
+      symbolPath: `${interfaceName}.${name}#get`,
+      kind: 'accessor',
+      returnTypeText: typeTextOf(member.type, sourceFile),
+    })
+    return
+  }
+  if (ts.isSetAccessorDeclaration(member)) {
+    pushRecord(records, usedPaths, {
+      ...base,
+      symbolPath: `${interfaceName}.${name}#set`,
+      kind: 'accessor',
+      params: simpleParameterNames(member.parameters),
+      hasDestructuredParam: member.parameters.some(isDestructuredParameter),
+    })
+    return
+  }
+  if (ts.isPropertySignature(member)) {
+    pushRecord(records, usedPaths, {
+      ...base,
+      symbolPath: `${interfaceName}.${name}`,
+      kind: 'property',
+      returnTypeText: typeTextOf(member.type, sourceFile),
+    })
+  }
 }
 
 function memberNameOf(member) {
@@ -258,13 +342,48 @@ function memberNameOf(member) {
  * `@param` 要求。返回 `undefined` 表示它不是可调用体（如 zod schema、常量对象）。
  */
 function callableOf(initializer) {
-  if (initializer === undefined) return undefined
-  if (!ts.isArrowFunction(initializer) && !ts.isFunctionExpression(initializer)) return undefined
+  const callable = callableExpressionOf(initializer)
+  if (callable === undefined) return undefined
   return {
-    parameters: simpleParameterNames(initializer.parameters),
-    hasDestructuredParam: initializer.parameters.some(isDestructuredParameter),
-    returnTypeText: typeTextOf(initializer.type, initializer.getSourceFile()),
+    parameters: simpleParameterNames(callable.parameters),
+    hasDestructuredParam: callable.parameters.some(isDestructuredParameter),
+    returnTypeText: typeTextOf(callable.type, callable.getSourceFile()),
   }
+}
+
+/**
+ * 取出初始化表达式里的函数。
+ *
+ * 除箭头与函数表达式外，也认 **HOC 包裹**的形态（`React.forwardRef((props, ref) => ...)`、
+ * `memo(...)`）：只看被调用的那个函数字面量参数。不认它会造成不一致 —— 同一文件里
+ * 包了 `forwardRef` 的组件不被要求写 `@param`，没包的却被要求。
+ */
+function callableExpressionOf(node) {
+  if (node === undefined) return undefined
+  if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return node
+  return isComponentWrapper(node)
+    ? node.arguments.find(
+        (argument) => ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)
+      )
+    : undefined
+}
+
+/**
+ * 是否是组件 HOC 包裹（`React.forwardRef(...)` / `memo(...)`）。
+ *
+ * 刻意**只认这两个名字**：泛化到「任何调用表达式里的函数字面量」会把
+ * `z.object({...}).refine((value) => ...)` 这类链式调用也当成组件，
+ * 于是 zod schema 常量被误判为函数、被要求写 `@param`。
+ */
+function isComponentWrapper(node) {
+  if (!ts.isCallExpression(node)) return false
+  const callee = node.expression
+  const name = ts.isPropertyAccessExpression(callee)
+    ? callee.name.text
+    : ts.isIdentifier(callee)
+      ? callee.text
+      : ''
+  return name === 'forwardRef' || name === 'memo'
 }
 
 function simpleParameterNames(parameters) {

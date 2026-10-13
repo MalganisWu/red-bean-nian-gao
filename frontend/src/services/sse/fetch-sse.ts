@@ -9,15 +9,25 @@ import type { ChatRequest, AnswerRequest } from '@/types/chat'
 export interface SSEConnectionOptions {
   /** 目标端点，默认 API_ROUTES.CHAT.path；answer 用 API_ROUTES.CHAT_ANSWER.path */
   url?: string | undefined
+  /** 请求体；对话走 ChatRequest，卡片作答走 AnswerRequest。 */
   request: ChatRequest | AnswerRequest
+  /** 每收到一个合法事件时回调；心跳与未知事件名不会触发。 */
   onEvent: (event: ParsedSSEEvent) => void
+  /** 连接失败或首事件超时时回调；携带已可直接展示的错误。 */
   onError: (error: Error) => void
+  /** 连接正常关闭时回调（流结束）；不区分成功与中断。 */
   onClose: () => void
 }
 
 /** 连接打开后等待首个事件（START）的最长时间：半开连接不再无限挂起，转为可感知的连接错误。 */
 const FIRST_EVENT_TIMEOUT_MS = 30_000
 
+/**
+ * 读取响应体并解析为 JSON；空响应体按 `null` 处理，仅用于非 2xx 时提取业务 message。
+ *
+ * @param response - fetch 响应；body 只会被消费一次。
+ * @returns 解析后的 `unknown`；空体返回 `null`，非 JSON 文本会让 `JSON.parse` 抛错。
+ */
 async function readJson(response: Response): Promise<unknown> {
   const source = await response.text()
   if (!source) return null

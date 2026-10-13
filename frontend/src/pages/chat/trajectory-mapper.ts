@@ -33,6 +33,12 @@ export function formatEpochToClock(ms: number): string {
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }
 
+/**
+ * token 用量适配：把 wire 侧的 nullable cache 归一成组件侧的数字。
+ *
+ * @param u - 后端用量对象；cache 为 null 表示未采集到缓存命中，需按 0 处理。
+ * @returns 组件侧用量；缺失的 cache 一律落成 0，组件因此不必再判空。
+ */
 function mapUsage(u: {
   readonly input: number
   readonly output: number
@@ -41,6 +47,12 @@ function mapUsage(u: {
   return { input: u.input, output: u.output, cache: u.cache ?? 0 }
 }
 
+/**
+ * 尝试明细适配：时间转成展示时钟，可选字段缺失时不产出对应键。
+ *
+ * @param q - 后端尝试 DTO；at 为 epoch 毫秒，tokens / error 均可缺省。
+ * @returns 组件侧尝试对象；未采集到的 tokens、error 不出现在结果里。
+ */
 function mapAttempt(q: TrajectoryAttemptDto): TrajectoryAttempt {
   return {
     id: q.id,
@@ -55,6 +67,12 @@ function mapAttempt(q: TrajectoryAttemptDto): TrajectoryAttempt {
   }
 }
 
+/**
+ * 记录适配：递归转换子记录与尝试列表，时间字段统一转成展示时钟。
+ *
+ * @param r - 后端轨迹记录 DTO；children / attempts 会被递归映射。
+ * @returns 组件侧记录；null 或 undefined 的可选字段一律不产出键。
+ */
 function mapRecord(r: TrajectoryRecordDto): TrajectoryRecord {
   return {
     id: r.id,
@@ -79,6 +97,12 @@ function mapRecord(r: TrajectoryRecordDto): TrajectoryRecord {
   }
 }
 
+/**
+ * 结束标记适配：结束状态原样透传，只把时间转成展示时钟。
+ *
+ * @param end - 后端结束标记 DTO；note 为可选的补充说明。
+ * @returns 组件侧结束标记；note 缺失时不产出该键。
+ */
 function mapEndState(end: TrajectoryEndStateDto): TrajectoryTurnEnd {
   return {
     state: end.state,
@@ -89,15 +113,23 @@ function mapEndState(end: TrajectoryEndStateDto): TrajectoryTurnEnd {
 
 /** 会话轨迹的视图模型：轮次列表、压缩记录、结束标记与 token 合计。 */
 export interface SessionTrajectoryView {
+  /** 会话 id。 */
   readonly sessionId: string
+  /** 会话标题；无标题时由映射层给出兜底文案。 */
   readonly title: string
+  /** 逐轮次的轨迹（按时间序）。 */
   readonly turns: TrajectoryTurn[]
+  /** 上下文压缩记录；无压缩时缺省。 */
   readonly compaction?: TrajectoryCompaction | undefined
+  /** 会话结束标记；会话仍在进行或缺省时为空。 */
   readonly sessionEnd?: TrajectorySessionEnd | undefined
   /** 主会话累计 token；null = 未采集（G0）。 */
   readonly totalTokens: number | null
+  /** 子 Agent 累计 token 合计。 */
   readonly subAgentTokens: number
+  /** 会话内实际活跃时长（毫秒，已扣除轮次间空闲）。 */
   readonly activeMs: number
+  /** 会话总跨度（毫秒，首尾时间戳之差）。 */
   readonly spanMs: number
 }
 
@@ -142,6 +174,12 @@ export function mapSessionTrajectory(dto: SessionTrajectoryDto): SessionTrajecto
   }
 }
 
+/**
+ * 压缩记录适配：前后的轮次边界与 token 数原样透传，时间转成展示时钟。
+ *
+ * @param c - 后端压缩记录 DTO；strategy 为可选压缩策略。
+ * @returns 组件侧压缩记录；strategy 缺失时不产出该键。
+ */
 function mapCompaction(c: TrajectoryCompactionDto): TrajectoryCompaction {
   return {
     id: c.id,

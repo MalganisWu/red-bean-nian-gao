@@ -21,22 +21,31 @@ import { normalizeError } from '../../../../shared/errors/normalize-error.js'
 
 /** 记录器依赖；`onError` 缺省即静默降级——事实写入失败不影响会话主流程。 */
 export interface RunFactRecorderOptions {
+  /** 本次运行的容器命令；runId 用于追加事实与提交终态。 */
   readonly run: StartSessionRunCommand
   /** 事件与消息 append 阶段使用的中止信号；终态化允许传入独立的收尾信号。 */
   readonly signal: AbortSignal
+  /** 事实日志仓储；所有写入经串行队列落到它。 */
   readonly repository: RunFactRepository
+  /** 可替换时钟（epoch 毫秒）；缺省为 Date.now。 */
   readonly now?: (() => number) | undefined
   /** 事实写入失败只影响审计日志，不影响会话主流程；首次失败经此回调上报诊断。 */
   readonly onError?: ((error: Error) => void) | undefined
 }
 
+/** 已收到 tool_start 但尚未闭合的工具；终态补记时据此产出 incomplete 事实。 */
 interface OpenToolCall {
+  /** 工具调用 ID；tool_result 与终态补记据此配对。 */
   readonly callId: string
+  /** 工具名。 */
   readonly name: string
+  /** 调用参数；非可解析的 JSON 对象时为 null。 */
   readonly params: AgentJsonObject | null
+  /** tool_start 到达时刻（epoch 毫秒），用于计算执行时长。 */
   readonly startedAt: number
 }
 
+/** 空响应重试时追认到 attempt 上的固定失败文案；与 LLM_EMPTY_RESPONSE_RETRY 状态码一一对应。 */
 const EMPTY_RESPONSE_ERROR = '模型返回空响应'
 
 /**
@@ -55,15 +64,23 @@ const APPROVAL_CLOSURE_TOOL_NAME = 'approval'
  * `RunFactRepository` 持久化；attempt 状态机见 `RunFactStepBuffer`。
  */
 export class RunFactRecorder implements AgentExecutionEventSink {
+  /** 事实日志仓储；串行队列的写入目标。 */
   readonly #repository: RunFactRepository
+  /** 本次运行的容器命令；runId 用于追加事实与提交终态。 */
   readonly #run: StartSessionRunCommand
+  /** append 阶段的中止信号；由构造参数传入。 */
   readonly #signal: AbortSignal
+  /** 可替换时钟（epoch 毫秒）；缺省为 Date.now。 */
   readonly #now: () => number
+  /** 写入失败诊断回调；未注入时静默降级。 */
   readonly #onError: ((error: Error) => void) | undefined
   /** 串行化所有仓储写入：保证 facts JSONB 的追加顺序与事件到达顺序一致。 */
   #queue: Promise<void> = Promise.resolve()
+  /** 是否已因写入失败停写；置位后队列不再执行后续操作，避免把注定失败的写排进队列。 */
   #broken = false
+  /** 当前进行中步骤的累积缓冲；承载 attempts、思考与正文增量。 */
   #step = new RunFactStepBuffer()
+  /** 已收到 tool_start 但尚未闭合的工具，按 callId 索引；终态时产出 incomplete 事实。 */
   #openTools = new Map<string, OpenToolCall>()
   /**
    * 本次运行已登记过的 callId（tool_start 或 tool_result 事件）。
@@ -288,6 +305,7 @@ export class RunFactRecorder implements AgentExecutionEventSink {
    *
    * **只处理本次运行没见过的 callId**：普通工具的 tool 消息与 tool_result 事件是同一次结果的
    * 两个通道，两边都写会重复成两行；而 interrupting 工具没有 tool_start，必然「没见过」。
+   * @param message - resume 注入的 tool 消息；其 toolCallId 是与挂起事实合并的关键
    */
   #recordApprovalClosure(message: AgentMessage): void {
     const callId = message.toolCallId
@@ -325,17 +343,28 @@ export class RunFactRecorder implements AgentExecutionEventSink {
     this.#openTools.clear()
   }
 
+  /**
+   * 把一条已组装的事实排进串行写入队列；调用方不等待其完成（尽力语义）。
+   * @param fact - 待追加的事实记录
+   */
   #emitFact(fact: RunFact): void {
     this.#enqueue(async (): Promise<void> => {
       await this.#append(fact)
     })
   }
 
+  /**
+   * 把事实追加到 run 容器；使用 append 阶段的信号，失败向上抛由队列统一收尾。
+   * @param fact - 待追加的事实记录
+   */
   async #append(fact: RunFact): Promise<void> {
     await this.#repository.appendFact(this.#run.runId, fact, this.#signal)
   }
 
-  /** 所有仓储写入的唯一入口：串行 + 尽力语义，首次失败上报并停写。 */
+  /**
+   * 所有仓储写入的唯一入口：串行 + 尽力语义，首次失败上报并停写。
+   * @param operation - 返回写入 promise 的操作；失败由队列捕获并置 #broken
+   */
   #enqueue(operation: () => Promise<void>): void {
     /** 写入失败收尾：标记停写，并把归一化后的错误交给诊断回调（缺省即静默降级）。 */
     const onWriteFailure = (cause: unknown): void => {

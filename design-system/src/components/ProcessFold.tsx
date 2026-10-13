@@ -13,11 +13,20 @@ export type ProcessStepState = 'complete' | 'active' | 'waiting'
 
 /** 过程轨道里的一步；`kind` 标明步骤类型，对应的载荷字段按需填入，其余忽略。 */
 export interface ProcessStep {
+  /**
+   * 步骤类型，决定走哪条渲染分支：`think` / `narration` 出正文，`tool` 出工具行（可挂子代理），
+   * `sub_agent` 与 `approval` 直接渲染各自载荷；其余字段按类型按需读取。
+   */
   kind: 'think' | 'narration' | 'tool' | 'sub_agent' | 'approval'
+  /** 步骤正文（`think` / `narration` 用），支持反引号内联代码；缺省按空串处理。 */
   content?: string | undefined
+  /** 工具调用的展示数据（`tool` 用）；缺省时该步骤不渲染工具行。 */
   tool?: ToolItemProps | undefined
+  /** 子代理节点（`tool` 或 `sub_agent` 用）；挂在工具行下时表示该工具派生了子任务。 */
   subAgent?: ReactNode | undefined
+  /** 确认节点（`approval` 用）；缺省时该步骤渲染为空，等待确认也不会常显。 */
   approval?: ReactNode | undefined
+  /** 完成度；参与轨道节点配色与「已完成步数」统计，缺省视为未开始。 */
   state?: ProcessStepState | undefined
   /** 兼容旧调用方；true 等同于 state="active"。 */
   active?: boolean | undefined
@@ -37,6 +46,7 @@ export interface ProcessFoldProps {
   defaultExpanded?: boolean | undefined
 }
 
+/** 过程整体状态到折叠标题文案的映射；键与 `ProcessStatus` 一一对应，新增状态时类型检查会强制补齐。 */
 const STATUS_LABEL: Record<ProcessStatus, string> = {
   running: '正在执行',
   awaiting: '等待确认',
@@ -45,10 +55,28 @@ const STATUS_LABEL: Record<ProcessStatus, string> = {
   cancelled: '已停止',
 }
 
+/**
+ * 判断某一步是否是「正在等待确认」的批准节点。
+ *
+ * 等待确认的节点即使整条轨道收起也必须常显，因此这个判定同时服务折叠标题与逐条可见性；
+ * 新旧两种写法（`state="waiting"` 与旧调用方的 `active`）都算等待，避免漏掉确认提示。
+ *
+ * @param step - 待判定的过程步骤。
+ * @returns 该步骤是否为待确认节点。
+ */
 function isPendingApproval(step: ProcessStep): boolean {
   return step.kind === 'approval' && (step.state === 'waiting' || step.active === true)
 }
 
+/**
+ * 把过程正文里的反引号片段渲染成内联代码，其余文本原样输出。
+ *
+ * 只用一层正则切分而不引入 Markdown 引擎——过程文案是轻量占位文本，为它拉全套解析
+ * 不划算；反引号内的内容按等宽字体与 `process-code` 语义色渲染。
+ *
+ * @param content - 过程步骤的原始正文。
+ * @returns 文本与内联 `code` 元素交错组成的节点数组。
+ */
 function renderProcessCopy(content: string): ReactNode {
   return content.split(/(`[^`\n]+`)/g).map((part, index) =>
     part.startsWith('`') && part.endsWith('`') ? (

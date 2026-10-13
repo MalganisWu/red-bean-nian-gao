@@ -5,33 +5,53 @@ import type { DisplayMessage } from '../../presentation/model/display-message.js
  * 从 unknown 开始逐字段守卫，不让脏数据进入投影。
  */
 export interface SectionLike {
+  /** 段类型判别值；由投影层与本文件共享的常量集解释，取值不合法即静默跳过该段。 */
   readonly type?: unknown
+  /** 段的子项数组（reason 的思考片段、sub_agent 的载荷等）；非数组按空缺处理。 */
   readonly items?: unknown
+  /** tool_group 段的工具项数组；非数组按空处理，不视为错误。 */
   readonly tools?: unknown
+  /** content 段的正文文本；非字符串按空缺处理。 */
   readonly content?: unknown
+  /** card 段的卡片载荷（审批交互状态）；非对象按无卡片处理。 */
   readonly card?: unknown
+  /** 段发生时刻（epoch 毫秒）；非法值退回 0。 */
   readonly timestamp?: unknown
+  /** 段耗时（毫秒）；非法值退回 null，与合法的 0 区分。 */
   readonly duration?: unknown
 }
 
 /** `tools[]` 元素的形状守卫；字段刻意全是 `unknown`，读取方必须逐个收窄后才能用。 */
 export interface ToolItemLike {
+  /** 工具调用 id；当前仅供潜在的去重与关联使用。 */
   readonly callId?: unknown
+  /** 工具名；唯一硬性字段，缺失即丢弃该工具项。 */
   readonly name?: unknown
+  /** 工具结局（如 success / failed）；非字符串按未知处理。 */
   readonly status?: unknown
+  /** 工具入参的 JSON 文本；非字符串按空缺处理。 */
   readonly params?: unknown
+  /** 工具成功结果文本；非字符串按空缺处理。 */
   readonly result?: unknown
+  /** 工具失败文本；非字符串按空缺处理。 */
   readonly error?: unknown
+  /** 工具耗时（毫秒）；非法值退回 null。 */
   readonly duration?: unknown
 }
 
 /** `sub_agent` 段落的形状守卫；键名沿用落库时的 snake_case，不在这里改名。 */
 export interface SubAgentSectionLike {
+  /** 子 Agent 定义 id，落库键沿用 snake_case。 */
   readonly agent_id?: unknown
+  /** 子 Agent 展示名；缺失时回落到子执行记录或固定文案。 */
   readonly agent_name?: unknown
+  /** 子执行 id；用于与子执行记录对账。 */
   readonly execution_id?: unknown
+  /** 父运行里触发本次委派的工具调用 id；据此并入子执行记录。 */
   readonly parent_call_id?: unknown
+  /** 子运行状态；非字符串或缺失时回落到子执行记录。 */
   readonly status?: unknown
+  /** 子运行结果摘要；缺失时回落到子执行记录或名称。 */
   readonly result_summary?: unknown
 }
 

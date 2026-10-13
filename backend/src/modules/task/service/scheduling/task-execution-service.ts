@@ -24,34 +24,52 @@ import { optionalField } from '../../../../shared/object/optional-field.js'
 
 /** 重试策略：最大重试次数、重试间隔（毫秒）与 cron 解释所用的时区。 */
 export interface ScheduledTaskPolicy {
+  /** 最大重试次数；重试计数达到它即判定预算耗尽，进入最终失败分支。 */
   readonly maxRetries: number
+  /** 距上次失败的等待间隔（毫秒）；用于算下一次重试的运行时刻。 */
   readonly retryIntervalMilliseconds: number
+  /** 解释 cron 表达式所用时区；非法时区在构造期即拒绝。 */
   readonly timezone: string
 }
 
 /** 一次定时任务运行的业务身份、时间与 fencing 快照。 */
 export interface ScheduledTaskRunState {
+  /** 本次执行所依据的任务定义快照。 */
   readonly task: AgentTaskDefinition
+  /** 本次执行业务 ID；同时作为 Agent run 的业务标识与执行记录主键。 */
   readonly executionId: string
+  /** 链路追踪 ID；透传给 Agent run 与日志，串联一次执行的全程。 */
   readonly traceId: string
+  /** 实际开始时刻；作为执行记录的 startedAt 写入。 */
   readonly startedAt: Date
+  /** 认领执行权用的围栏令牌；失租后落库写入会被拒绝。 */
   readonly fencingToken: bigint
+  /** 失租信号；兑现即表示写入资格已失效，落库前必须据此中断。 */
   readonly leaseLost?: Promise<Error> | undefined
 }
 
 /** 服务依赖；仓储按实际用到的方法收窄，`queue` 缺省表示这次装配不投递结果。 */
 export interface TaskExecutionServiceOptions {
+  /** 任务读取入口；收窄到读取任务定义一个方法。 */
   readonly queries: Pick<TaskQueryRepository, 'getTask'>
+  /** 写路径仓储；认领、更新任务与执行落库三个方法。 */
   readonly commands: Pick<
     TaskCommandRepository,
     'claimExecution' | 'updateTask' | 'saveExecutionWithTaskUpdate'
   >
+  /** ID 生成器；为本次执行生成带前缀的业务 ID。 */
   readonly idGenerator: IdGenerator
+  /** 后台 Agent 执行 Port；run 的核心动作由它承担。 */
   readonly background: BackgroundAgentExecutionPort
+  /** 投递入口；缺省表示本次装配不投递结果（如测试或纯执行场景）。 */
   readonly queue: Pick<DeliveryQueue, 'queueDeliverExecution'> | undefined
+  /** 重试与 cron 策略。 */
   readonly policy: ScheduledTaskPolicy
+  /** 链路追踪器；run 的 span 由它开启与结束。 */
   readonly tracer: Tracer
+  /** traceId 工厂；每次执行据此生成链路标识，便于测试注入固定值。 */
   readonly traceIdFactory: () => string
+  /** 时钟注入点；缺省用系统时间，测试可注入固定时刻。 */
   readonly now?: (() => Date) | undefined
 }
 
@@ -86,17 +104,26 @@ const PERSISTENCE_TIMEOUT_MILLISECONDS = 30_000
  * 全部串联在 run 一个公开方法内，按序调用私有小方法；span 与 traceId 生命周期也由本类负责。
  */
 export class TaskExecutionService {
+  /** 任务读取入口；重试与成功分支都会重新加载任务以拿最新状态。 */
   readonly #queries: Pick<TaskQueryRepository, 'getTask'>
+  /** 写路径仓储；认领、更新任务与执行落库三个方法。 */
   readonly #commands: Pick<
     TaskCommandRepository,
     'claimExecution' | 'updateTask' | 'saveExecutionWithTaskUpdate'
   >
+  /** ID 生成器；为本次执行生成业务 ID。 */
   readonly #idGenerator: IdGenerator
+  /** 后台 Agent 执行 Port。 */
   readonly #background: BackgroundAgentExecutionPort
+  /** 投递入口；undefined 表示本次装配不投递结果。 */
   readonly #queue: Pick<DeliveryQueue, 'queueDeliverExecution'> | undefined
+  /** 重试与 cron 策略；构造时已校验合法。 */
   readonly #policy: ScheduledTaskPolicy
+  /** 链路追踪器；负责 run 的 span。 */
   readonly #tracer: Tracer
+  /** traceId 工厂。 */
   readonly #traceIdFactory: () => string
+  /** 时钟注入点；缺省为系统时间。 */
   readonly #now: () => Date
 
   public constructor(options: TaskExecutionServiceOptions) {
@@ -150,7 +177,15 @@ export class TaskExecutionService {
     }
   }
 
-  /** 快照：加载任务、索取 fencing 并生成执行 ID；凭据不足或竞争失败立即拒绝。 */
+  /**
+   * 快照：加载任务、索取 fencing 并生成执行 ID；凭据不足或竞争失败立即拒绝。
+   *
+   * @param taskId - 待执行任务标识。
+   * @param lease - 调度租约，提供 fencing token 与失租信号。
+   * @param traceId - 本次执行的链路 ID，写入快照供后续日志复用。
+   * @param signal - 取消信号，透传到库查询与认领。
+   * @returns 本次运行的不可变快照。
+   */
   async #loadRunState(
     taskId: string,
     lease: ScheduledTaskLease,
@@ -170,7 +205,14 @@ export class TaskExecutionService {
     }
   }
 
-  /** 执行 Agent：单一调用点组装运行选项；结果或异常统一归一化返回，不在本方法抛错。 */
+  /**
+   * 执行 Agent：单一调用点组装运行选项；结果或异常统一归一化返回，不在本方法抛错。
+   *
+   * @param state - 本次运行快照，提供身份、输入与回退键。
+   * @param lease - 调度租约；其失租信号并入执行信号，失租即中断运行。
+   * @param signal - 取消信号，通常来自调度器的执行超时与父级取消。
+   * @returns Agent 结果与被归一化的错误，二者按约定互斥地表达成败。
+   */
   async #executeAgent(
     state: ScheduledTaskRunState,
     lease: ScheduledTaskLease,
@@ -190,7 +232,14 @@ export class TaskExecutionService {
     }
   }
 
-  /** 提交结果：lease 未丢失才落库；按成功/可重试失败/最终失败走对应分支，随后投递。 */
+  /**
+   * 提交结果：lease 未丢失才落库；按成功/可重试失败/最终失败走对应分支，随后投递。
+   *
+   * @param state - 本次运行快照；落库前据此确认租约仍在。
+   * @param result - Agent 结果；undefined 表示执行期抛错，按系统崩溃处理。
+   * @param executionError - 被捕获的执行异常；与 result 二者至少一个非空。
+   * @param signal - 落库阶段的取消信号，已换为独立的持久化超时预算。
+   */
   async #commit(
     state: ScheduledTaskRunState,
     result: BackgroundAgentExecutionResult | undefined,
@@ -226,6 +275,11 @@ export class TaskExecutionService {
    * - **预算耗尽**：写一条失败执行记录并投递。此时按任务类型分流：
    *   周期任务**把 retryCount 归零**再排下一次 cron——否则它会永远卡在耗尽状态、
    *   每次触发都直接失败；一次性任务则关停。
+   *
+   * @param state - 本次运行快照；fencing token 用于保护落库写入。
+   * @param result - Agent 结果；undefined 表示执行期抛错，展示消息回退为空。
+   * @param errorMessage - 归一化后的错误文案，写入执行记录的 errorMessage。
+   * @param signal - 落库阶段的取消信号。
    */
   async #handleFailure(
     state: ScheduledTaskRunState,
@@ -265,7 +319,13 @@ export class TaskExecutionService {
     await this.#deliver(state, signal)
   }
 
-  /** 成功分支：清空重试计数、按类型安排下次运行或关闭任务，再写执行记录并投递。 */
+  /**
+   * 成功分支：清空重试计数、按类型安排下次运行或关闭任务，再写执行记录并投递。
+   *
+   * @param state - 本次运行快照；fencing token 用于保护落库写入。
+   * @param result - 成功的 Agent 结果，提供输出与展示消息。
+   * @param signal - 落库阶段的取消信号。
+   */
   async #handleSuccess(
     state: ScheduledTaskRunState,
     result: BackgroundAgentExecutionResult,
@@ -293,7 +353,14 @@ export class TaskExecutionService {
     await this.#deliver(state, signal)
   }
 
-  /** 原子落库（fencing 保护）+ 清除恢复缓冲；持久化超时由调用方信号约束。 */
+  /**
+   * 原子落库（fencing 保护）+ 清除恢复缓冲；持久化超时由调用方信号约束。
+   *
+   * @param state - 本次运行快照；fencing token 与租赁检查保护写入。
+   * @param task - 与执行同事务更新的任务定义。
+   * @param execution - 待写入的执行记录。
+   * @param signal - 持久化阶段的取消信号。
+   */
   async #commitExecutionWithUpdate(
     state: ScheduledTaskRunState,
     task: AgentTaskDefinition,
@@ -305,7 +372,19 @@ export class TaskExecutionService {
     await this.#background.clearRecovery(state.task.taskId, signal)
   }
 
-  /** 组装执行记录：成败两路共用同一字段骨架，只替换状态、展示与消息内容。 */
+  /**
+   * 组装执行记录：成败两路共用同一字段骨架，只替换状态、展示与消息内容。
+   *
+   * @param state - 本次运行快照，提供执行 ID、任务与会话归属。
+   * @param scheduledAt - 计划执行时刻；取自任务 nextRunAt 快照。
+   * @param completedAt - 结束时刻。
+   * @param status - 终态；成功为 completed，失败为 failed。
+   * @param displayMessages - 该次运行的展示消息快照。
+   * @param resultType - 结果类型标记：success 或 error。
+   * @param resultMessage - 结果正文，透传给用户。
+   * @param errorMessage - 失败原因；仅在失败分支给出。
+   * @returns 待落库的执行记录。
+   */
   #buildExecution(
     state: ScheduledTaskRunState,
     scheduledAt: Date,
@@ -332,6 +411,12 @@ export class TaskExecutionService {
     }
   }
 
+  /**
+   * 投递结果：把本次执行推进会话投递队列；装配时未提供 queue 则静默跳过。
+   *
+   * @param state - 本次运行快照，提供会话与执行标识。
+   * @param signal - 取消信号，透传到投递队列。
+   */
   async #deliver(state: ScheduledTaskRunState, signal: AbortSignal): Promise<void> {
     await this.#queue?.queueDeliverExecution(
       state.task.sessionId,
@@ -342,7 +427,12 @@ export class TaskExecutionService {
   }
 }
 
-/** Task execution ID 是该次 Agent run 的稳定业务 ID，此映射不得退化为散落字段复制。 */
+/**
+ * Task execution ID 是该次 Agent run 的稳定业务 ID，此映射不得退化为散落字段复制。
+ *
+ * @param state - 本次运行快照。
+ * @returns Agent run 的业务身份；attempt 为已重试次数加一。
+ */
 function scheduledTaskRunIdentity(state: ScheduledTaskRunState): AgentRunIdentity {
   return {
     runId: state.executionId,
@@ -353,7 +443,13 @@ function scheduledTaskRunIdentity(state: ScheduledTaskRunState): AgentRunIdentit
   }
 }
 
-/** 组装本次后台 Agent 运行选项：身份、输入截断与固定系统提示词。 */
+/**
+ * 组装本次后台 Agent 运行选项：身份、输入截断与固定系统提示词，
+ * 并带上排除工具清单，防止无人值守的执行路径触达交互或命令执行工具。
+ *
+ * @param state - 本次运行快照。
+ * @returns 后台 Agent 执行命令。
+ */
 function buildRunOptions(state: ScheduledTaskRunState): BackgroundAgentExecutionCommand {
   return {
     ...scheduledTaskRunIdentity(state),
@@ -365,6 +461,14 @@ function buildRunOptions(state: ScheduledTaskRunState): BackgroundAgentExecution
   }
 }
 
+/**
+ * 把失租信号并入执行信号：租约被接管时立即中断本次运行，避免过期实例继续写。
+ * 无失租信号时直接返回原信号，不额外建控制器。
+ *
+ * @param signal - 原执行信号，通常来自调度器的超时与父级取消。
+ * @param leaseLost - 租约失租信号；undefined 表示该租约不提供失租通知。
+ * @returns 兼受原信号与失租约束的执行信号。
+ */
 function executionSignal(signal: AbortSignal, leaseLost: Promise<Error> | undefined): AbortSignal {
   if (leaseLost === undefined) return signal
   const controller = new AbortController()
@@ -372,6 +476,13 @@ function executionSignal(signal: AbortSignal, leaseLost: Promise<Error> | undefi
   return AbortSignal.any([signal, controller.signal])
 }
 
+/**
+ * 取出租约的围栏令牌；缺失即抛错——没有 fencing token 就无法保证写入资格，
+ * 与其裸奔落库，不如在这里就拒绝。
+ *
+ * @param lease - 调度租约。
+ * @returns 租约的 fencing token。
+ */
 function requireFencingToken(lease: ScheduledTaskLease): bigint {
   if (lease.fencingToken === undefined) throw new Error('定时任务 lease 缺少 fencing token')
   return lease.fencingToken
@@ -381,6 +492,11 @@ function requireFencingToken(lease: ScheduledTaskLease): bigint {
  * 失败时的展示消息：把失败文案放在最前，**保留**原有的推理与工具组 section 在文案之后。
  * 保留过程是有意的——用户需要看到「它尝试做了什么才失败的」，
  * 只留一句「任务失败」会让排障变成猜谜。只截取 reason/tool_group 两类，去掉会与失败文案冲突的内容 section。
+ *
+ * @param messages - 本次运行产生的展示消息；从中抽取推理与工具组过程。
+ * @param notice - 失败文案，置于展示消息最前。
+ * @param timestamp - 消息时间戳来源。
+ * @returns 合成的失败展示消息；内容 section 为失败文案，后接保留的过程 section。
  */
 function failureDisplayMessage(
   messages: readonly DisplayMessage[],
@@ -403,6 +519,12 @@ function failureDisplayMessage(
   }
 }
 
+/**
+ * 把 Agent 的结果状态翻译成面向用户的中文失败文案，覆盖全部状态分支。
+ *
+ * @param status - 结果状态；额外接受 'failed' 表示执行期抛错。
+ * @returns 对应的中文说明。
+ */
 function translateFailureStatus(
   status: BackgroundAgentExecutionResult['status'] | 'failed'
 ): string {
@@ -427,6 +549,11 @@ function translateFailureStatus(
  * 表达式非法或算不出下次时间时，**兜底为 1 小时后**而不是抛错：
  * 抛错会让这次执行失败、任务卡在「永远不会再触发」的状态；
  * 顺延一小时至少能让它继续被调度，运维还有机会从执行记录里发现问题。
+ *
+ * @param expression - cron 表达式；非法时回退。
+ * @param timezone - 解释表达式所用时区。
+ * @param now - 计算基准时刻。
+ * @returns 下次触发时刻；表达式非法或算不出时返回 now 之后一小时。
  */
 function nextCronRun(expression: string, timezone: string, now: Date): Date {
   try {
@@ -443,6 +570,8 @@ function nextCronRun(expression: string, timezone: string, now: Date): Date {
  * `Promise.race([lost, Promise.resolve(undefined)])` 只判断**是否已经丢失**，
  * 不等它将来可能丢失——这个 race 立刻就有结果：丢失的 Promise 已 settle 则拿到 Error，
  * 否则拿到 undefined。若直接 `await state.leaseLost`，一次成功的执行会被永久挂在这里。
+ *
+ * @param state - 本次运行快照；无失租信号时不做任何校验。
  */
 async function assertLeaseHeld(state: ScheduledTaskRunState): Promise<void> {
   if (state.leaseLost === undefined) return
@@ -450,10 +579,22 @@ async function assertLeaseHeld(state: ScheduledTaskRunState): Promise<void> {
   if (lost !== undefined) throw new Error('拒绝持久化已丢失 lease 的定时任务', { cause: lost })
 }
 
+/**
+ * 判定 JSON 值是否为非数组对象，作为读取 section 字段前的窄化闸门。
+ *
+ * @param value - 待判定的 JSON 值。
+ * @returns 为真时 value 可安全按对象索引。
+ */
 function isJsonObject(value: AgentJsonValue): value is Record<string, AgentJsonValue> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/**
+ * 组装期校验重试策略：重试次数与间隔必须为正整数，时区必须能被 Intl 解析。
+ * 在构造时失败，避免运行期出现「永远重试」或「cron 时区静默错位」这类隐患。
+ *
+ * @param policy - 待校验的重试与 cron 策略。
+ */
 function validatePolicy(policy: ScheduledTaskPolicy): void {
   if (!Number.isSafeInteger(policy.maxRetries) || policy.maxRetries <= 0)
     throw new Error('最大重试次数必须大于 0')

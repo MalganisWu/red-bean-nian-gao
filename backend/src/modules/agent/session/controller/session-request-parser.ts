@@ -29,12 +29,30 @@ export function parseSessionPagination(value: unknown): {
   return { cursor, limit: parsedLimit === undefined ? 20 : Math.min(parsedLimit, 100) }
 }
 
+/**
+ * 把 query 里的数字字符串解析为正整数，不可用时返回 `undefined` 交由调用方决定默认值。
+ *
+ * 只接受纯十进制整数串：直接交给 `Number` 会把 `'1e3'`、`'0x10'`、`' 1 '` 也解析成数字，
+ * 让页大小出现预期外的取值；超出安全整数或不算正数的同样拒绝，宁可回落默认值也不放大请求。
+ *
+ * @param value - 未经校验的 query 字段值
+ * @returns 解析出的正整数；非字符串、非纯数字、非安全整数或不为正时返回 `undefined`
+ */
 function positiveInteger(value: unknown): number | undefined {
   if (typeof value !== 'string' || !/^\d+$/u.test(value)) return undefined
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
 }
 
+/**
+ * 判断解包出的 query 是否为可索引的记录，排除 `null` 与数组。
+ *
+ * query 由 Fastify 直接解包，形状不可信；这里不做严格校验而只做形状窄化，是因为分页参数
+ * 另有逐字段兜底，非对象时按空查询处理即可，不必为此返回 400。
+ *
+ * @param value - 未经校验的 query 输入
+ * @returns 是否为非 null、非数组的记录
+ */
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

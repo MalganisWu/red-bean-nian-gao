@@ -10,9 +10,13 @@ import type { ToolItemProps } from './ToolItem'
 
 /** reason 轨道里的一项：一段思考文本，或一次工具调用。 */
 export interface ReasonItem {
+  /** 项的种类：`step` 是一段思考/正文文本，`tool` 是一次工具调用。 */
   itemType: 'step' | 'tool'
+  /** 在原始 reason 轨道里的序号；只用于追溯来源，渲染顺序由数组顺序决定。 */
   index?: number | undefined
+  /** `step` 的文本内容；为空时该 step 被丢弃、不渲染空行。 */
   content?: string | undefined
+  /** `tool` 的工具调用详情（见 `ToolItemProps`）；为空时该工具项被丢弃。 */
   tool?: ToolItemProps | undefined
 }
 
@@ -26,7 +30,15 @@ export interface ReasoningBlockProps {
   defaultExpanded?: boolean | undefined
 }
 
-/** 把一项 reason 记录摊平成 0 或 1 个 Process 步骤；无内容的项直接丢弃。 */
+/**
+ * 把一项 reason 记录摊平成 0 或 1 个 Process 步骤；无内容的项直接丢弃。
+ *
+ * 丢弃而不是补占位：旧数据里可能残留没有内容的 step，摊平成空数组后调用方 `flatMap`
+ * 会自然跳过，避免在统一 Process 轨道里渲染一行空折叠。
+ *
+ * @param item - 一项 reason 记录，可能是思考步骤，也可能是工具调用。
+ * @returns 至多含一个 Process 步骤的数组；无内容的项返回空数组。
+ */
 function reasonItemToSteps(item: ReasonItem): ProcessStep[] {
   if (item.itemType === 'tool' && item.tool) return [{ kind: 'tool', tool: item.tool }]
   if (item.itemType === 'step' && item.content) return [{ kind: 'think', content: item.content }]

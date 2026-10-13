@@ -22,9 +22,13 @@ import {
 
 /** Identity 路由绑定所需的 Controller 与传输层前置处理器。 */
 export interface IdentityRouteBindings {
+  /** 已组装好的用例控制器；路由只负责解包请求、调用它并包成功信封。 */
   readonly controller: IdentityController
+  /** 认证前置处理器；挂到需要 Principal 的端点上，失败时短路成 401。 */
   readonly authenticate: preHandlerAsyncHookHandler
+  /** 注册限流前置处理器；注册端点专用，额度比登录更紧。 */
   readonly limitRegistration: preHandlerAsyncHookHandler
+  /** 登录限流前置处理器；登录端点专用，超限短路成 429。 */
   readonly limitLogin: preHandlerAsyncHookHandler
 }
 
@@ -94,7 +98,13 @@ export function registerUserRoutes(server: FastifyInstance, bindings: IdentityRo
   })
 }
 
-/** POST /api/register：注册新用户并返回 201 信封。 */
+/**
+ * POST /api/register：注册新用户并返回 201 信封。
+ *
+ * @param bindings - 组装层注入的控制器与前置处理器集合
+ * @param request - Fastify 请求对象，请求体取自 `request.body` 并在此先行校验
+ * @param reply - Fastify 响应对象，成功信封由 `sendOk` 写出
+ */
 async function registerUser(
   bindings: IdentityRouteBindings,
   request: FastifyRequest,
@@ -112,7 +122,13 @@ async function registerUser(
   )
 }
 
-/** POST /api/login：校验凭据并签发令牌。 */
+/**
+ * POST /api/login：校验凭据并签发令牌。
+ *
+ * @param bindings - 组装层注入的控制器与前置处理器集合
+ * @param request - Fastify 请求对象，登录体取自 `request.body` 并在此先行校验
+ * @param reply - Fastify 响应对象，成功信封由 `sendOk` 写出
+ */
 async function loginUser(
   bindings: IdentityRouteBindings,
   request: FastifyRequest,
@@ -126,7 +142,13 @@ async function loginUser(
   )
 }
 
-/** POST /api/logout：按 Bearer token 注销当前会话。 */
+/**
+ * POST /api/logout：按 Bearer token 注销当前会话。
+ *
+ * @param bindings - 组装层注入的控制器与前置处理器集合
+ * @param request - Fastify 请求对象，令牌在此从认证头独立解析（该端点不挂 auth 前置处理器）
+ * @param reply - Fastify 响应对象，成功信封由 `sendOk` 写出
+ */
 async function logoutUser(
   bindings: IdentityRouteBindings,
   request: FastifyRequest,
@@ -138,7 +160,13 @@ async function logoutUser(
   )
 }
 
-/** POST /api/refresh：按 Bearer token 续签令牌。 */
+/**
+ * POST /api/refresh：按 Bearer token 续签令牌。
+ *
+ * @param bindings - 组装层注入的控制器与前置处理器集合
+ * @param request - Fastify 请求对象，令牌在此从认证头独立解析（该端点不挂 auth 前置处理器）
+ * @param reply - Fastify 响应对象，成功信封由 `sendOk` 写出
+ */
 async function refreshSession(
   bindings: IdentityRouteBindings,
   request: FastifyRequest,
@@ -150,7 +178,13 @@ async function refreshSession(
   )
 }
 
-/** GET /api/me：读取当前登录用户的资料。 */
+/**
+ * GET /api/me：读取当前登录用户的资料。
+ *
+ * @param bindings - 组装层注入的控制器与前置处理器集合
+ * @param request - Fastify 请求对象，Principal 由 auth 前置处理器写入此处读出
+ * @param reply - Fastify 响应对象，成功信封由 `sendOk` 写出
+ */
 async function getSelfProfile(
   bindings: IdentityRouteBindings,
   request: FastifyRequest,
@@ -167,7 +201,13 @@ async function getSelfProfile(
   )
 }
 
-/** PUT /api/me：按 DTO 更新当前登录用户的资料。 */
+/**
+ * PUT /api/me：按 DTO 更新当前登录用户的资料。
+ *
+ * @param bindings - 组装层注入的控制器与前置处理器集合
+ * @param request - Fastify 请求对象，更新体取自 `request.body`，写入目标取 Principal 的 userId
+ * @param reply - Fastify 响应对象，成功信封由 `sendOk` 写出
+ */
 async function updateSelfProfile(
   bindings: IdentityRouteBindings,
   request: FastifyRequest,
@@ -185,7 +225,13 @@ async function updateSelfProfile(
   )
 }
 
-/** GET /api/users/:id：按 id 读取用户公开资料。 */
+/**
+ * GET /api/users/:id：按 id 读取用户公开资料。
+ *
+ * @param bindings - 组装层注入的控制器与前置处理器集合
+ * @param request - Fastify 请求对象，目标用户 ID 取自路径参数并在此校验
+ * @param reply - Fastify 响应对象，成功信封由 `sendOk` 写出
+ */
 async function getUserDetail(
   bindings: IdentityRouteBindings,
   request: FastifyRequest,
@@ -199,7 +245,13 @@ async function getUserDetail(
   )
 }
 
-/** GET /api/users：按 offset/limit 分页列出用户。 */
+/**
+ * GET /api/users：按 offset/limit 分页列出用户。
+ *
+ * @param bindings - 组装层注入的控制器与前置处理器集合
+ * @param request - Fastify 请求对象，分页参数取自 `request.query` 并由解析层归一化
+ * @param reply - Fastify 响应对象，成功信封由 `sendOk` 写出
+ */
 async function listUsers(
   bindings: IdentityRouteBindings,
   request: FastifyRequest,
@@ -212,7 +264,15 @@ async function listUsers(
   )
 }
 
-/** 从认证头提取 Bearer token；logout/refresh 不经过 authenticate 前置处理器，需要独立解析。 */
+/**
+ * 从认证头提取 Bearer token；logout/refresh 不经过 authenticate 前置处理器，需要独立解析。
+ *
+ * 缺头或空串一律抛 400，不静默放行；`Bearer ` 前缀存在时剥掉，否则按原文返回，
+ * 以兼容历史客户端直接投递裸令牌的写法。
+ *
+ * @param request - Fastify 请求对象，认证头从 `request.headers.authorization` 读取
+ * @returns 去掉 `Bearer ` 前缀后的令牌原文
+ */
 function bearerToken(request: FastifyRequest): string {
   const authorization = firstHeader(request.headers.authorization)
   if (authorization === undefined || authorization === '') throw validationError('缺少认证凭证')

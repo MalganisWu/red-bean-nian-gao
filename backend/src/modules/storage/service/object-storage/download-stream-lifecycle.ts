@@ -29,6 +29,15 @@ export function bindDownloadStreamToAbort(body: Readable, signal: AbortSignal): 
   else signal.addEventListener('abort', onAbort, { once: true })
 }
 
+/**
+ * 取取消信号携带的原因作为流的销毁理由，非 Error 时回落为固定文案。
+ *
+ * 保留原始 `reason` 是为了让下游能看见取消的真实来源；`AbortController.abort()` 不带参数时
+ * `reason` 会是默认的 DOMException，仍属 Error，因此只有非 Error 的取值才需要兜底。
+ *
+ * @param signal - 已进入 aborted 状态的取消信号
+ * @returns 可直接传给 `Readable.destroy` 的错误对象
+ */
 function abortReason(signal: AbortSignal): Error {
   return signal.reason instanceof Error ? signal.reason : new Error('下载已取消')
 }

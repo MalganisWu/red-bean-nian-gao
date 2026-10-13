@@ -20,6 +20,7 @@ import type {
  * 测试也就测不出真实实现里的隔离问题。
  */
 export class MemoryMessageBuffer implements MessageBuffer {
+  /** 各会话的缓冲消息；键为 sessionId（分代写入时含代 revision）。 */
   readonly #messages = new Map<string, AgentMessage[]>()
 
   /**
@@ -128,6 +129,13 @@ export class MemoryMessageBuffer implements MessageBuffer {
   }
 }
 
+/**
+ * 在会话键上追加分代 revision，得到内存实现里这一代专属的键；各代因此互不覆盖。
+ *
+ * @param sessionId - 目标会话标识。
+ * @param generation - 目标分代，只用其 `revision` 参与拼键。
+ * @returns 该会话该代的缓冲键。
+ */
 function generationKey(sessionId: string, generation: MessageBufferGeneration): string {
   return `${sessionId}:${generation.revision.toString()}`
 }
@@ -142,10 +150,13 @@ function generationKey(sessionId: string, generation: MessageBufferGeneration): 
  *   于是「最近更新的排最前」这件事完全不依赖时钟——测试可以注入固定的 `now`。
  */
 export class MemorySessionStore implements FencedSessionRepository {
+  /** 会话主存储；键为 session id，值为深拷贝隔离的快照。 */
   readonly #sessions = new Map<string, Session>()
+  /** 各会话的最后更新时间；列表摘要取它，写入时机与 `save` 一致。 */
   readonly #updated = new Map<string, Date>()
   /** 更新顺序（最早 → 最新）；读取时反转即为列表顺序。 */
   #order: string[] = []
+  /** 取当前时间的函数；默认用真实时钟，测试可注入固定值以消除时间抖动。 */
   readonly #now: () => Date
 
   public constructor(now: () => Date = (): Date => new Date()) {
@@ -315,6 +326,13 @@ export class MemorySessionStore implements FencedSessionRepository {
   }
 }
 
+/**
+ * 深拷贝会话后再交给调用方或存回内部状态。仓储的契约是调用方不得通过返回值直接改到内部状态，
+ * 因此进出都要复制；省掉任何一次都会让测试测不出真实实现里的共享可变问题。
+ *
+ * @param session - 待拷贝的会话。
+ * @returns 与原对象不共享引用的副本。
+ */
 function cloneSession(session: Session): Session {
   return structuredClone(session)
 }
@@ -323,6 +341,9 @@ function cloneSession(session: Session): Session {
  * 取第一条有正文的用户消息作为标题，超过 30 个字符则截断加省略号。
  * 用 `Array.from` 而不是 `slice`：后者按 UTF-16 码元切，会把 emoji 或星形平面的汉字劈成半个。
  * 一条用户消息都没有时返回空串，由展示层决定占位文案。
+ *
+ * @param messages - 会话的展示消息列表，按时间顺序。
+ * @returns 标题；没有可用用户消息时为空串。
  */
 function extractTitle(messages: readonly DisplayMessage[]): string {
   for (const message of messages) {
@@ -333,10 +354,20 @@ function extractTitle(messages: readonly DisplayMessage[]): string {
   return ''
 }
 
+/**
+ * 构造会话不存在的领域错误。越权读与真的不存在收敛到同一条，调用方无法据此探测他人会话。
+ *
+ * @returns `NOT_FOUND` 类型的 SessionStoreError。
+ */
 function notFoundError(): SessionStoreError {
   return new SessionStoreError(SESSION_STORE_ERROR_CODES.NOT_FOUND, 'session not found')
 }
 
+/**
+ * 构造围栏陈旧的领域错误；表示锁已被别的实例接管，调用方应当放弃而不是重试。
+ *
+ * @returns `STALE_FENCE` 类型的 SessionStoreError。
+ */
 function staleFenceError(): SessionStoreError {
   return new SessionStoreError(
     SESSION_STORE_ERROR_CODES.STALE_FENCE,
@@ -344,6 +375,13 @@ function staleFenceError(): SessionStoreError {
   )
 }
 
+/**
+ * 把「已取消」转成待拒绝的错误；返回 undefined 表示信号仍有效、调用方可以继续。
+ * 优先复用信号自身的 reason，缺省时给出标准的 AbortError，保证取消原因不丢。
+ *
+ * @param signal - 调用方传入的取消信号。
+ * @returns 已中止时为对应错误，否则为 undefined。
+ */
 function abortFailure(signal: AbortSignal): Error | undefined {
   if (!signal.aborted) return undefined
   return signal.reason instanceof Error

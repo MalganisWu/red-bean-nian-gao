@@ -26,7 +26,14 @@ const fixturesPath = path.join(root, 'tooling/typescript/export-jsdoc-cases.json
 function listSourceFiles(directory) {
   const files = []
   for (const entry of readdirSync(directory)) {
-    if (entry === 'node_modules' || entry === 'dist') continue
+    if (
+      entry === 'node_modules' ||
+      entry === 'dist' ||
+      entry === '__tests__' ||
+      entry === '__mocks__'
+    ) {
+      continue // 测试目录不参与：测试辅助没有外部调用方，注释收益不成立
+    }
     const full = path.join(directory, entry)
     if (statSync(full).isDirectory()) {
       files.push(...listSourceFiles(full))
@@ -34,6 +41,7 @@ function listSourceFiles(directory) {
     }
     if (!/\.tsx?$/.test(entry)) continue
     if (entry.endsWith('.d.ts')) continue
+    if (/\.(test|spec)\./u.test(entry)) continue
     files.push(full)
   }
   return files

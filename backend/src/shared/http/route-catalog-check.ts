@@ -1,6 +1,7 @@
 import { API_ROUTES, type ApiRouteDefinition } from '@red-bean/api-contract'
 import type { FastifyInstance, RouteOptions } from 'fastify'
 
+/** 契约目录的形状；路由名索引到路由定义，`API_ROUTES` 是其唯一生产实例。 */
 type RouteCatalog = Readonly<Record<string, ApiRouteDefinition>>
 
 /** 路由目录对账句柄；只对账 method+path，认证钩子的一致性由 `bindRoute` 自己断言。 */
@@ -59,7 +60,11 @@ export function verifyRouteCatalog(server: FastifyInstance): void {
   routeCatalogChecker(server).verify()
 }
 
-/** 把一条已注册路由收进对账表；HEAD 由 GET 自动派生，不按业务路由统计。 */
+/**
+ * 把一条已注册路由收进对账表；HEAD 由 GET 自动派生，不按业务路由统计。
+ * @param options - Fastify 传入的路由注册选项，从中取 method 与 url。
+ * @param registered - 收集表，键为 `METHOD url`；本函数就地写入。
+ */
 function collectRegisteredRoute(options: RouteOptions, registered: Map<string, string>): void {
   const methods = Array.isArray(options.method) ? options.method : [options.method]
   for (const method of methods) {
@@ -68,6 +73,11 @@ function collectRegisteredRoute(options: RouteOptions, registered: Map<string, s
   }
 }
 
+/**
+ * 按首个空格把 `METHOD url` 形式的键拆成方法与路径两段。
+ * @param key - `METHOD url` 形式的键；方法名内不含空格，因此按首个空格切分即可。
+ * @returns 方法名与路径组成的二元组。
+ */
 function splitKey(key: string): readonly [string, string] {
   const separator = key.indexOf(' ')
   return [key.slice(0, separator), key.slice(separator + 1)]

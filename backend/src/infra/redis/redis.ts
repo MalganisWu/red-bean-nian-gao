@@ -30,7 +30,13 @@ end
 return 0
 `
 
+/** 单条 `RPUSH`，本身即原子；包成脚本只为与其它列表操作共用同一条下发路径与返回值约定。 */
 const LIST_RIGHT_PUSH_SCRIPT = 'return redis.call("rpush", KEYS[1], ARGV[1])'
+/**
+ * 读列表全量元素的快照脚本（`LRANGE 0 -1`），返回值是元素数组而非计数。
+ * 它不带任何写操作，因此不存在「拆成两次往返会读到中间态」的问题；
+ * 但列表大时会一次性全部取回，只适合规模可控的恢复消息列表。
+ */
 const LIST_RANGE_SCRIPT = 'return redis.call("lrange", KEYS[1], 0, -1)'
 /**
  * 从待办队列取出一个元素并**同时**放进处理中队列（KEYS[2]）。
@@ -58,6 +64,11 @@ while redis.call("llen", KEYS[2]) > 0 do
 end
 return 0
 `
+/**
+ * `LREM` 删除第一个匹配元素。`count` 固定为 `1` 而不是 `0`：同一条消息可能因重投、
+ * 重复回收而出现多份，只删本次消费的那一份，避免误伤还在被别的消费者处理的副本。
+ * 元素不在列表中时返回 `0`，这是幂等清理的正常结果，不是错误。
+ */
 const LIST_REMOVE_SCRIPT = 'return redis.call("lrem", KEYS[1], 1, ARGV[1])'
 /** 追加并续期必须原子，否则可能先追加成功、续期前进程挂掉，留下一个永不过期的列表。 */
 const LIST_APPEND_WITH_EXPIRY_SCRIPT = `
@@ -91,39 +102,124 @@ return data
 
 /** KV 与比较交换接口；比较的是**值**而不是键是否存在，这正是「不会误删别人的锁」的关键。 */
 export interface RedisStore {
+  /**
+   * 无条件写入键并设置毫秒级 TTL，不看旧值；需要互斥语义时应改用 `setIfAbsent`。
+   * @param key - 目标键；本接口不加命名空间前缀，键的唯一性由调用方负责
+   * @param value - 待写入的字符串，序列化由调用方完成
+   * @param ttlMilliseconds - 存活时间（毫秒）
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   */
   set(key: string, value: string, ttlMilliseconds: number, signal: AbortSignal): Promise<void>
+  /**
+   * 仅当键不存在时写入，是获取分布式锁的原语（Redis 的 `SET NX`）。
+   * @param key - 锁键
+   * @param value - 持有者标识；后续比较交换靠它确认所有权
+   * @param ttlMilliseconds - 锁的存活时间（毫秒）
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 是否写入成功；`false` 表示键已被他人占用，本次未做任何修改，属于正常竞争结果
+   */
   setIfAbsent(
     key: string,
     value: string,
     ttlMilliseconds: number,
     signal: AbortSignal
   ): Promise<boolean>
+  /**
+   * 读取键的当前值；键不存在返回 `undefined` 而不是空串，以便与「值恰好是空字符串」区分。
+   * @param key - 目标键
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 键的值；键不存在时为 `undefined`
+   */
   get(key: string, signal: AbortSignal): Promise<string | undefined>
+  /**
+   * 无条件删除键，只应在确认数据确实归自己所有时使用；释放锁必须改用 `compareAndDelete`。
+   * @param key - 目标键
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   */
   delete(key: string, signal: AbortSignal): Promise<void>
+  /**
+   * 值仍是期望值时才续期（比较与续期在同一段 Lua 内完成，不会被「续期途中被抢锁」插空）。
+   * @param key - 锁键
+   * @param expectedValue - 期望的当前值，即自己的持有者标识
+   * @param ttlMilliseconds - 续期后的存活时间（毫秒）
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 是否续期成功；`false` 表示值已不匹配，此时续期已无意义，本次未做任何修改
+   */
   compareAndExpire(
     key: string,
     expectedValue: string,
     ttlMilliseconds: number,
     signal: AbortSignal
   ): Promise<boolean>
+  /**
+   * 值仍是期望值时才删除，是释放锁的唯一安全方式；比较与删除在同一段 Lua 内完成。
+   * @param key - 锁键
+   * @param expectedValue - 期望的当前值，即自己的持有者标识
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 是否真的删除；`false` 表示锁已不属于自己，什么都不做即正确结果
+   */
   compareAndDelete(key: string, expectedValue: string, signal: AbortSignal): Promise<boolean>
+  /**
+   * 查询键的剩余存活时间（毫秒），语义透传 Redis 的 `PTTL`。
+   * @param key - 目标键
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 剩余毫秒数；`-1` 表示键存在但永不过期，`-2` 表示键不存在，两者必须分开判断
+   */
   ttlMilliseconds(key: string, signal: AbortSignal): Promise<number>
 }
 
 /** 底层客户端的窄接口；上层因此不绑定具体 redis 客户端，测试可注入假驱动。 */
 export interface RedisDriver {
+  /** 建立连接；未完成前其余命令都不应下发。 */
   connect(): Promise<void>
+  /**
+   * 发一次 `PING` 并原样返回响应文本，健康判定交由上层决定。
+   * @returns 服务端返回的响应文本，正常为 `PONG`
+   */
   ping(): Promise<string>
+  /**
+   * 优雅关闭连接并等待服务端回应。
+   * @returns 服务端返回的关闭响应文本
+   */
   quit(): Promise<string>
+  /** 同步强制断开，不做优雅关闭，用于连接已经不可用的失败路径。 */
   destroy(): void
+  /**
+   * 透传 Redis 的 `SET`，过期与互斥语义完全由 `options` 决定。
+   * @param key - 目标键
+   * @param value - 待写入的字符串
+   * @param options - `PX` 是必填的过期毫秒数；`NX` 为真时仅在键不存在时写入
+   * @returns 写入成功为 `OK`；`NX` 未命中时为 `null`
+   */
   set(
     key: string,
     value: string,
     options: { readonly PX: number; readonly NX?: true }
   ): Promise<string | null>
+  /**
+   * 读取键值。
+   * @param key - 目标键
+   * @returns 键的值；键不存在时为 `null`
+   */
   get(key: string): Promise<string | null>
+  /**
+   * 无条件删除键。
+   * @param key - 目标键
+   * @returns 实际删除的键数量
+   */
   del(key: string): Promise<number>
+  /**
+   * 查询键的剩余存活时间（毫秒）。
+   * @param key - 目标键
+   * @returns 剩余毫秒数；`-1` 为无过期时间，`-2` 为键不存在
+   */
   pTTL(key: string): Promise<number>
+  /**
+   * 执行一段 Lua 脚本；`keys` 与 `arguments` 分列传入，不把参数拼进脚本文本。
+   * @param script - Lua 脚本原文
+   * @param options - `keys` 作为 `KEYS` 数组、`arguments` 作为 `ARGV` 数组传给脚本
+   * @returns 脚本的原始返回值，其类型由脚本自身决定
+   */
   eval(
     script: string,
     options: { readonly keys: readonly string[]; readonly arguments: readonly string[] }
@@ -132,32 +228,56 @@ export interface RedisDriver {
 
 /** 造驱动的工厂；默认实现基于 node-redis 的 `createClient`。 */
 export interface RedisDriverFactory {
+  /**
+   * 造一个尚未建连的驱动实例；建连由 `RedisDriver.connect` 负责，工厂本身不产生网络副作用。
+   * @param url - 连接串，协议必须是 `redis:` 或 `rediss:`
+   * @returns 新的驱动实例
+   */
   create(url: string): RedisDriver
 }
 
+/** 基于 node-redis `createClient` 的默认驱动：把窄接口一对一映射到客户端方法，不做任何策略。 */
 class NodeRedisDriver implements RedisDriver {
+  /** node-redis 的客户端实例；只在本类内部使用，上层一律通过窄接口访问。 */
   readonly #client: ReturnType<typeof createClient>
 
   public constructor(url: string) {
     this.#client = createClient({ url })
   }
 
+  /** 建立连接。 */
   public async connect(): Promise<void> {
     await this.#client.connect()
   }
 
+  /**
+   * 探活。
+   * @returns 服务端返回的响应文本
+   */
   public ping(): Promise<string> {
     return this.#client.ping()
   }
 
+  /**
+   * 优雅关闭。
+   * @returns 服务端返回的关闭响应文本
+   */
   public quit(): Promise<string> {
     return this.#client.quit()
   }
 
+  /** 同步强制断开。 */
   public destroy(): void {
     this.#client.destroy()
   }
 
+  /**
+   * 透传 `SET`。
+   * @param key - 目标键
+   * @param value - 待写入的字符串
+   * @param options - `PX` 为过期毫秒数；`NX` 为真时仅在键不存在时写入
+   * @returns 写入成功为 `OK`；`NX` 未命中时为 `null`
+   */
   public set(
     key: string,
     value: string,
@@ -166,18 +286,40 @@ class NodeRedisDriver implements RedisDriver {
     return this.#client.set(key, value, options)
   }
 
+  /**
+   * 读取键值。
+   * @param key - 目标键
+   * @returns 键的值；键不存在时为 `null`
+   */
   public get(key: string): Promise<string | null> {
     return this.#client.get(key)
   }
 
+  /**
+   * 无条件删除键。
+   * @param key - 目标键
+   * @returns 实际删除的键数量
+   */
   public del(key: string): Promise<number> {
     return this.#client.del(key)
   }
 
+  /**
+   * 查询剩余存活时间（毫秒）。
+   * @param key - 目标键
+   * @returns 剩余毫秒数；`-1` 为无过期时间，`-2` 为键不存在
+   */
   public pTTL(key: string): Promise<number> {
     return this.#client.pTTL(key)
   }
 
+  /**
+   * 执行 Lua 脚本。这里把只读的 `keys` / `arguments` 复制成可变数组，
+   * 因为 node-redis 的 `eval` 签名要求可变数组，直接传只读引用无法通过类型检查。
+   * @param script - Lua 脚本原文
+   * @param options - `keys` 作为 `KEYS` 数组、`arguments` 作为 `ARGV` 数组传给脚本
+   * @returns 脚本的原始返回值，其类型由脚本自身决定
+   */
   public eval(
     script: string,
     options: { readonly keys: readonly string[]; readonly arguments: readonly string[] }
@@ -186,7 +328,13 @@ class NodeRedisDriver implements RedisDriver {
   }
 }
 
+/** 默认工厂：每次调用都造一个独立的 node-redis 驱动，实例之间不共享连接。 */
 class DefaultRedisDriverFactory implements RedisDriverFactory {
+  /**
+   * 造一个基于 node-redis 的驱动实例。
+   * @param url - 连接串，直接交给 `createClient`
+   * @returns 尚未建连的驱动实例
+   */
   public create(url: string): RedisDriver {
     return new NodeRedisDriver(url)
   }
@@ -204,7 +352,9 @@ class DefaultRedisDriverFactory implements RedisDriverFactory {
  * 副作用（写、删、出队）**已经发生**，这一点调用方必须知道：取消不等于回滚。
  */
 export class RedisConnection implements RedisStore {
+  /** 底层驱动；所有 Redis 命令都经它转发。 */
   readonly #driver: RedisDriver
+  /** 关闭的共享 Promise；`??=` 保证 `close()` 被反复调用时只断开一次。 */
   #closePromise: Promise<void> | undefined
 
   public constructor(driver: RedisDriver) {
@@ -546,6 +696,15 @@ export class RedisConnection implements RedisStore {
     return this.#closePromise
   }
 
+  /**
+   * 执行一段 Lua，并在命令前后各做一次取消检查；所有列表与比较交换脚本都经这里下发。
+   * 它在脚本返回后才检查中止：副作用此时**已经发生**，抛错只表示结果被丢弃，不表示回滚。
+   * @param script - Lua 脚本原文
+   * @param keys - 作为 `KEYS` 数组传给脚本的键列表
+   * @param arguments_ - 作为 `ARGV` 数组传给脚本的参数列表
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 脚本的原始返回值，解释方式由各调用方决定
+   */
   async #evaluate(
     script: string,
     keys: readonly string[],
@@ -589,7 +748,11 @@ export async function connectRedis(
   }
 }
 
-/** 提前拦住明显错误的 URL：空值，以及 `http:` 这类会被 `createClient` 拒掉的协议。 */
+/**
+ * 提前拦住明显错误的 URL：空值，以及 `http:` 这类会被 `createClient` 拒掉的协议。
+ * 在进 `connectRedis` 前就抛错，避免把配置错误拖到建连阶段才暴露成连接失败。
+ * @param value - 待校验的连接串
+ */
 function validateRedisUrl(value: string): void {
   if (value.trim() === '') throw new Error('REDIS_URL 未设置')
   let url: URL
@@ -603,13 +766,25 @@ function validateRedisUrl(value: string): void {
   }
 }
 
-/** Lua 的整数返回值可能是 number 或 bigint（取决于客户端与数值大小），两者都接受。 */
+/**
+ * Lua 的整数返回值可能是 number 或 bigint（取决于客户端与数值大小），两者都接受。
+ * @param value - Lua 的原始返回值
+ * @returns 解释后的整数；无法安全解释成整数时抛错，而不是静默当成 0
+ */
 function redisInteger(value: unknown): number {
   if (typeof value === 'number' && Number.isSafeInteger(value)) return value
   if (typeof value === 'bigint') return Number(value)
   throw new Error('invalid Redis integer response')
 }
 
+/**
+ * 把 Lua 的列表返回值收敛成字符串数组。
+ * 逐项校验而不是直接断言：驱动返回的形状取决于客户端版本，混进非字符串元素时必须报错，
+ * 否则坏数据会一路流进队列消费逻辑，在离根因很远的地方才炸开。
+ * @param value - Lua 的原始返回值
+ * @param operation - 操作名，仅用于组装错误消息
+ * @returns 校验通过的字符串数组；形状不对时抛错
+ */
 function redisStringArray(value: unknown, operation: string): readonly string[] {
   if (!Array.isArray(value)) throw new Error(`${operation} returned an invalid value`)
   const items: string[] = []

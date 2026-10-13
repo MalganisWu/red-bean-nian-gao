@@ -108,6 +108,9 @@ const GRID = `${GRID_WIDE} ${GRID_NARROW}`
  * 产出子行的单行摘要：取首行并在展示层截断。
  * 后端 `SUMMARY_MAX_CHARS` 是**数据**上限（防病态单行），这里是**视觉**截断，
  * 两者职责不同：宽容器能多显示、窄容器少显示，不按固定字符数硬切。
+ *
+ * @param text - 产出全文（可能多行）。
+ * @returns 首行文本；没有内容时返回空串，不虚构占位。
  */
 function firstSummaryLine(text: string): string {
   return text.split('\n', 1)[0] ?? ''
@@ -117,14 +120,11 @@ function firstSummaryLine(text: string): string {
  * 时间轴节点：形状语言本身也是身份线索（颜色之外），并承载进行中/失败/挂起状态。
  * call 用实心圆，attempt 用小圆点（见 AttemptRow），工具用圆角方，子 Agent 用空心环，
  * 终态标记用空心方——四类形状互不混淆。
+ *
+ * @param props - 节点属性；字段语义见下方类型。
  */
-function AxisNode({
-  kind,
-  status,
-}: {
-  kind: TrajectoryRecord['kind']
-  status?: TrajectoryRecord['status']
-}) {
+function AxisNode(props: { kind: TrajectoryRecord['kind']; status?: TrajectoryRecord['status'] }) {
+  const { kind, status } = props
   return (
     <span
       aria-hidden="true"
@@ -157,16 +157,17 @@ function AxisNode({
   )
 }
 
-/** 耗时胶囊条：宽度占全会话比例尺的百分比。 */
-function DurationBar({
-  ms,
-  tone,
-  scaleMs,
-}: {
+/**
+ * 耗时胶囊条：宽度占全会话比例尺的百分比。
+ *
+ * @param props - 条属性；字段语义见下方类型。
+ */
+function DurationBar(props: {
   ms: number | undefined
   tone: 'call' | 'tool' | 'err' | 'sub' | 'turn' | 'cmp'
   scaleMs: number
 }) {
+  const { ms, tone, scaleMs } = props
   if (ms === undefined) return null
   const width = Math.max((ms / scaleMs) * 100, 2)
   return (
@@ -198,8 +199,11 @@ function DurationBar({
  * 工具的状态**并入 chip**（沿用「工具 · 失败」的既有做法）：窄容器下「记录」列约 262px，
  * 放不下「chip + 工具名 + 目标 + 状态徽章 + 等待时长」五项；有状态时目标让位，
  * 完整目标与参数在检查器。
+ *
+ * @param props - 组件属性；`record` 为待渲染的记录，其 `kind` / `status` 决定 chip 文案与配色。
  */
-function KindChip({ record }: { record: TrajectoryRecord }) {
+function KindChip(props: { record: TrajectoryRecord }) {
+  const { record } = props
   if (record.kind === 'user') {
     return (
       <span className="inline-flex h-[19px] items-center rounded-md border border-brand-indicator bg-primary-soft px-[5px] py-0 text-label leading-none font-semibold tracking-[0.035em] text-brand-text">
@@ -257,15 +261,10 @@ function KindChip({ record }: { record: TrajectoryRecord }) {
  * 产出子行：`call` 的 `thinking` / `reply` **字段投影行**，不是记录类型、不占身份调色板。
  * 与检查器的「思考 / 输出」两 tab 同源；展开只显示首行（表格行高必须一致），
  * 全文仍在检查器。点击选中**所属调用**——产出没有独立记录 id。
+ *
+ * @param props - 组件属性；字段语义见下方类型。
  */
-function OutputRow({
-  label,
-  text,
-  callId,
-  selectedId,
-  onSelect,
-  filterText,
-}: {
+function OutputRow(props: {
   label: string
   text: string
   callId: string
@@ -273,6 +272,7 @@ function OutputRow({
   onSelect: ((id: string, tab?: string) => void) | undefined
   filterText: string
 }) {
+  const { label, text, callId, selectedId, onSelect, filterText } = props
   const q = filterText.trim().toLowerCase()
   const hit = !q || text.toLowerCase().includes(q)
   return (
@@ -317,15 +317,10 @@ function OutputRow({
  * 尝试子行：**字段投影行，不是记录类型**——它是所属 `call` 的 `attempts[]` 明细。
  * 因此不复用 `LedgerRow`（那需要伪造一个 kind），也不占身份调色板（无 chip）。
  * 「尝试 N/M」是唯一标签，失败时把原因接在后面。
+ *
+ * @param props - 组件属性；字段语义见下方类型。
  */
-function AttemptRow({
-  attempt,
-  seq,
-  scaleMs,
-  selectedId,
-  onSelect,
-  filterText,
-}: {
+function AttemptRow(props: {
   attempt: TrajectoryAttempt
   seq: number | undefined
   scaleMs: number
@@ -333,6 +328,7 @@ function AttemptRow({
   onSelect: ((id: string) => void) | undefined
   filterText: string
 }) {
+  const { attempt, seq, scaleMs, selectedId, onSelect, filterText } = props
   const q = filterText.trim().toLowerCase()
   const hit =
     !q ||
@@ -501,6 +497,9 @@ export function groupRequests(records: readonly TrajectoryRecord[]): TurnItem[] 
 /**
  * 「工具调用」行的文本：模型写出的调用意图 = 工具名 + 参数。
  * 与紧随其后的「工具执行」行（系统阶段，带结果与耗时）是两件事。
+ *
+ * @param tool - 工具记录；`name` / `target` 缺省时按空串处理。
+ * @returns `name(target)` 形式；只有名字时返回名字，两者皆空时返回空串。
  */
 function toolCallText(tool: TrajectoryRecord): string {
   const name = tool.name ?? ''
@@ -513,6 +512,9 @@ function toolCallText(tool: TrajectoryRecord): string {
  *
  * 不用 `turn.tokens`（那是「轮次合计」单一数字，拆不出入/出/缓）；
  * 各请求的 `tokens` 是调用级三段，求和即可。全部为未采集时返回 undefined（显示占位，不虚构 0）。
+ *
+ * @param records - 本轮按时序排列的扁平记录。
+ * @returns 三段合计；本轮没有任何带 token 的 call 时为 undefined。
  */
 function turnUsage(
   records: readonly TrajectoryRecord[]
@@ -529,12 +531,23 @@ function turnUsage(
   )
 }
 
-/** 请求的模型名：记录级缺失时回落到最后一次尝试携带的模型。 */
+/**
+ * 请求的模型名：记录级缺失时回落到最后一次尝试携带的模型。
+ *
+ * @param call - 调用记录；wire 上模型常挂在 attempt 里。
+ * @returns 模型名；记录级与尝试级都缺失时为 undefined（消费方不渲染模型槽）。
+ */
 function requestModel(call: TrajectoryRecord): string | undefined {
   return call.model ?? call.attempts?.at(-1)?.model
 }
 
-/** 不可变地切换集合里的一项：有则删、无则加。 */
+/**
+ * 不可变地切换集合里的一项：有则删、无则加。
+ *
+ * @param source - 原集合；不直接改写，保证 React 状态引用变化可被侦测。
+ * @param value - 要切换的项。
+ * @returns 新的集合实例。
+ */
 function toggleInSet<T>(source: ReadonlySet<T>, value: T): ReadonlySet<T> {
   const next = new Set(source)
   if (next.has(value)) next.delete(value)
@@ -542,7 +555,13 @@ function toggleInSet<T>(source: ReadonlySet<T>, value: T): ReadonlySet<T> {
   return next
 }
 
-/** 不可变地从集合里删掉一项。 */
+/**
+ * 不可变地从集合里删掉一项。
+ *
+ * @param source - 原集合；不直接改写。
+ * @param value - 要删除的项。
+ * @returns 新的集合实例（不存在该项时内容不变但仍是新实例）。
+ */
 function removeFromSet<T>(source: ReadonlySet<T>, value: T): ReadonlySet<T> {
   const next = new Set(source)
   next.delete(value)
@@ -554,16 +573,10 @@ function removeFromSet<T>(source: ReadonlySet<T>, value: T): ReadonlySet<T> {
  *
  * 输出 token **不拆到各块产出上**（Provider 只返回整次响应的总量，不返回分块），
  * 所以「出」挂在这里，思考/正文/工具调用共享它，不虚构分块数字。
+ *
+ * @param props - 组件属性；字段语义见下方类型。
  */
-function RequestHeaderRow({
-  index,
-  call,
-  toolCount,
-  selectedId,
-  onSelect,
-  folded,
-  onToggleFold,
-}: {
+function RequestHeaderRow(props: {
   index: number
   call: TrajectoryRecord
   toolCount: number
@@ -574,6 +587,7 @@ function RequestHeaderRow({
   /** 折叠开关；缺省表示该请求没有可折叠的工具执行。 */
   onToggleFold?: (() => void) | undefined
 }) {
+  const { index, call, toolCount, selectedId, onSelect, folded, onToggleFold } = props
   /** 键盘等价于点击：Enter / 空格选中这次请求。 */
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -702,20 +716,17 @@ function RequestHeaderRow({
  *
  * wire 只带机制值，文案由 `END_STATE_LABEL` 在此映射：
  * `interrupt` → 「等待用户」（LLM 发起挂起，**不是**中断）、`crashed` → 「已中断」。
+ *
+ * @param props - 组件属性；字段语义见下方类型。
  */
-function EndRow({
-  record,
-  state,
-  selectedId,
-  onSelect,
-  filterText,
-}: {
+function EndRow(props: {
   record: TrajectoryRecord
   state: TrajectoryTurnEnd['state']
   selectedId: string | undefined
   onSelect: ((id: string) => void) | undefined
   filterText: string
 }) {
+  const { record, state, selectedId, onSelect, filterText } = props
   const q = filterText.trim().toLowerCase()
   const hit = !q || record.summary.toLowerCase().includes(q)
   const tone =
@@ -786,15 +797,17 @@ function EndRow({
   )
 }
 
-function LedgerRow({
-  record,
-  scaleMs,
-  selectedId,
-  onSelect,
-  filterText,
-  isChild,
-  focusIds,
-}: {
+/**
+ * 通用记录行：身份 chip + 摘要 + token 列 + 耗时条 + 时长的七列网格行，
+ * 承载普通记录与系统执行（工具 / 子 Agent）。
+ *
+ * `kind=call` 的产出（思考 / 正文）与尝试明细按需展开为子行，默认折叠 —— 审计优先看
+ * 「做了什么」，默认展开会让每个调用多出 1–2 行，密度翻倍。用户消息等即时事件没有耗时，
+ * 「时长」列留空而非填 0。子 Agent 的内部工具通过 `children` 递归渲染。
+ *
+ * @param props - 组件属性；字段语义见下方类型。
+ */
+function LedgerRow(props: {
   record: TrajectoryRecord
   scaleMs: number
   selectedId: string | undefined
@@ -803,6 +816,7 @@ function LedgerRow({
   isChild?: boolean
   focusIds?: ReadonlySet<string> | null | undefined
 }) {
+  const { record, scaleMs, selectedId, onSelect, filterText, isChild, focusIds } = props
   /* 产出（思考/正文）与尝试明细默认**折叠**：审计优先看「做了什么」，
      需要原文时再展开——默认展开会让每个调用都多出 1–2 行，密度翻倍。 */
   const [childrenOpen, setChildrenOpen] = useState(false)
@@ -1020,8 +1034,13 @@ function LedgerRow({
 
 /* ---------- 结束标记行 ---------- */
 
-/* 终态文案：wire 只带机制值（按触发者分类），文案在展示边界补。
-   interrupt 是 LLM 发起挂起，不是中断；crashed 才是进程遗留。 */
+/**
+ * 终态文案：wire 只带机制值（按触发者分类），文案在展示边界补。
+ * interrupt 是 LLM 发起挂起，不是中断；crashed 才是进程遗留。
+ *
+ * 不复用 `trajectoryEndStateLabel`：记录表里 `crashed` 要说全（「已中断 · 进程中断」），
+ * 单看「已中断」容易与 `interrupt` 的「等待用户」混淆，而两者的责任方根本不同。
+ */
 const END_STATE_LABEL: Record<TrajectoryTurnEnd['state'], string> = {
   completed: '完成',
   failed: '失败',
@@ -1031,6 +1050,18 @@ const END_STATE_LABEL: Record<TrajectoryTurnEnd['state'], string> = {
   crashed: '已中断 · 进程中断',
 }
 
+/**
+ * 把终态标记合成为一条可渲染的 `turn-end` / `session-end` 记录。
+ *
+ * wire 上终态是轮次上的字段、不是记录；记录表按「行」渲染，所以在这里补出一个
+ * 只有展示意义的记录壳。`seq` 缺省时不写该字段（而非写 0），避免显示假序号。
+ *
+ * @param kind - 记录类型：轮次结束或会话结束。
+ * @param at - 结束时刻，HH:MM:SS。
+ * @param seq - 全局稳定序号；undefined 表示未采集。
+ * @param text - 行摘要文案（状态由 chip 承担，正文只讲发生了什么）。
+ * @returns 供 EndRow 渲染的合成记录。
+ */
 function endRowRecord(
   kind: 'turn-end' | 'session-end',
   at: string,
@@ -1044,19 +1075,25 @@ function endRowRecord(
 
 /* ---------- 压缩卡片 ---------- */
 
+/** 压缩终态 → 展示文案；三态在压缩卡片里都要可辨（失败/中断时上下文未收缩）。 */
 const CMP_STATUS_LABEL = { success: '成功', failed: '失败', interrupted: '已中断' } as const
 
-function CompactionCard({
-  compaction,
-  scaleMs,
-  selectedId,
-  onSelect,
-}: {
+/**
+ * 压缩卡片：轮次之间的虚线卡片，展示 token 收缩的**对照事实**（压缩前 → 压缩后）、
+ * 状态、被总结的消息数与释放量。
+ *
+ * 压缩不产出模型 token，所以它既不是记录也不是请求，而是轮次间的一等公民事件。
+ * 失败 / 中断时 `afterTokens` 未收缩，卡片照实显示而不美化。
+ *
+ * @param props - 组件属性；字段语义见下方类型。
+ */
+function CompactionCard(props: {
   compaction: TrajectoryCompaction
   scaleMs: number
   selectedId: string | undefined
   onSelect: ((id: string) => void) | undefined
 }) {
+  const { compaction, scaleMs, selectedId, onSelect } = props
   const ratio = compaction.afterTokens / compaction.beforeTokens
   const released = compaction.beforeTokens - compaction.afterTokens
   const status = compaction.status ?? 'success'
@@ -1155,7 +1192,15 @@ function CompactionCard({
   )
 }
 
-/** 找出含选中记录的轮次号；没有选中或找不到时返回 undefined。 */
+/**
+ * 找出含选中记录的轮次号；没有选中或找不到时返回 undefined。
+ *
+ * 选中项可能是记录本身，也可能是它的一条尝试（尝试与记录共用选中态，但 id 不同）。
+ *
+ * @param turns - 全部轮次。
+ * @param selectedId - 当前选中的记录 / 尝试 id；undefined 表示无选中。
+ * @returns 命中轮次的序号；无选中或未命中时 undefined（此时不画 turnRail）。
+ */
 function findActiveTurn(
   turns: TrajectoryTurn[],
   selectedId: string | undefined
@@ -1170,7 +1215,16 @@ function findActiveTurn(
   return undefined
 }
 
-/** 推导每轮之前的间隔项：压缩事件前后各一段空档，没有压缩时只剩等待用户的空档。 */
+/**
+ * 推导每轮之前的间隔项：压缩事件前后各一段空档，没有压缩时只剩等待用户的空档。
+ *
+ * 间隔不属于 wire 数据，是从轮次起止时刻与压缩时刻推导出的展示项；因此只对第 2 轮起
+ * 生成（首轮之前没有前序）。
+ *
+ * @param turns - 全部轮次。
+ * @param compaction - 会话级压缩事件；undefined 时只推导单段等待空档。
+ * @returns 轮次号到该轮前间隔项列表的映射。
+ */
 function computeIntervalsBefore(
   turns: TrajectoryTurn[],
   compaction: TrajectoryCompaction | undefined
@@ -1666,8 +1720,13 @@ export function TrajectoryLedger(props: TrajectoryLedgerProps) {
   )
 }
 
-/** 轮次间空档带：全宽虚线 + pill 标签。 */
-function GapBand({ gap }: { gap: TrajectoryGap }) {
+/**
+ * 轮次间空档带：全宽虚线 + pill 标签。
+ *
+ * @param props - 组件属性；`gap` 提供空档秒数与起止时刻，标签说明在等什么。
+ */
+function GapBand(props: { gap: TrajectoryGap }) {
+  const { gap } = props
   return (
     <div className={`relative grid min-h-[46px] ${GRID} items-center gap-x-2.5`}>
       <span />

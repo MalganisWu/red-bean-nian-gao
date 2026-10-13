@@ -1,10 +1,16 @@
 import { ArrowRight, Square } from 'lucide-react'
 
+/** 输入框属性：受控值 + 发送/取消回调；流式中或存在待答卡片时锁定输入。 */
 interface ChatInputProps {
+  /** 输入框的受控文本值。 */
   value: string
+  /** 文本变更时回调，由调用方更新受控值。 */
   onChange: (value: string) => void
+  /** 提交发送；回车（非 IME 组合中）与发送按钮都触发。 */
   onSend: () => void
+  /** 取消当前流式；流式中展示为停止按钮。 */
   onCancel: () => void
+  /** 是否正在流式；为 true 时输入框禁用、动作转为取消。 */
   isStreaming: boolean
   /** 存在待回答的询问卡片：锁普通消息（answer 是唯一解算者） */
   pending?: boolean

@@ -6,16 +6,28 @@ import * as authApi from '@/services/api/auth'
 import * as userApi from '@/services/api/user'
 import type { LoginRequest, RegisterRequest, User } from '@/types/api'
 
+/** useAuth 的返回契约：登录、注册、登出、拉取当前用户四个动作，以及当前认证态快照。 */
 interface AuthControls {
+  /** 登录：成功后写入令牌与用户，失败向上抛出由调用方提示。 */
   login: (request: LoginRequest) => Promise<void>
+  /** 注册并自动登录：注册接口不返回令牌，故随后用同一凭据再登录一次。 */
   register: (request: RegisterRequest) => Promise<void>
+  /** 登出并按 finally 语义清空本地状态，服务端登出失败也不影响本地重置。 */
   logout: () => Promise<void>
+  /** 拉取当前用户并写入 store；失败抛出，由调用方决定处理。 */
   fetchMe: () => Promise<void>
+  /** 当前是否已认证（透传 store 的派生标志）。 */
   isAuthenticated: boolean
+  /** 当前用户快照；未拉取到时为 null。 */
   user: User | null
 }
 
-/** 登录并把令牌与用户信息写入 auth store。 */
+/**
+ * 登录并把令牌与用户信息写入 auth store。
+ *
+ * @param req - 登录请求；用户名与密码。
+ * @param setAuth - 写入令牌与用户的回调；先落 token 再拉用户信息，因为 getMe 依赖 store 中已存的 token。
+ */
 async function loginAndSetAuth(
   req: LoginRequest,
   setAuth: (token: string, user: User) => void
@@ -27,7 +39,12 @@ async function loginAndSetAuth(
   setAuth(res.token, me)
 }
 
-/** 注册成功后自动登录，并把令牌与用户信息写入 auth store。 */
+/**
+ * 注册成功后自动登录，并把令牌与用户信息写入 auth store。
+ *
+ * @param req - 注册请求；用户名与密码。
+ * @param setAuth - 写入令牌与用户的回调；注册本身不返回令牌，故随后用同一凭据再登录一次。
+ */
 async function registerAndSetAuth(
   req: RegisterRequest,
   setAuth: (token: string, user: User) => void
@@ -40,7 +57,11 @@ async function registerAndSetAuth(
   setAuth(loginRes.token, me)
 }
 
-/** 登出并清空本地认证状态；无论服务端登出是否成功，本地状态都要清干净。 */
+/**
+ * 登出并清空本地认证状态；无论服务端登出是否成功，本地状态都要清干净。
+ *
+ * @param clearAuth - 清空 auth store 的回调；在 finally 中调用，保证服务端登出失败时本地也会重置。
+ */
 async function logoutAndClearAuth(clearAuth: () => void): Promise<void> {
   try {
     await authApi.logout()
@@ -52,7 +73,11 @@ async function logoutAndClearAuth(clearAuth: () => void): Promise<void> {
   }
 }
 
-/** 拉取当前用户并写入 auth store。 */
+/**
+ * 拉取当前用户并写入 auth store。
+ *
+ * @param setUser - 写入当前用户的回调；请求失败会抛出，由调用方决定如何处理。
+ */
 async function fetchCurrentUser(setUser: (user: User) => void): Promise<void> {
   const me = await userApi.getMe()
   setUser(me)

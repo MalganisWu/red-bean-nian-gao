@@ -1,8 +1,11 @@
 import { useCallback, useRef } from 'react'
 import type { RefObject, UIEventHandler } from 'react'
 
+/** 无限滚动的挂载契约：绑定到列表容器的 ref 与需挂到容器上的 onScroll 处理器。 */
 interface InfiniteScrollControls {
+  /** 绑定到列表容器的 ref；处理器据此读取滚动位置。 */
   listRef: RefObject<HTMLDivElement | null>
+  /** 挂到容器 onScroll 上的处理器；触底且仍有下一页时回调 loadMore。 */
   handleScroll: UIEventHandler<HTMLDivElement>
 }
 

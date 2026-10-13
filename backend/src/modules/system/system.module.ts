@@ -7,6 +7,7 @@ import { HealthService } from './service/health/default-health-service.js'
 
 /** System Module 对应用层公开的部署探针能力。 */
 export interface SystemModule {
+  /** 部署探针能力：只暴露 Port，隐藏 HealthService 这一具体实现。 */
   readonly health: HealthServicePort
 }
 

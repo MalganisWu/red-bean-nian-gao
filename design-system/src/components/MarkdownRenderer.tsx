@@ -9,7 +9,9 @@ import './markdown.css'
 
 /** Markdown 渲染器的 Props；`className` 追加在 `markdown-body` 之后。 */
 export interface MarkdownRendererProps {
+  /** 待渲染的内容，按 GitHub-Flavored Markdown 解释；纯文本原样显示。 */
   content: string
+  /** 追加在 `markdown-body` 之后的类名；用于外层间距或宽度约束，不改写内部排版规则。 */
   className?: string
 }
 

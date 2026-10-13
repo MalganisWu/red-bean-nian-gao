@@ -1,9 +1,13 @@
 import type { ScheduledTaskMeta } from '@/types/chat'
 import type { ExecutionViewState } from '@/types/task'
 
+/** 定时任务结果卡片折叠判定的输入：任务状态、是否最新一轮，以及用户的手动覆盖。 */
 interface DefaultCollapsedInput {
+  /** 定时任务的运行状态；仅 completed 才可能自动折叠。 */
   status: ScheduledTaskMeta['status']
+  /** 是否为最新一轮结果；最新结果不自动折叠，避免刚产出就被收起。 */
   isLatest: boolean
+  /** 该执行的视图状态（含手动折叠覆盖与已读时间）；缺失时回落到自动规则。 */
   viewState?: ExecutionViewState | undefined
 }
 

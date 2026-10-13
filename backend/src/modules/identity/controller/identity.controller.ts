@@ -25,8 +25,11 @@ import { optionalField } from '../../../shared/object/optional-field.js'
 
 /** Controller 的三个用例服务依赖；Controller 不感知仓储与散列的具体实现。 */
 export interface IdentityControllerDependencies {
+  /** 注册用例服务；负责唯一性校验、散列与落库，控制器不碰这些细节。 */
   readonly registration: IdentityRegistrationService
+  /** 认证端口；登录/登出/续签的失败语义由实现方收敛，控制器只做 HTTP 映射。 */
   readonly authentication: AuthServicePort
+  /** 资料用例服务；承担自有视图与公开视图的读取与更新，含归属校验。 */
   readonly profiles: IdentityProfileService
 }
 
@@ -35,8 +38,11 @@ export interface IdentityControllerDependencies {
  * 请求解包、Principal/Bearer 提取与成功信封输出由 `identity.routes.ts` 承担。
  */
 export class IdentityController {
+  /** 注册用例服务，构造时注入，控制器全生命周期复用同一实例。 */
   readonly #registration: IdentityRegistrationService
+  /** 认证端口，构造时注入，注销与续签都经它执行。 */
   readonly #authentication: AuthServicePort
+  /** 资料用例服务，构造时注入，自带视图与公开视图都由它读取。 */
   readonly #profiles: IdentityProfileService
 
   public constructor(dependencies: IdentityControllerDependencies) {
@@ -224,6 +230,17 @@ export class IdentityController {
   }
 }
 
+/**
+ * 把应用层错误收敛成 HTTP 语义：只有显式标记 CONFLICT / NOT_FOUND 的
+ * `IdentityApplicationError` 才转成 409 / 404，其余一律按未知异常落 500。
+ *
+ * 保守取向的原因：仓储、散列等底层异常的错误信息可能含实现细节，不应转发给调用方；
+ * 未识别的错误码也当未知处理，避免新增错误码被静默当成客户端错误。
+ *
+ * @param cause - 用例层抛出的原始异常；类型未知，需在内部逐类判定
+ * @param fallback - 落 500 时写日志用的中文兜底文案，由调用点按操作语义给定
+ * @returns 可直接抛回 Fastify 的 HTTP 错误对象
+ */
 function mapIdentityFailure(cause: unknown, fallback: string): Error {
   if (cause instanceof IdentityApplicationError) {
     if (cause.code === IDENTITY_APPLICATION_ERROR_CODES.CONFLICT)

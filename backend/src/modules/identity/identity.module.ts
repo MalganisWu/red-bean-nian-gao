@@ -12,9 +12,13 @@ import { PostgresUserRepository } from './service/user-repository/postgres-user-
 
 /** Identity Module 的输出面：认证服务、密码散列器与两个用例服务。 */
 export interface IdentityModule {
+  /** 认证服务；跨 Module 只经由此端口调用登录、注销、续签与令牌校验。 */
   readonly authService: AuthServicePort
+  /** 实际生效的密码散列器；回吐它是为了让上层确认注入被采纳，而非各处置换。 */
   readonly passwordHasher: PasswordHasher
+  /** 注册用例服务；承接唯一性校验、散列与落库。 */
   readonly registrationService: IdentityRegistrationService
+  /** 资料用例服务；承接自有视图与公开视图的读取与更新。 */
   readonly profileService: IdentityProfileService
 }
 

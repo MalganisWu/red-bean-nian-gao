@@ -17,9 +17,12 @@ import type { IdGenerator } from './../../../../shared/id/id-generator.js'
 import type { AgentTaskDefinition } from './../../model/task.js'
 import type { ScheduledTaskManagementRepositories } from './port/scheduled-task-management-repository.port.js'
 
+/** list 动作最多返回的条数；防止模型一次拉出过多任务撑爆上下文。 */
 const MAX_LIST_ITEMS = 20
+/** 列表项 task_input 预览的截断长度（码点数）；完整内容留给 get 查看。 */
 const PREVIEW_LENGTH = 80
 
+/** 工具入参的运行时校验 schema；所有字段都给默认空串，缺省即「未提供」。 */
 const parametersSchema = z.object({
   action: z.string(),
   task_id: z.string().default(''),
@@ -29,8 +32,10 @@ const parametersSchema = z.object({
   cron_expr: z.string().default(''),
 })
 
+/** 工具入参的类型投影；由 parametersSchema 推导，保证运行时与编译期同源。 */
 type ScheduledTaskParameters = z.infer<typeof parametersSchema>
 
+/** 对外暴露给模型的 JSON Schema：字段描述即模型理解用法的唯一来源。 */
 const PARAMETERS: AgentJsonObject = Object.freeze({
   type: 'object',
   properties: {
@@ -89,9 +94,13 @@ export class ScheduledTaskManageTool implements AgentTool {
     },
   }
 
+  /** 任务读写边界；工具不直接触碰数据库。 */
   readonly #repositories: ScheduledTaskManagementRepositories
+  /** ID 生成器；为新任务生成 STASK 前缀的业务 ID。 */
   readonly #idGenerator: IdGenerator
+  /** 解释 run_at 与 cron 所用时区；构造时已校验合法。 */
   readonly #timezone: string
+  /** 时钟注入点；用于「run_at 是否为过去」判定与算下次触发，测试可注入固定时刻。 */
   readonly #now: () => Date
 
   public constructor(
@@ -150,6 +159,14 @@ export class ScheduledTaskManageTool implements AgentTool {
     return { content }
   }
 
+  /**
+   * create 分支：校验输入并组装新任务后落库；归属取自 scope 而非参数。
+   *
+   * @param scope - 当前用户与会话组成的作用域。
+   * @param parameters - 已校验的入参；create 要求非空的 task_input。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 面向模型的 JSON 结果字符串。
+   */
   async #create(
     scope: TaskScope,
     parameters: ScheduledTaskParameters,
@@ -165,7 +182,13 @@ export class ScheduledTaskManageTool implements AgentTool {
     return taskResult(task, '任务已创建')
   }
 
-  /** 组装新任务：基础字段 + 按调度类型填入触发时间（once → run_at；recurring → cron）。 */
+  /**
+   * 组装新任务：基础字段 + 按调度类型填入触发时间（once → run_at；recurring → cron）。
+   *
+   * @param scope - 当前用户与会话组成的作用域，写入任务归属。
+   * @param parameters - 已校验的入参；调度类型决定用 run_at 还是 cron_expr。
+   * @returns 待落库的任务定义。
+   */
   #buildTask(scope: TaskScope, parameters: ScheduledTaskParameters): AgentTaskDefinition {
     validateScheduleType(parameters.schedule_type)
     const task: AgentTaskDefinition = {
@@ -200,6 +223,15 @@ export class ScheduledTaskManageTool implements AgentTool {
     return task
   }
 
+  /**
+   * update 分支：按作用域加载归属任务后做局部更新；切换调度类型时要求同时提供对应时间字段，
+   * 并在草稿上重算 nextRunAt，保证落库结果自洽。
+   *
+   * @param scope - 当前用户与会话组成的作用域。
+   * @param parameters - 已校验的入参；至少提供一个可更新字段。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 面向模型的 JSON 结果字符串。
+   */
   async #update(
     scope: TaskScope,
     parameters: ScheduledTaskParameters,
@@ -269,6 +301,14 @@ export class ScheduledTaskManageTool implements AgentTool {
     return taskResult(task, '任务已更新')
   }
 
+  /**
+   * delete 分支：按作用域确认归属后再软删除，越权或不存在都报同一句「任务不存在或无权操作」。
+   *
+   * @param scope - 当前用户与会话组成的作用域。
+   * @param taskId - 目标任务标识；空串即报错。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 面向模型的 JSON 结果字符串。
+   */
   async #delete(scope: TaskScope, taskId: string, signal: AbortSignal): Promise<string> {
     if (taskId === '') throw new Error('delete 需要提供 task_id')
     await this.#loadOwnedTask(scope, taskId, signal)
@@ -280,6 +320,13 @@ export class ScheduledTaskManageTool implements AgentTool {
     return JSON.stringify({ task_id: taskId, message: '任务已删除' })
   }
 
+  /**
+   * list 分支：列出作用域内仍活跃的任务并截断到上限，task_input 以预览形式返回。
+   *
+   * @param scope - 当前用户与会话组成的作用域。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 含数量与任务摘要数组的 JSON 字符串。
+   */
   async #list(scope: TaskScope, signal: AbortSignal): Promise<string> {
     let tasks: readonly AgentTaskDefinition[]
     try {
@@ -294,11 +341,28 @@ export class ScheduledTaskManageTool implements AgentTool {
     return JSON.stringify({ count: items.length, tasks: items })
   }
 
+  /**
+   * get 分支：按作用域加载归属任务并返回完整摘要（不截断 task_input）。
+   *
+   * @param scope - 当前用户与会话组成的作用域。
+   * @param taskId - 目标任务标识；空串即报错。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 单任务摘要的 JSON 字符串。
+   */
   async #get(scope: TaskScope, taskId: string, signal: AbortSignal): Promise<string> {
     if (taskId === '') throw new Error('get 需要提供 task_id')
     return JSON.stringify(taskSummary(await this.#loadOwnedTask(scope, taskId, signal), false))
   }
 
+  /**
+   * 按作用域加载任务并把「不存在 / 非本人 / 非本人会话 / 已删除」统一收敛成同一句错误，
+   * 让模型无法靠错误差异探测他人任务是否存在。
+   *
+   * @param scope - 当前用户与会话组成的作用域。
+   * @param taskId - 目标任务标识。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 归属校验通过且仍活跃的任务定义。
+   */
   async #loadOwnedTask(
     scope: TaskScope,
     taskId: string,
@@ -318,11 +382,20 @@ export class ScheduledTaskManageTool implements AgentTool {
   }
 }
 
+/** 工具操作的作用域：由调用上下文派生，工具参数里的 task_id 一律据它校验归属。 */
 interface TaskScope {
+  /** 当前会话标识。 */
   readonly sessionId: string
+  /** 当前登录用户标识。 */
   readonly userId: string
 }
 
+/**
+ * 从调用上下文派生作用域；缺少会话或用户归属即拒绝，避免无归属的越权操作。
+ *
+ * @param context - Agent 工具调用上下文。
+ * @returns 当前用户与会话组成的作用域。
+ */
 function currentScope(context: AgentToolCallContext): TaskScope {
   if (context.threadId === '' || context.userId === '') {
     throw new Error('当前上下文缺少会话或用户归属，拒绝操作')
@@ -330,6 +403,12 @@ function currentScope(context: AgentToolCallContext): TaskScope {
   return { sessionId: context.threadId, userId: context.userId }
 }
 
+/**
+ * 校验 task_input：create 要求非空，任何分支都限制在字符数上限内。
+ *
+ * @param value - 待校验的 task_input。
+ * @param required - 是否必填；update 允许留空表示不改动。
+ */
 function validateTaskInput(value: string, required: boolean): void {
   if (required && value.trim() === '') throw new Error('task_input 必填：请说明任务到点要执行什么')
   if (Array.from(value).length > MAX_TASK_INPUT_LENGTH) {
@@ -337,12 +416,25 @@ function validateTaskInput(value: string, required: boolean): void {
   }
 }
 
+/**
+ * 校验调度类型取值；用断言签名让调用点之后的窄化直接生效。
+ *
+ * @param value - 待校验的调度类型。
+ * @returns 无实际返回值；它是断言签名，通过校验后 value 在调用点被窄化为具体联合类型。
+ */
 function validateScheduleType(value: string): asserts value is 'once' | 'recurring' {
   if (value !== 'once' && value !== 'recurring') {
     throw new Error('schedule_type 非法：仅支持 once（一次性）或 recurring（周期）')
   }
 }
 
+/**
+ * 把任务组装成 create/update 的标准化结果：返回 task_id、调度类型、下次触发与提示文案。
+ *
+ * @param task - 落库后的任务定义。
+ * @param message - 面向用户的提示文案。
+ * @returns JSON 字符串形式的结果。
+ */
 function taskResult(task: AgentTaskDefinition, message: string): string {
   return JSON.stringify({
     task_id: task.taskId,
@@ -352,6 +444,13 @@ function taskResult(task: AgentTaskDefinition, message: string): string {
   })
 }
 
+/**
+ * 把任务投影成给模型看的摘要对象：按调度类型只给对应的触发字段（once 给 run_at，recurring 给 cron_expr）。
+ *
+ * @param task - 待投影的任务定义。
+ * @param preview - 是否截断 task_input；列表场景为 true，详情场景为 false。
+ * @returns 摘要对象，供 JSON 序列化后返回给模型。
+ */
 function taskSummary(task: AgentTaskDefinition, preview: boolean): AgentJsonObject {
   const summary: Record<string, AgentJsonValue> = {
     task_id: task.taskId,
@@ -365,10 +464,22 @@ function taskSummary(task: AgentTaskDefinition, preview: boolean): AgentJsonObje
   return summary
 }
 
+/**
+ * 生成 task_input 的列表预览：按码点截断，避免撑大列表返回。
+ *
+ * @param value - 完整的 task_input。
+ * @returns 截断并带省略号的预览文本。
+ */
 function previewTaskInput(value: string): string {
   return truncateCodePoints(value, PREVIEW_LENGTH, '…')
 }
 
+/**
+ * 把可缺省的时刻格式化为 ISO 字符串；缺省时返回空串，让模型直观看到「无下次触发」。
+ *
+ * @param value - 待格式化的时刻；undefined 表示缺省。
+ * @returns ISO 8601 字符串；输入缺省时为空串。
+ */
 function formatTaskTime(value: Date | undefined): string {
   return value?.toISOString() ?? ''
 }

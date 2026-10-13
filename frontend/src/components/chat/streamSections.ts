@@ -109,13 +109,25 @@ export function applyToolStart(
   return [...sections, { type: 'tool_group', tools: [tool], timestamp: Date.now() }]
 }
 
-/** 结算耗时：有打点则算 durationMs 并清除打点（旧数据/无打点不补） */
+/**
+ * 结算耗时：有打点则算 durationMs 并清除打点（旧数据/无打点不补）
+ *
+ * @param t - 目标工具卡片；缺 `startedAtMs` 打点时按零补丁处理，不做推算。
+ * @returns 只含 `durationMs` 与清除打点的最小补丁。
+ */
 function settleDuration(t: ToolCard): Partial<ToolCard> {
   if (t.startedAtMs === null || t.startedAtMs === undefined) return {}
   return { durationMs: Math.max(0, Date.now() - t.startedAtMs), startedAtMs: undefined }
 }
 
-/** 按 callId 更新工具状态（tool_group 与 reason 内嵌工具两处都可能命中） */
+/**
+ * 按 callId 更新工具状态（tool_group 与 reason 内嵌工具两处都可能命中）
+ *
+ * @param sections - 待打补丁的 section 列表。
+ * @param callId - 目标工具调用的稳定 ID。
+ * @param patch - 依据当前工具卡片返回增量补丁的纯函数。
+ * @returns 打补丁后的新 section 列表；未命中的保持原样（不可变）。
+ */
 function mapTool(
   sections: MessageSection[],
   callId: string,
@@ -124,7 +136,14 @@ function mapTool(
   return sections.map((section) => mapToolInSection(section, callId, patch))
 }
 
-/** 在单个 section 内按 callId 打补丁：tool_group 与 reason 内嵌工具两处都可能命中。 */
+/**
+ * 在单个 section 内按 callId 打补丁：tool_group 与 reason 内嵌工具两处都可能命中。
+ *
+ * @param section - 待打补丁的单个 section。
+ * @param callId - 目标工具调用的稳定 ID。
+ * @param patch - 依据当前工具卡片返回增量补丁的纯函数。
+ * @returns 打补丁后的 section；非 tool_group/reason 或未命中时原样返回。
+ */
 function mapToolInSection(
   section: MessageSection,
   callId: string,
@@ -181,6 +200,12 @@ export function applyToolFail(
   return mapTool(sections, callId, (t) => ({ status: 'failed', error, ...settleDuration(t) }))
 }
 
+/**
+ * 把仍处于 running 的单个工具收成 incomplete 终态并结算耗时；已终态的保持原样。
+ *
+ * @param tool - 待结算的工具卡片。
+ * @returns 结算后的工具卡片；非 running 状态时原样返回。
+ */
 function settleRunningTool(tool: ToolCard): ToolCard {
   if (tool.status !== 'running') return tool
   return { ...tool, status: 'incomplete', ...settleDuration(tool) }
@@ -198,7 +223,12 @@ export function settleIncompleteTools(sections: MessageSection[]): MessageSectio
   return sections.map(settleIncompleteSection)
 }
 
-/** 兜底结算单个 section：把其中仍 running 的工具与委派标为 incomplete。 */
+/**
+ * 兜底结算单个 section：把其中仍 running 的工具与委派标为 incomplete。
+ *
+ * @param section - 待结算的单个 section，递归覆盖工具、理由、子 Agent 与 process 步骤。
+ * @returns 结算后的 section；不属于上述类型时原样返回。
+ */
 function settleIncompleteSection(section: MessageSection): MessageSection {
   if (section.type === 'tool_group') {
     return { ...section, tools: section.tools.map(settleRunningTool) }
@@ -228,7 +258,12 @@ function settleIncompleteSection(section: MessageSection): MessageSection {
   return section
 }
 
-/** 兜底结算单个 Process 步骤：工具本身与它挂载的委派都要收成终态。 */
+/**
+ * 兜底结算单个 Process 步骤：工具本身与它挂载的委派都要收成终态。
+ *
+ * @param step - 待结算的 process 步骤，tool 与 sub_agent 两类分别收口。
+ * @returns 结算后的步骤；非 tool/sub_agent 类型时原样返回。
+ */
 function settleIncompleteStep(step: ProcessStepItem): ProcessStepItem {
   if (step.kind === 'tool' && step.tool) {
     return {
@@ -246,6 +281,12 @@ function settleIncompleteStep(step: ProcessStepItem): ProcessStepItem {
   return step
 }
 
+/**
+ * 兜底结算子 Agent 数据：running 状态收成 incomplete，并递归结算其内层 sections。
+ *
+ * @param data - 子 Agent section 数据；`sections` 缺省时按空数组处理。
+ * @returns 状态与内层 section 均已收口的新子 Agent 数据（不可变）。
+ */
 function settleSubAgent(data: SubAgentSectionData): SubAgentSectionData {
   return {
     ...data,

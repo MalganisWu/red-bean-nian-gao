@@ -29,36 +29,55 @@ import { SubExecutionLifecycle } from '../../run/service/default-sub-execution-l
 
 /** Loader 交给工具工厂的子 Agent 定义快照，不包含数据库 row 命名。 */
 export interface SubAgentToolDefinition {
+  /** 子 Agent 定义标识；写入执行记录并作为委派工具的 identity。 */
   readonly agentId: string
+  /** 子 Agent 展示名；也是委派工具对模型暴露的工具名。 */
   readonly name: string
+  /** 委派工具描述；模型据此判断何时该把任务交给这个子 Agent。 */
   readonly description: string
+  /** 子 Agent 系统提示词；作为子运行执行定义的一部分。 */
   readonly systemPrompt: string
+  /** 授权给子 Agent 的系统工具 id 列表；子 Agent 的工具授权独立于父清单。 */
   readonly systemToolIds: readonly string[]
 }
 
 /** 一次构建请求：本次加载到的子 Agent 定义，外加父运行共享的模型、运行参数与展示注册表。 */
 export interface BuildSubAgentToolsRequest {
+  /** 本次加载到的子 Agent 定义快照；逐个组装成委派工具。 */
   readonly definitions: readonly SubAgentToolDefinition[]
+  /** 父运行的模型适配器；子运行默认复用它，装饰器可再包装。 */
   readonly parentAdapter: AgentModelAdapter
+  /** 父运行使用的模型名；写入子执行记录用于展示。 */
   readonly modelName: string
+  /** 父运行的模型参数；透传给子运行执行定义。 */
   readonly modelParams: AgentModelParams
+  /** 父运行的运行时配置；透传给子运行执行定义。 */
   readonly runtimeConfig: AgentRuntimeConfig
+  /** 展示注册表；子执行展示载荷按父调用 id 登记在此。 */
   readonly displayRegistry: SubAgentDisplayRegistryPort
+  /** 本次加载上下文；其事件出口用于把子运行事件投递给父流。 */
   readonly loadContext: AgentLoadContext
 }
 
 /** 构建结果：给模型看的 schema 列表与实际分发用的 dispatcher，两者必须出自同一批工具。 */
 export interface SubAgentToolSet {
+  /** 给模型看的工具 schema 列表。 */
   readonly schemas: readonly AgentToolSchema[]
+  /** 实际分发调用的 dispatcher；与 schemas 出自同一批工具，必须成对使用。 */
   readonly dispatcher: AgentToolDispatcher
 }
 
 /** 工厂依赖；`decorators` 可缺省，追加请走 `withRuntimeDecorator`（返回新实例，不就地改）。 */
 export interface RuntimeSubAgentToolFactoryOptions {
+  /** 执行器；子运行与主运行共用同一条执行链路。 */
   readonly executor: AgentExecutionPort
+  /** ID 生成器；新建子执行时分配 executionId。 */
   readonly idGenerator: IdGenerator
+  /** 工具注册表；按 systemToolIds 取子 Agent 的 schema 与 dispatcher。 */
   readonly registry: ToolRegistry
+  /** 子执行仓储；交给动态组装的子执行生命周期使用。 */
   readonly repository: SubExecutionRepository
+  /** 子运行装饰器；缺省为空，追加请走 `withRuntimeDecorator`。 */
   readonly decorators?: readonly ChildRuntimeDecorator[] | undefined
 }
 
@@ -68,6 +87,7 @@ export interface RuntimeSubAgentToolFactoryOptions {
  * 动态 Runner 的构造属于该 Adapter，Loader 只消费稳定的 build 能力。
  */
 export class RuntimeSubAgentToolFactory {
+  /** 构造时固定的依赖与装饰器快照；实例不可变，追加装饰器返回新实例。 */
   readonly #options: RuntimeSubAgentToolFactoryOptions
 
   public constructor(options: RuntimeSubAgentToolFactoryOptions) {
@@ -119,6 +139,10 @@ export class RuntimeSubAgentToolFactory {
    *
    * 子执行的工具集取 `definition.systemToolIds`：子 Agent 的工具授权是它自己的，
    * 与父的清单无关，这也是「子 Agent 是独立配置」的体现。
+   *
+   * @param definition - 目标子 Agent 定义快照，决定工具名、描述与工具授权。
+   * @param request - 本次构建请求，提供父运行的模型、参数与展示注册表。
+   * @returns 组装完成的委派工具；runner 已按装饰器层层包装。
    */
   #createTool(definition: SubAgentToolDefinition, request: BuildSubAgentToolsRequest): AgentTool {
     let adapter = request.parentAdapter

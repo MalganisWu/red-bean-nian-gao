@@ -31,6 +31,7 @@ import { ServerApplication, buildManaged } from './server-application.js'
 
 /** 组装选项；目前只有构建版本信息一项可注入。 */
 export interface BuildApplicationOptions {
+  /** 构建版本信息，注入到系统模块的版本接口；缺省时不暴露版本字段。 */
   readonly version?: VersionInfo | undefined
 }
 
@@ -191,6 +192,8 @@ export function buildApplication(
  * 把中性观测层的日志出口接到项目 logger 上。
  * 两者的级别名集合略有差异（观测层只有 debug/info/error，没有 warn），
  * 这里按同名直传；span 因此与业务日志进同一条流，按 trace_id 一次检索即可对齐。
+ * @param logger - 项目日志实现，接收观测层的结构化记录
+ * @returns 观测层期望的日志出口对象；写入时按记录级别直传 logger
  */
 function traceLogSink(logger: Logger): {
   readonly write: (record: {
