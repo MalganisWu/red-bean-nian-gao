@@ -99,7 +99,7 @@ Fastify 解耦的用例签名，并负责 wire DTO 投影和 HTTP 应用错误�
   `...(cond ? {} : { field })` 条件展开三分（详见根 TS 规范「表达式与调用可读性」）。
 - 可空字段判空写法全仓统一、私有成员用 `#` 不混写 `private`、方法参数"所有者/作用域在前"、
   错误包装保留 cause 链、错误消息与日志中文（分别见根 TS 规范「判空与可空映射」「命名与签名约定」
-  「控制流与错误」「中文注释」）。
+  「控制流与错误」「注释」）。
 - Module 内默认实现在对应 `*.module.ts` 通过 `new ConcreteClass(...)` 绑定；全局
   `src/app/composition-root.ts` 只负责跨 Module 接线和进程级基础设施。生产代码不得用匿名对象充当默认实现；
   factory 返回协议对象时必须声明返回类型或使用 `satisfies`。测试 fake 可使用对象字面量，但必须接受显式
@@ -107,8 +107,7 @@ Fastify 解耦的用例签名，并负责 wire DTO 投影和 HTTP 应用错误�
 - `*RouteDependencies` 等 Controller 依赖清单必须用中文 JSDoc 标明各依赖的生产默认实现，并指向
   对应 `*.module.ts`；涉及跨 Module 绑定时再指向 `src/app/composition-root.ts`。默认绑定变化时，接线代码与
   该注释必须在同一次变更中更新。
-- 注释遵循根目录“中文注释规范”：重点解释边界、约束和原因，不逐行翻译实现；新增公开模块、DTO、Port、
-  Adapter 或复杂编排时必须补充足以支持人工审查的中文职责说明。
+- 注释见共享通用规范的「注释」章节（适用范围、机械门禁、书写要求、提交前检查均在那里）；新增公开模块、DTO、Port、Adapter 或复杂编排时必须补充足以支持人工审查的中文职责说明。
 - `public-api.ts` 不得通过业务 Model/Port 转发 Runtime SDK 类型；公开边界需要的 JSON 与消息结构由产品
   Module 持有，转换函数放在 Adapter、serializer 或 presenter，不能放进纯数据 model。
 - Service、Adapter 和 Model 不得为兼容旧路径转发 Port 或其他权威类型；消费者必须直接从定义文件

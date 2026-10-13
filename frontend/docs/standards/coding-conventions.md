@@ -230,10 +230,14 @@ AI 生成的代码默认不做性能优化（memo、lazy），避免过度优化
 
 ## 9. 注释规范（前端补充）
 
-规则正文见根 [`typescript-common-conventions.md`「中文注释」](../../../docs/standards/typescript-common-conventions.md)
-（简体中文、讲 why 与边界、注释与代码同 diff 更新、测试注释优先中文）。本节只列 React/UI 场景的应用要点：
+规则正文见共享通用规范的
+[`typescript-common-conventions.md`「注释」](../../../docs/standards/typescript-common-conventions.md)：
+适用范围（谁必须有注释）、机械门禁检查什么、书写要求、提交前人工检查都在那里。本节只列 React/UI
+场景的应用要点：
 
 - **Props**：关键 Props 用 JSDoc 说明用途与边界——回调触发时机、`undefined` 与缺省语义、联动的前置条件
+- **组件签名**：参数写具名 `props`、解构放函数体首行 —— 门禁要求参数是简单标识符才能写 `@param`；
+  函数体内仍不使用 `props.xxx`
 - **hooks / store action / SSE 事件处理**：跨状态流转的意图注释；方法流程超过三步用 `// ── 阶段名 ──`
   分段标题，让执行顺序成为视觉事实
 - **测试**：setup/mock 的目的、故障注入与断言原因用中文注释；用例名允许英文描述风格

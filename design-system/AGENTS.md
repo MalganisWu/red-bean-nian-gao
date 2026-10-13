@@ -106,7 +106,7 @@ React/UI 规则遵循 [`frontend/docs/standards/coding-conventions.md`](../front
 ## 组件注释规范
 
 注释语言与共性规则见根
-[`docs/standards/typescript-common-conventions.md`「中文注释」](../docs/standards/typescript-common-conventions.md)
+[`docs/standards/typescript-common-conventions.md`「注释」](../docs/standards/typescript-common-conventions.md)
 与 [`frontend/docs/standards/coding-conventions.md` §9](../frontend/docs/standards/coding-conventions.md)，
 本节只列 design-system 特有要求：
 
