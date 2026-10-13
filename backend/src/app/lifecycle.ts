@@ -10,6 +10,7 @@ export class Lifecycle {
   /**
    * 登记一个关闭处理器。关闭开始后再登记直接抛错——
    * 一个在关闭之后才登记的处理器永远不会被执行，静默接受等于悄悄泄漏一个资源。
+   * @param handler - 关闭回调；传非函数同样抛错，让「漏传依赖」在组装期就暴露
    */
   public onClose(handler: CloseHandler | null | undefined): void {
     if (typeof handler !== 'function') {
@@ -19,7 +20,10 @@ export class Lifecycle {
     this.#handlers.push(handler)
   }
 
-  /** 幂等：并发或重复调用共享同一次关闭，不会重复释放同一批资源。 */
+  /**
+   * 幂等：并发或重复调用共享同一次关闭，不会重复释放同一批资源。
+   * @param signal - 传给各关闭处理器的中止信号；调用方通常用带超时的信号，避免关闭卡死
+   */
   public close(signal: AbortSignal): Promise<void> {
     if (this.#closePromise !== undefined) return this.#closePromise
 

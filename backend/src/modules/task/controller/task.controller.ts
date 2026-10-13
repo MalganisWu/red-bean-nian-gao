@@ -47,6 +47,16 @@ export class TaskController {
     this.#dependencies = dependencies
   }
 
+  /**
+   * 列出当前用户的任务：游标分页，展示字段由 Presenter 投影。
+   * 仓储异常一律收敛成内部错误，不把 SQL 细节透给调用方。
+   *
+   * @param userId - 当前登录用户，决定可见范围；取自认证上下文而非请求体。
+   * @param cursor - 上一页末条的游标；空串表示取首页。
+   * @param limit - 本页最大条数，调用方需已完成上限收敛。
+   * @param signal - 请求取消信号，透传到查询用例。
+   * @returns 任务列表 DTO 与下一页游标。
+   */
   public async list(
     userId: string,
     cursor: string,
@@ -61,6 +71,14 @@ export class TaskController {
     }
   }
 
+  /**
+   * 批量取执行结果的视图状态；只返回属于当前用户的执行记录。
+   *
+   * @param userId - 当前登录用户，用于归属过滤。
+   * @param executionIds - 目标执行 ID 列表，调用方需已完成去重与数量上限校验。
+   * @param signal - 请求取消信号，透传到查询用例。
+   * @returns 命中的视图状态列表；越权或未设置的执行记录不会出现。
+   */
   public async listViewStates(
     userId: string,
     executionIds: readonly string[],
@@ -74,6 +92,14 @@ export class TaskController {
     }
   }
 
+  /**
+   * 读取单个任务详情；不存在与越权都映射成同一条 404，避免探测他人任务。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param taskId - 目标任务标识。
+   * @param signal - 请求取消信号，透传到查询用例。
+   * @returns 单任务 DTO。
+   */
   public async detail(
     userId: string,
     taskId: string,
@@ -85,6 +111,15 @@ export class TaskController {
     return { task: toTaskDto(task) }
   }
 
+  /**
+   * 更新任务的启停状态；属于命令路径，写前先校验所有权。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param taskId - 目标任务标识。
+   * @param input - 已校验的更新 DTO；当前只有 `is_active`。
+   * @param signal - 请求取消信号，透传到命令用例。
+   * @returns 仅含提示文案的结果信封，更新后不回读任务。
+   */
   public async update(
     userId: string,
     taskId: string,
@@ -97,6 +132,14 @@ export class TaskController {
     return { message: '任务更新成功' }
   }
 
+  /**
+   * 软删除任务：只置停用标记，不物理删除数据。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param taskId - 目标任务标识。
+   * @param signal - 请求取消信号，透传到命令用例。
+   * @returns 仅含提示文案的结果信封。
+   */
   public async delete(
     userId: string,
     taskId: string,
@@ -110,6 +153,16 @@ export class TaskController {
     return { message: '任务已删除' }
   }
 
+  /**
+   * 列出某任务的执行记录：先校验任务归属，再游标分页取执行历史。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param taskId - 目标任务标识。
+   * @param cursor - 上一页末条的游标；空串表示取首页。
+   * @param limit - 本页最大条数，调用方需已完成上限收敛。
+   * @param signal - 请求取消信号，透传到查询用例。
+   * @returns 执行记录列表 DTO 与下一页游标。
+   */
   public async listExecutions(
     userId: string,
     taskId: string,
@@ -131,6 +184,15 @@ export class TaskController {
     }
   }
 
+  /**
+   * 读取单条执行记录详情；任务不存在、执行不存在与越权都收敛到 404。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param taskId - 目标任务标识。
+   * @param executionId - 目标执行记录标识。
+   * @param signal - 请求取消信号，透传到查询用例。
+   * @returns 单条执行记录 DTO。
+   */
   public async executionDetail(
     userId: string,
     taskId: string,
@@ -143,6 +205,16 @@ export class TaskController {
     return { execution: toExecutionDto(execution) }
   }
 
+  /**
+   * 更新执行记录的已读/折叠偏好；校验顺序为任务所有权 → 执行存在性 → upsert。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param taskId - 目标任务标识。
+   * @param executionId - 目标执行记录标识。
+   * @param patch - 已校验的补丁 DTO；`mark_seen` 缺省按 false 处理。
+   * @param signal - 请求取消信号，透传到命令用例。
+   * @returns 更新后的视图状态 DTO。
+   */
   public async updateViewState(
     userId: string,
     taskId: string,
@@ -165,6 +237,14 @@ export class TaskController {
     return { view_state: toExecutionViewStateDto(state) }
   }
 
+  /**
+   * 列出某个会话下的全部任务；结果同时按用户过滤，越权会话返回空列表。
+   *
+   * @param userId - 当前登录用户，用于归属过滤。
+   * @param sessionId - 目标会话标识。
+   * @param signal - 请求取消信号，透传到查询用例。
+   * @returns 该会话的任务列表项 DTO。
+   */
   public async listBySession(
     userId: string,
     sessionId: string,

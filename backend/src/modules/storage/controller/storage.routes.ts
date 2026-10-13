@@ -23,6 +23,10 @@ const MAX_UPLOAD_BYTES = 20 << 20
  * 端点执行链路（Fastify 生命周期，自左向右）：onRequest(全局 Abort+CORS+trace)
  * → preHandler auth → handler zod 校验 → Controller 业务 → 信封 / 文件字节流；
  * 错误由全局 setErrorHandler 统一输出。各端点差异见下方链路指纹注释。
+ *
+ * @param server - 承载路由的 Fastify 实例；路径一律取自 `API_ROUTES`，不手写路径字面量
+ * @param controller - 已组装的用例控制器；路由只做解包与信封投影，不含业务规则
+ * @param authenticate - 认证前置处理器；五个端点全部要求已登录，此处不做逐端点差异化
  */
 export function registerStorageRoutes(
   server: FastifyInstance,

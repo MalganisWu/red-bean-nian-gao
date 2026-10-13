@@ -66,7 +66,6 @@ class BackgroundRunObserver implements AgentExecutionEventSink, AgentExecutionMe
   }
 }
 
-/** Agent Module 的默认后台执行实现；SDK 类型和配置选择不会扩散到 Task Module。 */
 /**
  * Agent Module 的默认后台执行实现；SDK 类型和配置选择不会扩散到 Task Module。
  *
@@ -85,6 +84,13 @@ export class DefaultBackgroundAgentExecutionService implements BackgroundAgentEx
     this.#buffer = buffer
   }
 
+  /**
+   * 跑一次后台执行：加载配置、按名排除交互式工具、追加系统提示词，经统一执行端口跑完并投影结果。
+   * 没有在线消费者，因此中断（suspended）在结果里表达为「等待用户输入」而不是让调用方去处理卡片。
+   * @param command 后台执行命令，承载身份、输入、排除工具名与系统提示词附录
+   * @param signal 中止信号，透传给 Loader 与执行端口
+   * @returns 后台执行结果；按执行端口状态映射为 completed / suspended / cancelled / exhausted / failed
+   */
   public async execute(
     command: BackgroundAgentExecutionCommand,
     signal: AbortSignal
@@ -150,6 +156,8 @@ export class DefaultBackgroundAgentExecutionService implements BackgroundAgentEx
    * 清空恢复缓冲。先 `flush` 再 `clear` 而不是直接 `clear`：
    * 凭 `flush` 的「读取并删除」语义确认残留内容确实被取走并丢弃，
    * 随后 `clear` 兜底处理两步之间新写入的消息。两次调用都是幂等的。
+   * @param recoveryKey 恢复缓冲的键（通常由会话与任务派生）
+   * @param signal 中止信号，传给 MessageBuffer 的 flush / clear
    */
   public async clearRecovery(recoveryKey: string, signal: AbortSignal): Promise<void> {
     await this.#buffer.flush(recoveryKey, signal)

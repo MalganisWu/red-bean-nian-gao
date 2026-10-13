@@ -150,6 +150,9 @@ const sessionRunRowSchema = z.object({
 /**
  * 校验并映射 session_runs 查询行；run 容器与内部事实序列在此完成信任边界转换。
  * 事实序列中的未知类型按版本纪律处理（ignorable 跳过 / 否则拒绝），见 parseRunFacts。
+ *
+ * @param value - 数据库返回的 unknown 行；结构不符即抛 RunFactStoreError
+ * @returns 通过校验的会话 run 记录
  */
 export function parseSessionRunRecord(value: unknown): SessionRunRecord {
   const parsed = sessionRunRowSchema.safeParse(value)
@@ -185,6 +188,9 @@ export function parseSessionRunRecord(value: unknown): SessionRunRecord {
 /**
  * 事实日志的版本纪律读取端（R9）：遇到不认识的记录——
  * 带 `ignorable` 标记的跳过，否则拒绝并明确报错，绝不静默误读。
+ *
+ * @param value - 事实日志 JSONB（unknown）；非数组或含非法记录即抛 RunFactStoreError
+ * @returns 通过校验的事实序列
  */
 export function parseRunFacts(value: unknown): readonly RunFact[] {
   if (!Array.isArray(value)) {

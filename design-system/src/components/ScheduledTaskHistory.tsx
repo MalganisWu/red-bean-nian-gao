@@ -29,18 +29,23 @@ function statusIndicatorClass(status: ScheduledTaskRunSummary['status']): string
   return 'bg-foreground-muted'
 }
 
-/** 执行记录账本。只描述每次运行，不重复任务定义，也不复用 Process 时间线。 */
-export function ScheduledTaskHistory({
-  records,
-  onSelect,
-  loading = false,
-  error,
-  onRetry,
-  sortLabel = '最近优先',
-  onSort,
-  hasMore = false,
-  onLoadMore,
-}: ScheduledTaskHistoryProps) {
+/**
+ * 执行记录账本。只描述每次运行，不重复任务定义，也不复用 Process 时间线。
+ *
+ * @param props - 组件属性；字段语义见 `ScheduledTaskHistoryProps`。
+ */
+export function ScheduledTaskHistory(props: ScheduledTaskHistoryProps) {
+  const {
+    records,
+    onSelect,
+    loading = false,
+    error,
+    onRetry,
+    sortLabel = '最近优先',
+    onSort,
+    hasMore = false,
+    onLoadMore,
+  } = props
   /** 渲染一条执行记录；分组标签只在与上一条不同时出现。 */
   function renderRecord(record: ScheduledTaskRunSummary, index: number): ReactElement {
     const previousGroup = records[index - 1]?.groupLabel

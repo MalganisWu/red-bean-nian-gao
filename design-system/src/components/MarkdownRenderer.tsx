@@ -19,8 +19,11 @@ export interface MarkdownRendererProps {
  * 展示格式契约：assistant 的最终 content 由 MarkdownAnswer 裸排后经此渲染；
  * fenced code block 才进入带语言标签和复制动作的独立容器；
  * Delegation 内部输出可直接使用本组件，user 输入保持纯文本。
+ *
+ * @param props - 组件属性；字段语义见 `MarkdownRendererProps`。
  */
-export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
+export function MarkdownRenderer(props: MarkdownRendererProps) {
+  const { content, className } = props
   return (
     <div className={cn('markdown-body', className)}>
       <ReactMarkdown

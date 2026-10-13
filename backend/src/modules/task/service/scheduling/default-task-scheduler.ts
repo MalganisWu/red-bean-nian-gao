@@ -47,6 +47,8 @@ export class ScheduledTaskScheduler implements TaskSchedulerPort {
    * 单次扫描：取一批到期任务并逐个启动 worker。
    * 到达并发上限时直接"让出"（不排队），等待下一次 scanOnce 驱动的扫描；扫描失败只记录
    * 不抛出——上层以定时驱动重扫，异常上抛只会打断无状态的轮询节奏。
+   *
+   * @param signal - 取消信号，决定本次扫描是否继续，并透传给取任务与后续 worker。
    */
   public async scanOnce(signal: AbortSignal): Promise<void> {
     let tasks: readonly AgentTaskDefinition[]
@@ -77,6 +79,9 @@ export class ScheduledTaskScheduler implements TaskSchedulerPort {
    * 执行单个任务：先认领 lease，再运行 pipeline。
    * 执行受三重信号约束——父级取消、执行超时预算、lease 丢失；任一触发都会中断运行。
    * lock 冲突（其他实例已认领）按正常情况记录，不算失败；lease 释放失败只告警不致命。
+   *
+   * @param task - 本次要执行的任务；其 taskId 用于抢 lease，并进任务级 logger。
+   * @param parent - 父级取消信号，与执行超时预算、lease 丢失信号合并后才驱动运行。
    */
   public async executeTask(task: AgentTaskDefinition, parent: AbortSignal): Promise<void> {
     // ── 信号组装：超时预算并入任务信号，任务级 logger 带上 task_id ──

@@ -25,10 +25,15 @@ const DEFAULT_EVENT_CAPACITY = 512
 
 /** Agent Run Service 使用的默认句柄；Controller 只依赖上面的公开接口。 */
 export class ManagedChatRunHandle implements ChatRunHandle {
+  /** 本次运行标识，同时也是取消注册表里的 requestId。 */
   public readonly runId: string
+  /** 该运行归属的会话标识，用于把事件与恢复缓冲写回同一会话。 */
   public readonly sessionId: string
+  /** 事件消费入口；与 `close`/`fail` 配合，队列 drained 后再发的事件会被静默丢弃。 */
   public readonly events: AsyncIterable<ProductStreamEvent>
+  /** 运行结局；由生产者（Run Service）在收尾动作全部落地后结算，`close()` 会等待它。 */
   public readonly completion: Promise<ChatRunResult>
+  /** 运行取消信号；合并了父信号与内部控制器，任一侧中止都会触发。 */
   public readonly signal: AbortSignal
 
   readonly #queue: RunEventQueue<ProductStreamEvent>
@@ -57,6 +62,14 @@ export class ManagedChatRunHandle implements ChatRunHandle {
     this.#resolveCompletion = resolveCompletion
   }
 
+  /**
+   * 向消费端投递一个事件。关闭后调用是安全的空操作（队列已 settled，数据不再外泄）；
+   * 队列溢出会被当作故障信号，转为整次运行的失败而不是静默丢帧。
+   *
+   * 本方法是队列的单生产者入口，不得并发调用。
+   *
+   * @param event - 待投递的产品事件；调用方须保证顺序，队列不会重排。
+   */
   public publish(event: ProductStreamEvent): void {
     this.#queue.push(event)
   }
@@ -76,7 +89,11 @@ export class ManagedChatRunHandle implements ChatRunHandle {
     )
   }
 
-  /** 失败收尾；与 `complete` 同样的「关闭优先」规则，结果里带上错误供上层诊断。 */
+  /**
+   * 失败收尾；与 `complete` 同样的「关闭优先」规则，结果里带上错误供上层诊断。
+   *
+   * @param error - 导致运行失败的原始错误；会透传给消费端迭代器并进入 `completion`，不得包装成字符串。
+   */
   public fail(error: Error): void {
     if (this.#settled) return
     this.#settled = true
@@ -97,6 +114,8 @@ export class ManagedChatRunHandle implements ChatRunHandle {
    *
    * `#closeReason ??= reason` 只记第一个原因：后续的重复关闭（如同时收到断连与停机）
    * 不该覆盖最初那个，否则排障时看到的是一个次生原因。
+   *
+   * @param reason - 首个关闭原因；后续重复关闭不会覆盖它，最终会成为 `cancelled` 结局的 reason。
    */
   public async close(reason: ChatRunCloseReason): Promise<void> {
     if (this.#settled) return

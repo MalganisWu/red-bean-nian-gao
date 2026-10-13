@@ -28,15 +28,26 @@ export interface TracerPort {
  * `within` 仍然执行操作——它只是不传播上下文，不能顺手把业务逻辑吞掉。
  */
 export class NoopTraceSpan implements TraceSpan {
+  /** 空实现：没有观测后端，属性无处落盘；调用方不必判空。 */
   public setAttributes(): void {}
+  /**
+   * 直接执行操作并透传其 Promise；不设置活跃上下文，子 span 因此不会挂到本 span 下。
+   * @param operation - 要在（空）span 上下文里执行的操作。
+   * @returns `operation` 的 Promise，结果原样透传。
+   */
   public within<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
     return operation()
   }
+  /** 空实现：没有真实 span 需要收尾。 */
   public end(): void {}
 }
 
 /** 空实现；`start` 恒返回 `NoopTraceSpan`，让「没配观测」与「配了观测」在业务代码里长得一样。 */
 export class NoopTracer implements TracerPort {
+  /**
+   * 恒返回空的 span，不产生任何观测副作用。
+   * @returns 新建的空的 `NoopTraceSpan`。
+   */
   public start(): TraceSpan {
     return new NoopTraceSpan()
   }

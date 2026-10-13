@@ -152,6 +152,9 @@ export interface TrajectorySessionEnd {
 /**
  * 终态标识 → 展示文案。wire 只带机制值（按触发者分类），文案在展示边界补——
  * `interrupt` 是 LLM 发起挂起，**不是**中断；`crashed` 才是进程遗留。
+ *
+ * @param state - 后端下发的机制态值（按触发者分类，不含展示文案）。
+ * @returns 面向用户的中文终态文案。
  */
 export function trajectoryEndStateLabel(state: TrajectoryEndStateValue): string {
   switch (state) {
@@ -173,6 +176,9 @@ export function trajectoryEndStateLabel(state: TrajectoryEndStateValue): string 
 /**
  * 等待时长的人类可读格式：短时用秒、超过一分钟用 m:ss、超过一小时用 h:mm:ss。
  * 长时间等待（如放弃作答的审批）必须紧凑，否则会撑爆记录列。
+ *
+ * @param ms - 等待时长（毫秒）；负数按 0 处理，避免时钟偏差显示负值。
+ * @returns 人类可读的等待时长文案。
  */
 export function formatTrajectoryWait(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000))
@@ -194,6 +200,10 @@ export function formatTrajectoryWait(ms: number): string {
  * 顺序异常时（工具出现在任何 `call` 之前，或先遇到新一轮 `user`）返回 `false`：
  * 降级为「没分组」——根级不缩进；**绝不挂到上一条调用**。分错组比不分组更难发现，
  * 审计视图宁可少表达也不表达错。
+ *
+ * @param records - 本轮按时序排列的扁平记录。
+ * @param index - 待判定记录在 `records` 中的下标。
+ * @returns 该记录之前存在尚未被 `user` 截断的 `call` 时为 true；顺序异常时为 false（降级为不分组）。
  */
 export function hasPrecedingCall(records: readonly TrajectoryRecord[], index: number): boolean {
   for (let i = index - 1; i >= 0; i -= 1) {
@@ -204,14 +214,24 @@ export function hasPrecedingCall(records: readonly TrajectoryRecord[], index: nu
   return false
 }
 
-/** 毫秒耗时的人类可读格式：>= 1s 显示 x.x s，否则 xxx ms；undefined 显示占位 —。 */
+/**
+ * 毫秒耗时的人类可读格式：>= 1s 显示 x.x s，否则 xxx ms；undefined 显示占位 —。
+ *
+ * @param ms - 耗时毫秒；undefined 表示未采集（区别于「耗时为零」）。
+ * @returns 人类可读的耗时文案；未采集时返回占位「—」，不虚构 0。
+ */
 export function formatTrajectoryDuration(ms: number | undefined): string {
   if (ms === undefined) return '—'
   if (ms >= 1000) return `${(ms / 1000).toFixed(1).replace(/\.0$/, '')} s`
   return `${ms} ms`
 }
 
-/** 秒数间隔的人类可读格式：3 m 24 s / 48 s。 */
+/**
+ * 秒数间隔的人类可读格式：3 m 24 s / 48 s。
+ *
+ * @param seconds - 空档秒数；按四舍五入取整后格式化。
+ * @returns 人类可读的空档文案。
+ */
 export function formatTrajectoryGap(seconds: number): string {
   const sec = Math.round(seconds)
   const m = Math.floor(sec / 60)
@@ -219,12 +239,22 @@ export function formatTrajectoryGap(seconds: number): string {
   return m ? `${m} m ${String(s).padStart(2, '0')} s` : `${s} s`
 }
 
-/** token 数量的千分位格式。 */
+/**
+ * token 数量的千分位格式。
+ *
+ * @param n - token 数量。
+ * @returns 带千分位的字符串（如 `8,100`），便于在窄列中快速比对量级。
+ */
 export function formatTrajectoryTokens(n: number): string {
   return n.toLocaleString('en-US')
 }
 
-/** HH:MM:SS → 当天秒数（用于时序定位的相对计算）。 */
+/**
+ * HH:MM:SS → 当天秒数（用于时序定位的相对计算）。
+ *
+ * @param t - HH:MM:SS 形式的时刻文本；缺字段按 0 计入，避免跨日或残缺输入抛错。
+ * @returns 该时刻对应的当天秒数。
+ */
 export function trajectoryTimeToSeconds(t: string): number {
   const [h = 0, m = 0, s = 0] = t.split(':').map(Number)
   return h * 3600 + m * 60 + s

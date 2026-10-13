@@ -12,15 +12,11 @@ interface ChatInputProps {
 
 /**
  * Quiet Tool composer：固定在阅读列底部的单层输入框，透明按钮只靠文字/图标色区分。
+ *
+ * @param props - 组件属性；字段语义见 `ChatInputProps`。
  */
-export function ChatInput({
-  value,
-  onChange,
-  onSend,
-  onCancel,
-  isStreaming,
-  pending,
-}: ChatInputProps) {
+export function ChatInput(props: ChatInputProps) {
+  const { value, onChange, onSend, onCancel, isStreaming, pending } = props
   function handleKeyDown(e: React.KeyboardEvent) {
     // IME 组合输入中（中文输入法按回车确认候选词）不提交，避免没打完就发出
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {

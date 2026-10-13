@@ -22,6 +22,9 @@ export interface AuthenticationOptions {
  *
  * Token 校验仍由 Identity Module 拥有；这里仅把校验结果绑定到当前 Fastify request，
  * 避免各 Controller 各自维护 WeakMap 和略有差异的 Bearer 解析规则。
+ * @param authService - 校验 Bearer token 并返回 userId 的服务；校验失败由本钩子统一映射为 401。
+ * @param options - 钩子选项；目前只有 Bearer 格式错误时的提示文案可定制。
+ * @returns 绑定该认证服务的 Fastify 异步 preHandler 钩子。
  */
 export function authenticatedRequest(
   authService: TokenValidator,
@@ -65,6 +68,8 @@ async function authenticateRequest(
  * 读取由 `authenticatedRequest` 写入的当前身份；**没有就拒绝访问**。
  * fail-closed 而不是返回一个空身份：忘了挂 auth 钩子的路由会得到 401，
  * 而不是以一个「无人」的身份悄悄放行。
+ * @param request - 当前 Fastify 请求。
+ * @returns 本次请求已绑定的调用身份。
  */
 export function authenticatedPrincipal(request: FastifyRequest): RequestPrincipal {
   const principal = requestPrincipals.get(request)
@@ -72,7 +77,11 @@ export function authenticatedPrincipal(request: FastifyRequest): RequestPrincipa
   return principal
 }
 
-/** 取 header 的首个值；同名 header 出现多次时 Fastify 给的是数组，这里统一取第一个。 */
+/**
+ * 取 header 的首个值；同名 header 出现多次时 Fastify 给的是数组，这里统一取第一个。
+ * @param value - header 的原始值，可能是字符串、字符串数组或 `undefined`。
+ * @returns 首个字符串值；缺失时为 `undefined`。
+ */
 export function firstHeader(value: string | readonly string[] | undefined): string | undefined {
   return typeof value === 'string' ? value : value?.[0]
 }

@@ -27,16 +27,13 @@ interface TaskDetailPanelProps {
   onViewExecution: (executionId: string) => void
 }
 
-/** 任务详情业务容器：负责取数与动作，视觉由 Design System 组件提供。 */
-export function TaskDetailPanel({
-  taskId,
-  activeTab,
-  backLabel,
-  onBack,
-  onTabChange,
-  onDeleted,
-  onViewExecution,
-}: TaskDetailPanelProps) {
+/**
+ * 任务详情业务容器：负责取数与动作，视觉由 Design System 组件提供。
+ *
+ * @param props - 组件属性；字段语义见 `TaskDetailPanelProps`。
+ */
+export function TaskDetailPanel(props: TaskDetailPanelProps) {
+  const { taskId, activeTab, backLabel, onBack, onTabChange, onDeleted, onViewExecution } = props
   const currentTask = useTaskStore((state) => state.currentTask)
   const currentTaskLoading = useTaskStore((state) => state.currentTaskLoading)
   const executions = useTaskStore((state) => state.executions)

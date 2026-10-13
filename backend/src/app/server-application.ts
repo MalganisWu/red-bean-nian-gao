@@ -78,6 +78,7 @@ export class ServerApplication {
    * 因为中途丢弃它们会留下未提交的定时任务状态。
    * 所有阶段的错误都收集起来，最后聚合成一个 `AggregateError`：关闭期同时坏掉好几处是常态，
    * 只报第一个会让其余问题永远看不见。
+   * @param signal - 外部中止信号，通常来自进程收到的 SIGINT/SIGTERM；它是进入关闭流程的唯一触发器
    */
   public async run(signal: AbortSignal): Promise<void> {
     const errors: Error[] = []
@@ -150,6 +151,9 @@ export class ServerApplication {
  *
  * 这是「半启动进程」的防线——构建链走到第五步失败却留着前三步建好的连接池与后台定时器，
  * 会让进程既不能正常工作也不退出。关闭失败会与构建失败一起抛出，保住原始根因。
+ * @param build - 构建回调，收到本次生命周期对象用于登记关闭责任；其返回值原样透传
+ * @param closeTimeoutMilliseconds - 失败清理的时间预算；非有限正数时退回默认值
+ * @returns 构建回调的返回值，仅在构建成功时给出
  */
 export async function buildManaged<T>(
   build: (lifecycle: Lifecycle) => T | Promise<T>,

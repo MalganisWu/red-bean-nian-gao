@@ -46,6 +46,9 @@ export class RuntimeAgentExecutor implements AgentExecutionPort {
    * 跑一次执行。**每次调用都新建一个 `AgentRuntime`**，且必在 finally 中关闭：
    * Runtime 的插件、能力图与生命周期计数器都是按实例持有的，跨命令复用会让上一次运行的
    * 取消计数、消息 hook 与资源登记串到下一次；不复用也就意味着「一次运行一个实例」是这里的隐含约定。
+   * @param command 业务执行命令，承载 session/run 身份、执行定义、恢复状态与观察者
+   * @param signal 取消信号，透传给 SDK 作为本次运行的取消来源
+   * @returns 宿主执行结果；SDK 抛 `RuntimeExecutionError` 时不丢结果快照，映射为带 error 的失败结果
    */
   public async execute(
     command: AgentExecutionCommand,

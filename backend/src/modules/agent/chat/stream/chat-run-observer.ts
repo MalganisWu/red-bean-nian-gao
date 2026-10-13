@@ -52,6 +52,8 @@ export class ChatRunObserver implements AgentExecutionEventSink, AgentExecutionM
    * 事件的三条出路，顺序固定为 **事实日志 → 展示投影 → SSE 队列**。
    * 事实日志放最前：它是审计记录，必须拿到事件的原始形态；
    * 展示投影可能改写或折叠事件，之后再看就不是原貌了。
+   *
+   * @param event - Runtime 上报的原始事件；本方法按固定顺序把它分发到三条出路，不改写内容。
    */
   public publish(event: AgentRuntimeEvent): void {
     this.#onEvent?.(event)
@@ -65,6 +67,9 @@ export class ChatRunObserver implements AgentExecutionEventSink, AgentExecutionM
    * **user 消息不进恢复缓冲**：它来自本次请求的入参，已经在 Session 里了，
    * 再缓冲一份会让崩溃恢复时把它合并成两条。
    * 事实观察放在最前且不设中止检查，是为了让取消路径上已产生的部分消息也留痕。
+   *
+   * @param message - 刚提交的领域消息；role 决定是否进恢复缓冲，user 消息会被跳过。
+   * @param signal - 取消信号，仅约束展示投影；事实观察与恢复缓冲不因它中止。
    */
   public async observe(message: AgentMessage, signal: AbortSignal): Promise<void> {
     // 事实观察先于中止检查：取消路径上已提交的部分消息仍要进入事实日志。

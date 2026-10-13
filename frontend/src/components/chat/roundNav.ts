@@ -40,6 +40,9 @@ function toolCountOf(sections: MessageSection[]): number {
 /**
  * 轮次导航派生：一条 user 消息 = 一轮；紧随其后的第一条 assistant 消息提供
  * 回答摘要 / 总耗时 / 工具数。纯函数，实时流与历史共用（spec: round-nav-gutter §6）。
+ *
+ * @param messages - 展示消息列表；只取 user 消息建轮，紧随其后的 assistant 提供摘要。
+ * @returns 与 user 消息一一对应的导航条目列表，无 assistant 响应时摘要字段缺省。
  */
 export function roundNavItems(messages: DisplayMessage[]): RoundNavItem[] {
   const items: RoundNavItem[] = []

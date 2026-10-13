@@ -54,10 +54,21 @@ export type SectionEventCollectorFactory = () => SectionEventCollector
 export class SubExecDisplayRegistry implements SubAgentDisplayRegistryPort {
   readonly #data = new Map<string, AgentJsonValue>()
 
+  /**
+   * 登记一次子执行的展示载荷；按父调用 ID 覆盖同一委派的旧快照。
+   *
+   * @param parentCallId - 发起委派的父工具调用 ID，作为归属键
+   * @param data - 子执行的展示载荷；写入前先克隆，避免共享可变引用
+   */
   public set(parentCallId: string, data: AgentJsonValue): void {
     this.#data.set(parentCallId, cloneJson(data))
   }
 
+  /**
+   * 快照当前全部展示载荷；逐项克隆，调用方改动不影响注册表内部状态。
+   *
+   * @returns 父调用 ID → 展示载荷 的只读副本
+   */
   public data(): ReadonlyMap<string, AgentJsonValue> {
     const snapshot = new Map<string, AgentJsonValue>()
     for (const [parentCallId, data] of this.#data) {
@@ -69,6 +80,7 @@ export class SubExecDisplayRegistry implements SubAgentDisplayRegistryPort {
 
 /** 把一次子 Agent 事件流归并为展示 section；节点只拥有本次 execute 创建的 Collector。 */
 export class SectionBuildNode {
+  /** 节点名；pipeline 组装按它识别本节点。 */
   public readonly name = 'SectionBuildNode'
   readonly #createCollector: SectionEventCollectorFactory
 
@@ -83,6 +95,9 @@ export class SectionBuildNode {
    * 拦截必须发生在 transport sink 之前——`sub_agent_display_ready` 是产品内部的
    * 展示交接，一旦漏到 SSE 上，前端会收到一个它不认识的、也不该看到的内部事件。
    * 收集器在 `execute` 里新建，因此每个节点只拥有本次执行产生的事件。
+   *
+   * @param context - pipeline 上下文；其 metadata 供内部事件捕获查注册表，eventSink 会被本节点接管
+   * @param signal - 中止信号；进入即检查，已中止则快速失败
    */
   public execute(context: ProductPipelineContext, signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
@@ -99,12 +114,22 @@ export class SectionBuildNode {
   }
 }
 
-/** 造一个展示交接事件；载荷先过 `toAgentJsonValue` 归一，保证它可被序列化与克隆。 */
+/**
+ * 造一个展示交接事件；载荷先过 `toAgentJsonValue` 归一，保证它可被序列化与克隆。
+ *
+ * @param data - 任意展示载荷；经归一化后写入事件
+ * @returns 内部展示交接事件（不得越过 SSE 边界）
+ */
 export function subAgentDisplayReadyEvent(data: unknown): SubAgentDisplayReadyEvent {
   return { type: 'sub_agent_display_ready', data: toAgentJsonValue(data) }
 }
 
-/** 把 section 载荷转成落库用的 snake_case JSON；空串与 `undefined` 同等对待，都不写入该字段。 */
+/**
+ * 把 section 载荷转成落库用的 snake_case JSON；空串与 `undefined` 同等对待，都不写入该字段。
+ *
+ * @param data - 子 Agent section 载荷
+ * @returns snake_case 的 JSON 对象；可选字段为空串 / undefined 时省略
+ */
 export function serializeSubAgentSectionData(data: SubAgentSectionData): AgentJsonObject {
   const payload: Record<string, AgentJsonValue> = {
     agent_id: data.agentId,
@@ -127,6 +152,10 @@ export function serializeSubAgentSectionData(data: SubAgentSectionData): AgentJs
  *
  * 注册表缺失时**同样返回 true**（消费掉但不存）：这类事件无论如何都不该流出去，
  * 「存不下」和「不该转发」是两件事，不能因为前者失败就放行后者。
+ *
+ * @param event - pipeline 事件；只有「带父调用标识的展示交接事件」会被消费
+ * @param metadata - pipeline 元数据；从中取注册表，缺失时仍消费事件但不落库
+ * @returns 是否为本节点消费的内部交接事件（true 表示不再转发）
  */
 export function captureSubAgentDisplayEvent(
   event: ProductPipelineEvent,
@@ -146,6 +175,10 @@ export function captureSubAgentDisplayEvent(
  * 匹配键是**父工具调用的 callId**：子执行是由父运行里某次委派工具调用发起的，
  * 把结果插在那一组工具之后，用户的阅读顺序才是「父调用了子 → 子返回了什么」。
  * 找不到匹配（`inserted` 为假）时返回原消息的浅拷贝，不做任何改动。
+ *
+ * @param messages - 父运行的展示消息序列；data 为空时原样返回
+ * @param data - 父调用 ID → 子执行展示载荷 的映射
+ * @returns 插入子执行 section 后的消息；无匹配时不改变原消息
  */
 export function embedSubAgentSections(
   messages: readonly DisplayMessage[],

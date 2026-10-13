@@ -31,6 +31,16 @@ export class StorageController {
     this.#storage = storage
   }
 
+  /**
+   * 上传对象并回吐其元信息。
+   *
+   * 失败语义集中在 `mapStorageFailure`：入参非法映射 400、对象不存在映射 404，其余未知异常落
+   * 500（写日志保留 cause）。对象 key 由应用层生成，控制器不参与命名。
+   *
+   * @param command - 上传命令，含归属用户与文件内容；`userId` 来自 Principal，不接受请求体改写
+   * @param signal - 请求生命周期绑定的取消信号，客户端断开时透传给应用层
+   * @returns 对象元信息 DTO，可进成功信封
+   */
   public async upload(command: UploadObjectCommand, signal: AbortSignal): Promise<ObjectInfoDto> {
     try {
       return toObjectInfoDto(await this.#storage.upload(command, signal))
@@ -39,6 +49,17 @@ export class StorageController {
     }
   }
 
+  /**
+   * 打开对象下载流并返回其元信息。
+   *
+   * 返回的 `body` 是**未消费**的流：所有权交给路由层写入 HTTP 响应，控制器不读取、不关闭；
+   * 取消由传入的 signal 向下传播，底层 Adapter 负责销毁 MinIO 响应流。
+   *
+   * @param userId - 归属用户 ID，来自 Principal；用于拼接并校验对象 key 前缀
+   * @param objectPath - 通配路径解析出的对象 key；越权 key 会被应用层判为不存在
+   * @param signal - 请求生命周期绑定的取消信号，断连时透传到流生命周期
+   * @returns 下载流与元信息；流由调用方负责消费
+   */
   public async download(
     userId: string,
     objectPath: string,
@@ -51,6 +72,16 @@ export class StorageController {
     }
   }
 
+  /**
+   * 删除当前用户拥有的对象。
+   *
+   * 删除是幂等的：对象本就不存在时底层不报错，仍返回成功回执；失败按映射规则落 400/404/500。
+   *
+   * @param userId - 归属用户 ID，来自 Principal；决定可删除的 key 前缀
+   * @param objectPath - 通配路径解析出的对象 key
+   * @param signal - 请求生命周期绑定的取消信号
+   * @returns 固定文案的删除回执
+   */
   public async delete(
     userId: string,
     objectPath: string,
@@ -64,6 +95,16 @@ export class StorageController {
     return { message: '已删除' }
   }
 
+  /**
+   * 签发下载预签名 URL。
+   *
+   * 与 `presignPut` 共用 `#presign`：两者只在签名动作与失败文案上不同。URL 直接回给客户端，
+   * 由客户端绕过后端访问对象存储。
+   *
+   * @param command - 预签名命令；`expiresSeconds` 缺省取默认有效期，超上限由应用层拒绝
+   * @param signal - 请求生命周期绑定的取消信号
+   * @returns URL 与本次实际采用的有效期（秒）
+   */
   public presignGet(
     command: PresignObjectCommand,
     signal: AbortSignal
@@ -71,6 +112,16 @@ export class StorageController {
     return this.#presign(command, signal, 'get')
   }
 
+  /**
+   * 签发上传预签名 URL。
+   *
+   * 与 `presignGet` 对称，共用 `#presign`；服务端只产出 URL，不在服务端创建对象，上传由客户端
+   * 用该 URL 完成。
+   *
+   * @param command - 预签名命令；`expiresSeconds` 缺省取默认有效期，超上限由应用层拒绝
+   * @param signal - 请求生命周期绑定的取消信号
+   * @returns URL 与本次实际采用的有效期（秒）
+   */
   public presignPut(
     command: PresignObjectCommand,
     signal: AbortSignal

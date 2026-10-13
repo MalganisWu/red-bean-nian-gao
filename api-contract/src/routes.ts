@@ -101,6 +101,9 @@ export const API_ROUTES = {
 /**
  * 渲染路径模板中的 `:param` 占位符；未提供的占位符原样保留。
  * 通配 `*` 不属于占位符替换（splat 语义），有直链需求时另提供后缀拼接工具。
+ * @param template - 取自 `API_ROUTES` 的路径模板，形如 `/api/sessions/:id`。
+ * @param params - 占位符到取值的映射；缺省的键会原样保留为 `:param`。
+ * @returns 替换后的路径字符串。
  */
 export function buildPath(template: string, params: Readonly<Record<string, string>> = {}): string {
   return template.replace(

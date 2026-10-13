@@ -49,12 +49,21 @@ export class ChildExecutionObserver
    * 事件同时进两处：子执行自己的展示收集器（落进它的执行记录），
    * 以及父流的事件出口（让父运行的 SSE 能把子执行的进展折叠展示出来）。
    * 三者都可选，因此观察器的存在不会强制宿主提供任何一项能力。
+   *
+   * @param event - 子运行的中性事件；按已配置的能力分流到展示收集器与父流
    */
   public publish(event: AgentRuntimeEvent): void {
     this.#sections?.collect(event)
     this.#eventSink?.(event)
   }
 
+  /**
+   * 观察子运行已提交消息，落进增量缓冲（经 messageSink 以 CAS 写入）；
+   * 未配置 sink 时空操作，不阻塞子运行。
+   *
+   * @param message - 子运行提交的消息
+   * @param signal - 中止信号，随写入一并传给 messageSink
+   */
   public observe(message: AgentMessage, signal: AbortSignal): Promise<void> {
     return (
       this.#messageSink?.(this.#executionId, this.#persistenceRevision, message, signal) ??

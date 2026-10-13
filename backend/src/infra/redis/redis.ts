@@ -211,6 +211,15 @@ export class RedisConnection implements RedisStore {
     this.#driver = driver
   }
 
+  /**
+   * 无条件写入键并设置毫秒级 TTL，已有值会被直接覆盖。
+   * 它不做「键是否已存在」的判断，需要互斥语义时应改用 `setIfAbsent`。
+   * 命令一旦发出就无法撤回：`signal` 只在调用前后检查，中止时抛错但写入可能已经生效。
+   * @param key - 目标键；本类不加命名空间前缀，键的唯一性由调用方负责
+   * @param value - 待写入的字符串，序列化由调用方完成
+   * @param ttlMilliseconds - 存活时间（毫秒）；传 0 或负数会被 Redis 拒绝
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   */
   public async set(
     key: string,
     value: string,
@@ -222,6 +231,16 @@ export class RedisConnection implements RedisStore {
     signal.throwIfAborted()
   }
 
+  /**
+   * 仅当键不存在时写入，是获取分布式锁的原语（Redis 的 `SET NX`）。
+   * 返回 `false` 表示键已被他人占用——这是正常竞争结果而非错误，调用方不应把它当作
+   * 需要重试到成功的失败；TTL 与写入在同一条命令内生效，因此不会留下无过期的锁。
+   * @param key - 锁键
+   * @param value - 持有者标识；后续 `compareAndExpire` / `compareAndDelete` 靠它确认所有权
+   * @param ttlMilliseconds - 锁的存活时间（毫秒），必须为正数以免锁永久残留
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 是否成功写入；`false` 表示键已存在，本次未做任何修改
+   */
   public async setIfAbsent(
     key: string,
     value: string,
@@ -234,6 +253,14 @@ export class RedisConnection implements RedisStore {
     return result === 'OK'
   }
 
+  /**
+   * 读取键的当前值。
+   * 键不存在返回 `undefined` 而不是空串，让调用方能区分「键已消失（锁被抢占或过期）」
+   * 与「值恰好是空字符串」这两种语义完全不同的情况。
+   * @param key - 目标键
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 键的值；键不存在时为 `undefined`
+   */
   public async get(key: string, signal: AbortSignal): Promise<string | undefined> {
     signal.throwIfAborted()
     const result = await this.#driver.get(key)
@@ -241,12 +268,30 @@ export class RedisConnection implements RedisStore {
     return result ?? undefined
   }
 
+  /**
+   * 无条件删除键，只应在确认数据确实归自己所有时使用。
+   * 释放锁必须改用 `compareAndDelete`：裸删除会连带删掉别人已经重新获取的锁。
+   * 删除不存在的键不算失败，Redis 不会报错。
+   * @param key - 目标键
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   */
   public async delete(key: string, signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
     await this.#driver.del(key)
     signal.throwIfAborted()
   }
 
+  /**
+   * 值仍是期望值时才续期，供持有者在锁尚未过期时给自己续命。
+   * 比较与续期在同一段 Lua 里完成，因此不会被「续期途中键过期并被他人抢走」插空。
+   * 返回 `false` 表示键已被他人接管或已过期，此时续期已经没有意义，
+   * 正确反应是停止继续持锁，而不是原地重试。
+   * @param key - 锁键
+   * @param expectedValue - 期望的当前值，即自己的持有者标识
+   * @param ttlMilliseconds - 续期后的存活时间（毫秒）
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 是否续期成功；`false` 表示值已不匹配且未做任何修改
+   */
   public async compareAndExpire(
     key: string,
     expectedValue: string,
@@ -262,6 +307,15 @@ export class RedisConnection implements RedisStore {
     return redisInteger(result) > 0
   }
 
+  /**
+   * 值仍是期望值时才删除，是释放锁的唯一安全方式。
+   * 比较与删除在同一段 Lua 里完成，避免「查到是自己的锁、删之前被别人接管」的竞态。
+   * 返回 `false` 表示锁已不属于自己，此时什么都不做就是正确结果，调用方不应报错。
+   * @param key - 锁键
+   * @param expectedValue - 期望的当前值，即自己的持有者标识
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 是否真的删除了；`false` 表示值已不匹配且未做任何修改
+   */
   public async compareAndDelete(
     key: string,
     expectedValue: string,
@@ -276,6 +330,14 @@ export class RedisConnection implements RedisStore {
     return redisInteger(result) > 0
   }
 
+  /**
+   * 查询键的剩余存活时间（毫秒），语义直接透传 Redis 的 `PTTL`。
+   * `-1` 表示键存在但没有设置过期，`-2` 表示键根本不存在——两者都是负数，
+   * 调用方必须分别判断，不能只写 `> 0` 就把「永不过期」和「已消失」当成同一回事。
+   * @param key - 目标键
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 剩余毫秒数；无过期时间为 `-1`，键不存在为 `-2`
+   */
   public async ttlMilliseconds(key: string, signal: AbortSignal): Promise<number> {
     signal.throwIfAborted()
     const result = await this.#driver.pTTL(key)
@@ -283,6 +345,12 @@ export class RedisConnection implements RedisStore {
     return result
   }
 
+  /**
+   * 探活：发一次 `PING` 并要求回包是 `PONG`。
+   * 这是比「连接对象还在」更可靠的健康判据——TCP 连接可能仍然打开，而对端已经不可用；
+   * 响应不是 `PONG` 时直接抛错，不返回布尔值，避免调用方静默忽略不健康状态。
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   */
   public async ping(signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
     const response = await this.#driver.ping()
@@ -290,11 +358,24 @@ export class RedisConnection implements RedisStore {
     if (response !== 'PONG') throw new Error(`redis ping returned ${JSON.stringify(response)}`)
   }
 
-  /** 产品投递队列使用的 Redis 原子列表操作。 */
+  /**
+   * 产品投递队列使用的 Redis 原子列表操作。
+   * @param key - 目标列表键；列表不存在时 `RPUSH` 会自动创建，因此无需先初始化
+   * @param value - 入队元素，序列化由调用方负责
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   */
   public async listRightPush(key: string, value: string, signal: AbortSignal): Promise<void> {
     await this.#evaluate(LIST_RIGHT_PUSH_SCRIPT, [key], [value], signal)
   }
 
+  /**
+   * 读取列表的全部元素，顺序与入队顺序一致。
+   * 这是一次**非原子**快照：列表很大时会一次性取回全部内容到内存，
+   * 因此只适合读取规模可控的恢复消息列表，不应用于长队列。
+   * @param key - 目标列表键；键不存在时返回空数组而不是报错
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 列表元素数组；键不存在或列表为空时为 `[]`
+   */
   public async listRange(key: string, signal: AbortSignal): Promise<readonly string[]> {
     const result = await this.#evaluate(LIST_RANGE_SCRIPT, [key], [], signal)
     if (!Array.isArray(result)) throw new Error('redis list range returned an invalid value')
@@ -309,6 +390,13 @@ export class RedisConnection implements RedisStore {
   /**
    * 取出一个待处理元素，同时把它转入 processing 列表。
    * 返回 `undefined` 表示队列为空——这是正常结果，不是错误。
+   * 两步在同一段 Lua 里完成，不会出现「元素已出队但尚未登记进 processing」的中间态；
+   * 元素一旦进入 `processingKey` 即视为「在途」，其所有权归本次领取者，
+   * 只有领取者才能通过 `listRequeue` 归还或由 `listRecover` 在重启时统一回收。
+   * @param sourceKey - 待办队列键，从队首（LPOP）取出
+   * @param processingKey - 处理中队列键，取出的元素被追加到其队尾；它是崩溃后仍能找回该元素的前提
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 取出的元素；队列为空时为 `undefined`
    */
   public async listClaim(
     sourceKey: string,
@@ -321,6 +409,15 @@ export class RedisConnection implements RedisStore {
     return result
   }
 
+  /**
+   * 处理失败时把元素从处理中队列放回待办队首，让它先于其他消息被重试。
+   * 只有元素确实还在 `processingKey` 里时才会被搬回：如果它已经被 `listRecover`
+   * 回收或已被移除，这次调用就是空操作，不会凭空造出一条消息。
+   * @param sourceKey - 待办队列键，元素被放回其队首（LPUSH）
+   * @param processingKey - 处理中队列键，元素从这里移除
+   * @param entry - 要归还的原始元素值；必须与领取时拿到的字符串完全一致
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   */
   public async listRequeue(
     sourceKey: string,
     processingKey: string,
@@ -330,6 +427,14 @@ export class RedisConnection implements RedisStore {
     await this.#evaluate(LIST_REQUEUE_SCRIPT, [sourceKey, processingKey], [entry], signal)
   }
 
+  /**
+   * 把处理中队列整体倒回待办队列，用于进程启动时回收上次崩溃遗留的在途消息。
+   * 这是**进程级**操作：它假设当前实例是处理中队列的唯一消费者，
+   * 若同一队列还有其他活着的消费者，会把别人正在处理的元素也抢回来重复投递。
+   * @param sourceKey - 待办队列键，被回收的元素回到其队首
+   * @param processingKey - 处理中队列键，被整体清空
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   */
   public async listRecover(
     sourceKey: string,
     processingKey: string,
@@ -338,11 +443,27 @@ export class RedisConnection implements RedisStore {
     await this.#evaluate(LIST_RECOVER_SCRIPT, [sourceKey, processingKey], [], signal)
   }
 
+  /**
+   * 从列表中移除**第一个**与给定值相等的元素，用于处理成功后把元素从处理中队列彻底删掉。
+   * 元素不在列表中时是空操作，不算失败——重投、重复回收都可能让同一条消息的
+   * 清理被调用两次，幂等是必须的。
+   * @param key - 目标列表键
+   * @param entry - 要移除的元素值，按字符串精确匹配
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   */
   public async listRemove(key: string, entry: string, signal: AbortSignal): Promise<void> {
     await this.#evaluate(LIST_REMOVE_SCRIPT, [key], [entry], signal)
   }
 
-  /** 原子追加恢复消息，并刷新其保留时间。 */
+  /**
+   * 原子追加恢复消息，并刷新其保留时间。
+   * 追加与续期必须同一条命令，否则「追加成功但续期前进程挂掉」会留下一个永不过期的列表，
+   * 里面的消息再也无人清理。
+   * @param key - 目标列表键
+   * @param value - 追加的元素，序列化由调用方负责
+   * @param ttlSeconds - 刷新后的存活时间（秒）；每次追加都会重置整个列表的过期时间
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   */
   public async appendListWithExpiry(
     key: string,
     value: string,
@@ -356,6 +477,13 @@ export class RedisConnection implements RedisStore {
    * 守卫键仍是期望值时才追加。
    * 返回 `false` 表示守卫已失效（持有者换人），**调用方不应把它当失败重试**——
    * 重试只会再次被拒；正确的反应是放弃这次投递。
+   * @param guardKey - 守卫键，代表「当前持有者 / 会话代次」
+   * @param expectedValue - 守卫键的期望值；与当前值不符即判定守卫失效
+   * @param key - 实际追加的目标列表键
+   * @param value - 追加的元素，序列化由调用方负责
+   * @param ttlSeconds - 刷新后的存活时间（秒）
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 是否追加成功；`false` 表示守卫已失效、未写入任何内容
    */
   public async appendListWithExpiryIfValue(
     guardKey: string,
@@ -374,6 +502,16 @@ export class RedisConnection implements RedisStore {
     return result === 1
   }
 
+  /**
+   * 守卫键仍是期望值时才删除数据，用于「确认自己仍是持有者后才清理」的场景。
+   * 返回 `false` 表示持有者已经换人，本方法什么都没删——这是正常的并发结果，
+   * 调用方不应把它当错误上报或重试，因为重试只会得到同样的 `false`。
+   * @param guardKey - 守卫键，代表「当前持有者 / 会话代次」
+   * @param expectedValue - 守卫键的期望值；与当前值不符即判定守卫失效
+   * @param key - 实际删除的目标键
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 是否真的删除；`false` 表示守卫已失效、未做任何修改
+   */
   public async deleteIfValue(
     guardKey: string,
     expectedValue: string,
@@ -389,7 +527,14 @@ export class RedisConnection implements RedisStore {
     return result === 1
   }
 
-  /** 原子读取并删除完整的恢复消息列表。 */
+  /**
+   * 原子读取并删除完整的恢复消息列表。
+   * 读与删之间不能有别的写入者，否则会漏掉刚追加的消息；也因此它是一次性消费，
+   * 调用方必须先把结果落盘或投递成功，再依赖它已经被清空这一事实。
+   * @param key - 目标列表键；键不存在时视为空列表，不算失败
+   * @param signal - 取消信号，命令前后各检查一次，已中止则抛错
+   * @returns 列表的全部元素；键不存在时为空数组
+   */
   public async consumeList(key: string, signal: AbortSignal): Promise<readonly string[]> {
     const result = await this.#evaluate(LIST_CONSUME_SCRIPT, [key], [], signal)
     return redisStringArray(result, 'redis list consume')
@@ -420,6 +565,10 @@ export class RedisConnection implements RedisStore {
  * 所以补一次 `ping()`。
  * 失败时用 `destroy()` 而不是 `quit()`：连接此刻已不可用，`quit()` 会尝试优雅关闭并等待回应，
  * 反而可能卡住；`destroy()` 是同步的强制断开。
+ * @param redisUrl - 连接串；协议必须是 `redis:` 或 `rediss:`，格式非法时在建连前就抛错
+ * @param signal - 启动期的取消信号，建连与 ping 之后各检查一次
+ * @param factory - 驱动工厂，测试可注入假驱动以避开真实网络
+ * @returns 已建连并验证过往返的连接对象；失败时抛错且不会返回半连接状态的对象
  */
 export async function connectRedis(
   redisUrl: string,

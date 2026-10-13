@@ -31,6 +31,15 @@ export class TaskQueryService {
     this.#dependencies = dependencies
   }
 
+  /**
+   * 按用户分页列出任务列表项；查询失败统一翻译为基础设施失败。
+   *
+   * @param userId - 当前登录用户，决定可见范围。
+   * @param cursor - 上一页末条的游标；空串表示取首页。
+   * @param limit - 本页最大条数。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 本页列表项与下一页游标。
+   */
   public async listByUser(
     userId: string,
     cursor: string,
@@ -49,6 +58,14 @@ export class TaskQueryService {
     }
   }
 
+  /**
+   * 批量取执行结果的视图状态；只返回属于该用户的执行记录。
+   *
+   * @param userId - 当前登录用户，用于归属过滤。
+   * @param executionIds - 目标执行 ID 列表；空列表直接返回空数组，不查库。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 命中的视图状态；未设置过的执行记录不会出现。
+   */
   public async listViewStates(
     userId: string,
     executionIds: readonly string[],
@@ -65,6 +82,14 @@ export class TaskQueryService {
     }
   }
 
+  /**
+   * 读取任务并校验归属；查不到抛 NOT_FOUND，查到但非本人抛 FORBIDDEN。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param taskId - 目标任务标识。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 归属校验通过的任务定义。
+   */
   public async getOwnedTask(
     userId: string,
     taskId: string,
@@ -77,6 +102,16 @@ export class TaskQueryService {
     return task
   }
 
+  /**
+   * 分页列出某任务的执行记录；先校验任务归属再查执行历史。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param taskId - 目标任务标识。
+   * @param cursor - 上一页末条的游标；空串表示取首页。
+   * @param limit - 本页最大条数。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 本页执行记录与下一页游标。
+   */
   public async listExecutions(
     userId: string,
     taskId: string,
@@ -97,6 +132,15 @@ export class TaskQueryService {
     }
   }
 
+  /**
+   * 读取单条执行记录；任务归属不通过抛 FORBIDDEN，记录不存在抛 EXECUTION_NOT_FOUND。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param taskId - 目标任务标识。
+   * @param executionId - 目标执行记录标识。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 目标执行记录。
+   */
   public async getExecution(
     userId: string,
     taskId: string,
@@ -123,6 +167,14 @@ export class TaskQueryService {
     return execution
   }
 
+  /**
+   * 列出某会话下的全部任务；同时按用户过滤，越权会话得到空列表。
+   *
+   * @param userId - 当前登录用户，用于归属过滤。
+   * @param sessionId - 目标会话标识。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 该会话的列表项集合。
+   */
   public async listBySession(
     userId: string,
     sessionId: string,

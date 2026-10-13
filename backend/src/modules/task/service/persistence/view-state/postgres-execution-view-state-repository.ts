@@ -15,6 +15,14 @@ export class PostgresExecutionViewStateRepository implements ExecutionViewStateR
     this.#now = now
   }
 
+  /**
+   * 批量取执行结果的视图状态；只返回属于该用户的执行记录，越权 ID 被静默过滤。
+   *
+   * @param userId - 当前登录用户，用于归属过滤。
+   * @param executionIds - 目标执行 ID 列表；空列表直接返回空数组，不查库。
+   * @param signal - 取消信号，透传到库查询。
+   * @returns 命中的视图状态；未设置过的执行记录不会出现。
+   */
   public async listExecutionViewStates(
     userId: string,
     executionIds: readonly string[],
@@ -41,6 +49,17 @@ export class PostgresExecutionViewStateRepository implements ExecutionViewStateR
     }
   }
 
+  /**
+   * upsert 单条视图状态：已读时间只置位不回退，折叠覆盖仅在显式给出时更新。
+   * 写入选择受任务所有权约束，无匹配行时抛 NOT_AUTHORIZED。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param executionId - 目标执行记录标识。
+   * @param markSeen - 是否标记已读；为 true 时写入当前时间，为 false 保留已有值。
+   * @param collapsedOverride - 折叠覆盖值；`undefined` 表示本次不改动该列。
+   * @param signal - 取消信号，透传到库查询。
+   * @returns upsert 后的视图状态。
+   */
   public async upsertExecutionViewState(
     userId: string,
     executionId: string,

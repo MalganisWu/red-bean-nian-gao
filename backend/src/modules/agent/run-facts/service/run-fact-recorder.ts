@@ -85,6 +85,8 @@ export class RunFactRecorder implements AgentExecutionEventSink {
    * 这里**刻意 `await`**（与后面所有写入的 fire-and-forget 不同）：
    * 容器是后续所有 fact 的外键，先确认它写成功，仓储不可用时就能立刻进入 `#broken` 状态停写，
    * 而不是把一串注定失败的事实追加排进队列。
+   *
+   * @param signal - 传给仓储 create 的中止信号；中止或失败即进入 `#broken` 停写
    */
   public async start(signal: AbortSignal): Promise<void> {
     this.#enqueue(async (): Promise<void> => {
@@ -93,7 +95,11 @@ export class RunFactRecorder implements AgentExecutionEventSink {
     await this.#queue
   }
 
-  /** AgentExecutionEventSink：接收主运行的中性事件（子 Agent envelope 由调用方过滤）。 */
+  /**
+   * AgentExecutionEventSink：接收主运行的中性事件（子 Agent envelope 由调用方过滤）。
+   *
+   * @param event - 主运行的中性运行时事件；按类型路由到步骤缓冲或工具记账
+   */
   public publish(event: AgentRuntimeEvent): void {
     switch (event.type) {
       case 'status': {
@@ -160,6 +166,8 @@ export class RunFactRecorder implements AgentExecutionEventSink {
   /**
    * 观察 Runtime 已提交消息：user 直接落事实，assistant 结算当前步骤缓冲，
    * tool 只处理「审批闭合」这一种（见 #recordApprovalClosure）。
+   *
+   * @param message - 已提交的会话消息；按 role 分派，其余 role 直接忽略
    */
   public onMessage(message: AgentMessage): void {
     if (message.role === 'user') {
@@ -192,6 +200,8 @@ export class RunFactRecorder implements AgentExecutionEventSink {
    * 记录审批挂起事实。interrupting 工具在 Runtime 里是屏障——不发 tool_start / tool_result，
    * resume 时也不重新 dispatch——所以「这一步要求过审批」只能由宿主在工具返回 interrupt 信号时
    * 自己落一条。写入点见 ApprovalFactToolDispatcher（run-facts/service）。
+   *
+   * @param input - 挂起工具调用快照；callId 会被登记，避免 resume 闭合消息重复写一行
    */
   public recordApprovalPending(input: {
     readonly callId: string
@@ -212,23 +222,40 @@ export class RunFactRecorder implements AgentExecutionEventSink {
     this.#emitFact(interruptedToolFact)
   }
 
-  /** 包裹主运行模型 adapter，观察每次实际 LLM 请求（attempt）。 */
+  /**
+   * 包裹主运行模型 adapter，观察每次实际 LLM 请求（attempt）。
+   *
+   * @param inner - 主运行使用的模型 adapter；子 Agent 委派在 Loader 内捕获原始实例，不经此包裹
+   * @returns 包了观察逻辑的新 adapter；原实例不变
+   */
   public observeModel(inner: AgentModelAdapter): AgentModelAdapter {
     return new RunFactModelObserver(this, inner)
   }
 
+  /** 开启一次 LLM attempt；缓冲按当前时刻记起点，悬挂中的上一个 attempt 会先被闭合。 */
   public beginModelAttempt(): void {
     this.#step.beginAttempt(this.#now())
   }
 
+  /**
+   * 记入本 attempt 的 token 用量；与 SDK usageCounted 口径一致，首个 usage 生效、后续忽略。
+   *
+   * @param usage - 模型 SDK 报告的 token 用量
+   */
   public recordModelUsage(usage: Parameters<RunFactStepBuffer['recordUsage']>[0]): void {
     this.#step.recordUsage(usage)
   }
 
+  /**
+   * 把本 attempt 标为失败；已有错误时不覆盖，保留首个根因。
+   *
+   * @param message - 归一化后的错误信息
+   */
   public markModelAttemptError(message: string): void {
     this.#step.markError(message)
   }
 
+  /** 闭合当前 attempt；无进行中的 attempt 时空操作。 */
   public endModelAttempt(): void {
     this.#step.endAttempt(this.#now())
   }
@@ -236,6 +263,9 @@ export class RunFactRecorder implements AgentExecutionEventSink {
   /**
    * 终态化：先补记未结算的步骤缓冲与未完成的工具调用（失败轮次不允许悄悄烂尾），
    * 再提交 run 终态命令。取消归属由调用方在命令里给出（chat cancel → user）。
+   *
+   * @param command - 终态命令；取消归属与结束时刻由调用方给出
+   * @param signal - 收尾信号；独立于会话信号，客户端断线也要把终态落盘
    */
   public async finalize(command: FinalizeSessionRunCommand, signal: AbortSignal): Promise<void> {
     const flushed = this.#step.flush(this.#now())

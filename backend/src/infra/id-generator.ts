@@ -23,6 +23,14 @@ export class TimestampIdGenerator implements IdGenerator {
     this.#randomBytes = randomByteSource
   }
 
+  /**
+   * 生成 `<prefix>_<毫秒时间戳><8 位随机后缀>` 形态的不透明 ID。
+   * 前缀按业务实体区分（如 `sess`、`msg`），后缀取自可注入的随机源。
+   * 时钟非安全整数或随机源长度不符时直接抛错，不做兜底——生成出格式错误的 ID
+   * 会污染持久化数据，宁可让调用点立刻失败。
+   * @param prefix - ID 的业务前缀，不含分隔符；分隔符 `_` 由本方法拼接
+   * @returns 拼接完成的 ID 字符串；时间戳为十进制文本，因此同一毫秒内仍靠随机后缀区分
+   */
   public generate(prefix: string): string {
     const timestamp = this.#clock()
     if (!Number.isSafeInteger(timestamp) || timestamp < 0) {

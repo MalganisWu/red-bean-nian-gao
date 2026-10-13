@@ -21,6 +21,9 @@ import { optionalField } from '../../../../shared/object/optional-field.js'
  * 落点是通用的 5000 + 固定文案——SSE 是一条已经打开的流，头部早已发出，
  * 这里没有 HTTP 状态码可用，错误只能以事件形式传递，因此更要小心不要把内部信息写进去。
  * 会话不存在映射为 4004、交互冲突映射为 4009，是给前端做分支用的稳定业务码。
+ *
+ * @param error - 捕获到的任意异常；仅 `SessionStoreError` / `AppError` 会被翻译成业务码，其余一律折叠为 5000，原始 message 与堆栈都不外泄。
+ * @returns 可直接序列化进 SSE 帧的错误事件；`code` 是前端做分支用的稳定业务码。
  */
 export function toStreamErrorEvent(error: unknown): StreamErrorEvent {
   if (error instanceof SessionStoreError) {
@@ -46,7 +49,12 @@ export function toStreamErrorEvent(error: unknown): StreamErrorEvent {
 export function localizeRuntimeEvent(event: AgentStatusEvent): LocalizedStatusEvent
 /** 非 status 事件：原样返回；`agent_event` 信封则递归处理其内层事件。 */
 export function localizeRuntimeEvent(event: ProductStreamEvent): ProductStreamEvent
-/** 实现体：`status` 交给 `localizedStatus`，`agent_event` 解构信封后递归。 */
+/**
+ * 实现体：`status` 交给 `localizedStatus`，`agent_event` 解构信封后递归。
+ *
+ * @param event - 单个产品事件；`status` 会被本地化，`agent_event` 会递归下钻，其余原样返回。
+ * @returns 展示边界上的事件；普通非 status 事件与入参是同一引用，调用方不应据此做身份判断。
+ */
 export function localizeRuntimeEvent(event: ProductStreamEvent): ProductStreamEvent {
   if (event.type === AGENT_EVENT_TYPES.STATUS) return localizedStatus(event)
   if (event.type !== STREAM_EVENT_TYPES.AGENT_EVENT) return event
@@ -55,7 +63,12 @@ export function localizeRuntimeEvent(event: ProductStreamEvent): ProductStreamEv
   return { ...envelope, event: localizeRuntimeEvent(nested) }
 }
 
-/** 将产品事件序列化为稳定的 SSE 帧。 */
+/**
+ * 将产品事件序列化为稳定的 SSE 帧。
+ *
+ * @param event - 待投影的产品事件；本函数只做本地化与 JSON 编码，不改变事件顺序。
+ * @returns 一帧 `event:` + `data:` 文本，末尾固定空行分隔；帧序与入参次序一致。
+ */
 export function serializeSseEvent(event: ProductStreamEvent): string {
   const localized = localizeRuntimeEvent(event)
   return `event: ${localized.type}\ndata: ${JSON.stringify(eventPayload(localized))}\n\n`

@@ -26,8 +26,13 @@ function timeOnly(value: string | null | undefined): string | undefined {
   })
 }
 
-/** 独立单次执行页：任务事件外壳留在聊天流，这里只展示运行元信息、Process 与 Final。 */
-export function ExecutionResultView({ taskId, executionId, onBack }: ExecutionResultViewProps) {
+/**
+ * 独立单次执行页：任务事件外壳留在聊天流，这里只展示运行元信息、Process 与 Final。
+ *
+ * @param props - 组件属性；字段语义见 `ExecutionResultViewProps`。
+ */
+export function ExecutionResultView(props: ExecutionResultViewProps) {
+  const { taskId, executionId, onBack } = props
   const activeExecution = useTaskStore((state) => state.activeExecution)
   const activeExecutionLoading = useTaskStore((state) => state.activeExecutionLoading)
   const currentTask = useTaskStore((state) => state.currentTask)

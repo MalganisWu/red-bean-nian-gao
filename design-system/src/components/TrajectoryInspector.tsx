@@ -57,17 +57,12 @@ function Metric({ label, value, sub }: { label: string; value: string; sub?: str
  * 轨迹记录检查器：右侧常驻栏，按记录类型分 tab 展示完整内容。
  * 用户=内容；步骤=思考/输出/概览；工具=参数/结果/概览；子 Agent=概览/结果/内部调用；
  * 压缩=前后对照与策略说明。
+ *
+ * @param props - 组件属性；字段语义见 `TrajectoryInspectorProps`。
  */
-export function TrajectoryInspector({
-  record,
-  compaction,
-  request,
-  turnLabel,
-  initialTab,
-  className,
-  onSelectRecord,
-  onClose,
-}: TrajectoryInspectorProps) {
+export function TrajectoryInspector(props: TrajectoryInspectorProps) {
+  const { record, compaction, request, turnLabel, initialTab, className, onSelectRecord, onClose } =
+    props
   const target = record ?? compaction ?? request
   const tabs: string[] =
     record?.kind === 'user'

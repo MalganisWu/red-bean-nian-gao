@@ -47,6 +47,14 @@ export class BcryptPasswordHasher implements PasswordHasher {
     this.#cost = cost
   }
 
+  /**
+   * 计算密码散列。
+   *
+   * 空密码直接拒绝，不消耗一次 bcrypt 计算；底层异常包装后重抛，明文既不进错误信息也不落日志。
+   *
+   * @param password - 待散列的明文密码；仅在本调用栈内存在，不被保存或记录
+   * @returns bcrypt 散列串，已含盐与成本参数，可直接入库
+   */
   public async hash(password: string): Promise<string> {
     if (password === '') throw new Error('password cannot be empty')
     try {
@@ -56,6 +64,14 @@ export class BcryptPasswordHasher implements PasswordHasher {
     }
   }
 
+  /**
+   * 校验明文密码与散列是否匹配，不匹配即抛错。
+   *
+   * 失败原因刻意不细分：无论散列非法还是口令不符都抛出同一类错误，避免成为口令探测的旁路。
+   *
+   * @param hashedPassword - 库中存储的散列串；格式非法时按不匹配处理
+   * @param plainPassword - 待校验的明文密码，仅在本调用栈内存在
+   */
   public async verify(hashedPassword: string, plainPassword: string): Promise<void> {
     try {
       if (!(await bcrypt.compare(plainPassword, hashedPassword))) {
@@ -92,6 +108,17 @@ export class JwtAuthService implements AuthServicePort {
     this.#now = options.now ?? ((): Date => new Date())
   }
 
+  /**
+   * 校验用户名密码并签发访问令牌。
+   *
+   * 账号不存在、密码不匹配、账号停用分别产生稳定的 AuthError 码；仓储异常包装为普通错误，
+   * 由上层统一收敛为 401，不向调用方区分具体原因。
+   *
+   * @param username - 登录用户名；查询失败按凭据错误处理，不暴露账号是否存在
+   * @param password - 明文密码，交给注入的散列器校验，不被记录
+   * @param signal - 取消信号；进入时先检查，并透传给用户查询
+   * @returns 签名后的访问令牌
+   */
   public async login(username: string, password: string, signal: AbortSignal): Promise<string> {
     signal.throwIfAborted()
     let user: User | undefined
@@ -112,11 +139,30 @@ export class JwtAuthService implements AuthServicePort {
     return this.sign(user, this.#now())
   }
 
+  /**
+   * 注销令牌。
+   *
+   * 当前是无状态占位实现：JWT 无法被服务端撤销，这里只做取消检查后直接返回；令牌在过期前
+   * 仍然可用，真正的失效依赖到期或后续引入的吊销表。
+   *
+   * @param _token - 待注销的令牌原文；无状态实现下不使用，保留占位以便未来接入吊销
+   * @param signal - 取消信号，仅用于进入时检查，后续无异步操作
+   */
   public logout(_token: string, signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
     return Promise.resolve()
   }
 
+  /**
+   * 校验令牌签名与有效期，返回其声明的用户 ID。
+   *
+   * 过期与其它非法原因被拆成 TOKEN_EXPIRED 与 INVALID_TOKEN 两个稳定码，上层可据此做差异化
+   * 处理（如静默续签）；载荷再经 Schema 复核，防止形状异常的伪造 claim 穿透。
+   *
+   * @param token - 待校验的 JWT 原文，来自 Authorization 头
+   * @param signal - 取消信号；进入时先检查
+   * @returns 令牌中经校验的 `user_id`
+   */
   public async validateToken(token: string, signal: AbortSignal): Promise<string> {
     signal.throwIfAborted()
     try {
@@ -133,6 +179,16 @@ export class JwtAuthService implements AuthServicePort {
     }
   }
 
+  /**
+   * 用旧令牌换取新令牌，延长会话。
+   *
+   * 与 `validateToken` 的分工：这里刻意接受**已过期**的令牌（只验签名），但签发时间受时钟偏移
+   * 容忍与 refresh 最大年龄双重约束；用户不存在或已停用一律按 INVALID_TOKEN 拒绝。
+   *
+   * @param oldToken - 待续签的旧令牌原文；允许已过期，但签名必须有效
+   * @param signal - 取消信号；进入时先检查，并透传给用户查询
+   * @returns 重新签发的访问令牌
+   */
   public async refreshToken(oldToken: string, signal: AbortSignal): Promise<string> {
     signal.throwIfAborted()
     let claims: TokenClaims

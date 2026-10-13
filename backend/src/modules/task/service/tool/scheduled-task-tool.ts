@@ -76,7 +76,9 @@ const PARAMETERS: AgentJsonObject = Object.freeze({
  * 而不是拿 task_id 直接读写。否则模型只要报出一个别人的 ID 就能越权操作。
  */
 export class ScheduledTaskManageTool implements AgentTool {
+  /** 工具在 Registry 中的注册名；与 Schema 的 function.name 必须一致。 */
   public readonly name = SCHEDULED_TASK_MANAGE_TOOL_NAME
+  /** 对外暴露的 JSON Schema；参数清单即模型可填的字段全集。 */
   public readonly schema: AgentToolSchema = {
     type: 'function',
     function: {
@@ -105,6 +107,15 @@ export class ScheduledTaskManageTool implements AgentTool {
     this.#now = now
   }
 
+  /**
+   * 执行工具调用：先校验参数与作用域，再按 action 分派到对应私有方法。
+   * 所有分支都以「当前用户 + 当前会话」为作用域，不信任参数里的 `task_id`。
+   *
+   * @param value - 模型给出的原始参数，形状不可信，先过 Schema。
+   * @param context - 调用上下文，提供当前会话与用户归属。
+   * @param signal - 取消信号；进入时先检查，随后透传到仓储。
+   * @returns 工具结果；内容为 JSON 字符串，未知 action 时抛错。
+   */
   public async execute(
     value: AgentJsonValue,
     context: AgentToolCallContext,

@@ -44,6 +44,11 @@ export interface DatabaseBootstrapOptions {
  * - `true`（本地开发）：直接跑迁移，方便 `make run` 一步到位。
  * - `false`（生产）：**只读校验**，有未应用的迁移就拒绝启动。生产迁移由独立 job 执行，
  *   应用实例并发跑 DDL 会互相踩；而且「启动时顺手改 schema」在生产是不可接受的隐式行为。
+ *
+ * 生产模式下存在未应用迁移时**直接抛错**，不做「跳过继续启动」的降级：schema 落后于代码
+ * 会让后续查询以难以定位的方式失败，宁可在启动期就拒绝。
+ * @param options - 播种依赖；`config.database.autoMigrate` 决定跑迁移还是只做校验，
+ *   `migrator` 缺省时按传入的数据库连接自建一个
  */
 export async function bootstrapDatabase(options: DatabaseBootstrapOptions): Promise<void> {
   const migrator = options.migrator ?? new PostgresMigrator(options.database)

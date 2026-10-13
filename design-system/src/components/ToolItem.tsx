@@ -33,18 +33,23 @@ const STATUS_TEXT: Record<ToolItemProps['status'], string> = {
   incomplete: '未完成',
 }
 
-/** Quiet Tool 行：名称、目标、耗时、状态共享一行，详细输入输出沿细线展开。 */
-export function ToolItem({
-  name,
-  isDelegation = false,
-  label,
-  status,
-  duration,
-  params,
-  result,
-  error,
-  defaultExpanded = false,
-}: ToolItemProps) {
+/**
+ * Quiet Tool 行：名称、目标、耗时、状态共享一行，详细输入输出沿细线展开。
+ *
+ * @param props - 组件属性；字段语义见 `ToolItemProps`。
+ */
+export function ToolItem(props: ToolItemProps) {
+  const {
+    name,
+    isDelegation = false,
+    label,
+    status,
+    duration,
+    params,
+    result,
+    error,
+    defaultExpanded = false,
+  } = props
   const [expanded, setExpanded] = useState(defaultExpanded)
   const hasDetail = Boolean(params || result || error)
   const rowClassName =

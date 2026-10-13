@@ -23,6 +23,9 @@ export interface BindRouteOptions {
  * method/path 全部取自该定义，后端路由文件不再出现路径字面量。
  * 传成员引用而非字符串键，是为了让 IDE 的 Go to Definition / Find Usages
  * 在目录与全部注册点之间双向可跳。
+ * @param server - 目标 Fastify 实例。
+ * @param route - `API_ROUTES` 的成员引用；其 method/path 就是注册用的路径。
+ * @param options - 注册参数；`auth` 必须与端点的 `authenticated` 标志一致，否则启动期直接失败。
  */
 export function bindRoute(
   server: FastifyInstance,

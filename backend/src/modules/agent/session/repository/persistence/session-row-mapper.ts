@@ -60,7 +60,12 @@ export interface SessionOwnerRow {
   readonly fencing_token?: string | number | bigint | undefined
 }
 
-/** 在 PostgreSQL 信任边界校验并转换 Session 聚合。 */
+/**
+ * 在 PostgreSQL 信任边界校验并转换 Session 聚合。
+ *
+ * @param value - 数据库返回的原始行，形状不可信，一律经 Schema 校验后才使用。
+ * @returns 校验通过的会话聚合；行结构不符时抛错，不返回部分字段。
+ */
 export function parseSession(value: unknown): Session {
   const parsed = sessionRowSchema.safeParse(value)
   if (!parsed.success) throw new Error('invalid session row', { cause: parsed.error })
@@ -75,7 +80,12 @@ export function parseSession(value: unknown): Session {
   }
 }
 
-/** 将同一份持久化行映射为列表查询所需的只读摘要。 */
+/**
+ * 将同一份持久化行映射为列表查询所需的只读摘要。
+ *
+ * @param value - 数据库返回的原始行，与 `parseSession` 共用同一份 Schema。
+ * @returns 摘要；标题由首条用户消息截断而来，行结构不符时抛错。
+ */
 export function parseSessionSummary(value: unknown): SessionSummary {
   const parsed = sessionRowSchema.safeParse(value)
   if (!parsed.success) throw new Error('invalid session row', { cause: parsed.error })
@@ -88,21 +98,36 @@ export function parseSessionSummary(value: unknown): SessionSummary {
   }
 }
 
-/** 解析会话所有权行；两个版本字段缺省是合法的，只做归属判断时用不到它们。 */
+/**
+ * 解析会话所有权行；两个版本字段缺省是合法的，只做归属判断时用不到它们。
+ *
+ * @param value - 数据库返回的所有权投影行，形状不可信。
+ * @returns 所有权行；`revision`/`fencing_token` 可能缺省，调用方自行判空。
+ */
 export function parseSessionOwner(value: unknown): SessionOwnerRow {
   const parsed = sessionOwnerSchema.safeParse(value)
   if (!parsed.success) throw new Error('invalid session owner row', { cause: parsed.error })
   return parsed.data
 }
 
-/** 解析单列 `revision`；用于写入前拿到当前版本，作为 CAS 的比较基准。 */
+/**
+ * 解析单列 `revision`；用于写入前拿到当前版本，作为 CAS 的比较基准。
+ *
+ * @param value - `RETURNING revision` 返回的单行结果。
+ * @returns 转成 bigint 的版本号；负数或非法形态一律抛错。
+ */
 export function parseRevision(value: unknown): bigint {
   const parsed = revisionSchema.safeParse(value)
   if (!parsed.success) throw new Error('invalid session revision row', { cause: parsed.error })
   return toBigInt(parsed.data.revision, 'revision')
 }
 
-/** 解析单列 `fencing_token`；续租或写入前用它确认自己仍持有围栏。 */
+/**
+ * 解析单列 `fencing_token`；续租或写入前用它确认自己仍持有围栏。
+ *
+ * @param value - `SELECT nextval(...) AS token` 返回的单行结果。
+ * @returns 转成 bigint 的围栏序号；负数或非法形态一律抛错。
+ */
 export function parseFencingToken(value: unknown): bigint {
   const parsed = tokenSchema.safeParse(value)
   if (!parsed.success) throw new Error('invalid session fencing token row', { cause: parsed.error })
@@ -113,6 +138,10 @@ export function parseFencingToken(value: unknown): bigint {
  * 把数据库里的三种形态统一成 bigint，并拒绝负数。
  * 负数在这里没有语义（revision 与 fencing token 都只增不减），
  * 出现负值说明数据被写坏了——静默接受会让它一路传到 CAS 比较里，变成一个无法解释的冲突。
+ *
+ * @param value - 待转换的原始值，可能是驱动返回的字符串、数字或 bigint。
+ * @param name - 字段名，只用于拼装错误信息，便于从日志里认出是哪一列出的问题。
+ * @returns 非负 bigint。
  */
 export function toBigInt(value: string | number | bigint, name: string): bigint {
   try {

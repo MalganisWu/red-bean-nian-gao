@@ -107,6 +107,15 @@ export class ProductAgentRunService implements AgentRunServicePort {
     }
   }
 
+  /**
+   * 准备阶段：建句柄、加载 Agent 配置与会话状态，并同步返回可消费的 SSE 句柄。
+   * 实际执行 fire-and-forget 转入 `#execute`，失败一律经句柄从流内传播给消费者——
+   * 此时响应头早已发出，抛异常已无接收者。
+   *
+   * @param request - 本次运行的请求（runId / sessionId / userId 等）
+   * @param signal - 客户端中止信号；只约束准备与执行阶段，收尾段改用独立超时信号
+   * @returns 承载本轮事件、可立即消费的 SSE 句柄
+   */
   public async start(request: AgentRunRequest, signal: AbortSignal): Promise<ChatRunHandle> {
     // 准备阶段：建立本轮事件投影，并加载运行期间保持不变的 Agent 配置。
     const handle = new ManagedChatRunHandle(request.runId, request.sessionId, signal)

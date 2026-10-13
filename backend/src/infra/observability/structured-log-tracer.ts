@@ -54,6 +54,14 @@ export class StructuredLogTracer implements TracerPort {
     this.#now = options.now ?? Date.now
   }
 
+  /**
+   * 建一条 span 日志并立即记下开始事件。
+   * trace ID 按三级回退解析：**本地活跃 span → 远端父属性 → 新生成**，因此同一请求内的
+   * 子 span 会沿用父 span 的 trace ID，而无父可依时才开一条新链路。
+   * 状态绑定不在这一步发生：本方法只建 span，真正把它设为活跃的是返回对象上的 `within`。
+   * @param start - 建 span 所需的名字与属性；属性里的 `trace.id` / `trace.parent_span_id` 参与父级解析
+   * @returns 新建的 span 句柄；调用方负责最终调用其 `end` 以写出结束事件
+   */
   public start(start: {
     readonly name: string
     readonly attributes: readonly TraceAttribute[]
@@ -172,12 +180,18 @@ function attributeValue(attributes: readonly TraceAttribute[], key: string): str
   return attributes.find((attribute): boolean => attribute.key === key)?.value || undefined
 }
 
-/** 返回非零且符合 W3C 格式的 16 字节 trace ID。 */
+/**
+ * 返回非零且符合 W3C 格式的 16 字节 trace ID。
+ * @returns 32 位十六进制字符串；全零会被下游判为非法，因此生成时会重试到非零为止
+ */
 export function newTraceId(): string {
   return randomHexId(16)
 }
 
-/** 返回非零的 8 字节 span ID（`traceparent` 的 span-id 段）。 */
+/**
+ * 返回非零的 8 字节 span ID（`traceparent` 的 span-id 段）。
+ * @returns 16 位十六进制字符串；与 trace ID 同理，全零值不被接受
+ */
 export function newSpanId(): string {
   return randomHexId(8)
 }

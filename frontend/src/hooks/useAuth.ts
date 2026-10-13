@@ -58,7 +58,11 @@ async function fetchCurrentUser(setUser: (user: User) => void): Promise<void> {
   setUser(me)
 }
 
-/** 认证动作集合：登录、注册与登出，并同步维护 auth store 中的令牌与用户信息。 */
+/**
+ * 认证动作集合：登录、注册与登出，并同步维护 auth store 中的令牌与用户信息。
+ *
+ * @returns login / register / logout / fetchMe 四个动作与当前认证态快照；登出无论服务端结果如何都会清空本地状态。
+ */
 export function useAuth(): AuthControls {
   const { setAuth, clearAuth, setUser, isAuthenticated, user } = useAuthStore()
 

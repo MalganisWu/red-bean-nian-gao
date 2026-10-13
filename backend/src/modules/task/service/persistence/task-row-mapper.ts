@@ -106,7 +106,13 @@ interface TaskListCursor {
   readonly taskId: string
 }
 
-/** 键集分页游标：`created_at` 与 `task_id` 一起编码，避免同一毫秒内建的任务在翻页时被跳过或重复。 */
+/**
+ * 键集分页游标：`created_at` 与 `task_id` 一起编码，避免同一毫秒内建的任务在翻页时被跳过或重复。
+ *
+ * @param createdAt - 本页末条的创建时间，作为下一页的时间上界。
+ * @param taskId - 本页末条的任务 ID，与时间一起打破同毫秒歧义。
+ * @returns base64url 编码的游标串。
+ */
 export function encodeTaskListCursor(createdAt: Date, taskId: string): string {
   return Buffer.from(`${createdAt.toISOString()}\n${taskId}`, 'utf8').toString('base64url')
 }
@@ -115,6 +121,9 @@ export function encodeTaskListCursor(createdAt: Date, taskId: string): string {
  * 解码游标；空串与任何畸形输入都返回 `undefined`，由调用方决定回退语义（通常是取首页）。
  * 这里刻意不抛错：游标是客户端回传的数据，把它当作不可信输入处理，坏游标不该让整个列表 500。
  * `isCanonicalBase64Url` 用来挡掉「同一串字节的多种 base64 写法」，保证游标可比较。
+ *
+ * @param value - 客户端回传的游标串，内容不可信。
+ * @returns 解析出的时间与任务 ID；空串、畸形或非规范编码时返回 `undefined`。
  */
 export function decodeTaskListCursor(value: string): TaskListCursor | undefined {
   if (value === '') return undefined
@@ -133,14 +142,24 @@ export function decodeTaskListCursor(value: string): TaskListCursor | undefined 
   return { createdAt, taskId }
 }
 
-/** 校验并映射单行 `scheduled_tasks`；schema 不匹配直接抛错，不做「尽力填默认值」的兜底。 */
+/**
+ * 校验并映射单行 `scheduled_tasks`；schema 不匹配直接抛错，不做「尽力填默认值」的兜底。
+ *
+ * @param value - 数据库原始行；可空列在 NULL 时视为字段缺省而非 `null`。
+ * @returns 领域任务定义；`run_at`/`next_run_at` 为 NULL 时对应字段整体缺省。
+ */
 export function mapScheduledTaskRow(value: unknown): AgentTaskDefinition {
   const parsed = scheduledTaskRowSchema.safeParse(value)
   if (!parsed.success) throw new Error('定时任务行数据无效', { cause: parsed.error })
   return toTaskDefinition(parsed.data)
 }
 
-/** 校验并映射单行 `agent_task_executions`；可空列经 `optionalField` 折叠成「字段缺失」而非 `null`。 */
+/**
+ * 校验并映射单行 `agent_task_executions`；可空列经 `optionalField` 折叠成「字段缺失」而非 `null`。
+ *
+ * @param value - 数据库原始行；`started_at`/`completed_at` 等可空列在 NULL 时折叠为字段缺省。
+ * @returns 领域执行记录；行数据不符 Schema 时抛错，不做兜底。
+ */
 export function mapExecutionRow(value: unknown): AgentTaskExecution {
   const parsed = executionRowSchema.safeParse(value)
   if (!parsed.success) throw new Error('执行记录行数据无效', { cause: parsed.error })
@@ -166,6 +185,9 @@ export function mapExecutionRow(value: unknown): AgentTaskExecution {
  * 摘要「有 id 就必须有状态与调度时间」是全有或全无的判定——半截数据说明 SQL 与 schema 已经漂移，
  * 与其渲染出一张空摘要卡片，不如在这里就失败。
  * 标题与摘要文案都做截断，列表接口不该被单条超长文本撑大。
+ *
+ * @param value - 数据库原始行；`latest_*` 一组字段要么全有、要么全无。
+ * @returns 列表项；`latest_execution_id` 为 NULL 时不带摘要，半截摘要直接抛错。
  */
 export function mapTaskListRow(value: unknown): AgentTaskListItem {
   const parsed = taskListRowSchema.safeParse(value)
@@ -195,7 +217,12 @@ export function mapTaskListRow(value: unknown): AgentTaskListItem {
   return { ...item, latestExecution }
 }
 
-/** 映射已读/折叠偏好行；三个可空字段缺省即表示「用户未设置」，由前端按默认规则决定呈现。 */
+/**
+ * 映射已读/折叠偏好行；三个可空字段缺省即表示「用户未设置」，由前端按默认规则决定呈现。
+ *
+ * @param value - 数据库原始行；可空列在 NULL 时字段整体缺省而非 `null`。
+ * @returns 视图状态领域对象；行数据不符 Schema 时抛错。
+ */
 export function mapViewStateRow(value: unknown): ExecutionViewState {
   const parsed = viewStateRowSchema.safeParse(value)
   if (!parsed.success) throw new Error('invalid task view-state row', { cause: parsed.error })
@@ -246,7 +273,12 @@ function toMessageMeta(row: z.infer<typeof messageMetaSchema>): MessageMeta {
     ...optionalField('runStartedAt', row.run_started_at),
   }
 }
-/** 只校验不映射，供需要读到原始列（如算游标用的 `created_at`）的调用点使用。 */
+/**
+ * 只校验不映射，供需要读到原始列（如算游标用的 `created_at`）的调用点使用。
+ *
+ * @param value - 数据库原始行；形状不可信，先过列表行 Schema。
+ * @returns 通过校验的原始行；不符 Schema 时抛错。
+ */
 export function parseTaskListRow(value: unknown): z.infer<typeof taskListRowSchema> {
   const parsed = taskListRowSchema.safeParse(value)
   if (!parsed.success) throw new Error('任务列表行数据无效', { cause: parsed.error })
@@ -257,6 +289,11 @@ export function parseTaskListRow(value: unknown): z.infer<typeof taskListRowSche
  * 任务分页：多取一行来判断是否存在下页，再截断到 `limit`。
  * 游标取自截断后最后一行的 `created_at`——用被丢弃的那一行会让下一页从错误的边界开始。
  * 空串游标表示没有下页，这是分页约定的终止值。
+ *
+ * @param rows - 数据库原始行，约定长度为 `limit + 1`。
+ * @param limit - 本页最大条数。
+ * @param mapper - 行到领域对象的映射器，只为截断后的行各调用一次。
+ * @returns 本页任务定义与下一页游标；无下页时游标为空串。
  */
 export function taskPage(
   rows: readonly unknown[],
@@ -277,7 +314,13 @@ export function taskPage(
   }
 }
 
-/** 执行记录分页；与 `taskPage` 同为「多取一行」策略，但整页先全量校验再映射，坏行不会被静默跳过。 */
+/**
+ * 执行记录分页；与 `taskPage` 同为「多取一行」策略，但整页先全量校验再映射，坏行不会被静默跳过。
+ *
+ * @param rows - 数据库原始行，约定长度为 `limit + 1`；任一行非法即抛错。
+ * @param limit - 本页最大条数。
+ * @returns 本页执行记录与下一页游标；无下页时游标为空串。
+ */
 export function executionPage(
   rows: readonly unknown[],
   limit: number

@@ -32,10 +32,20 @@ export class HealthService implements HealthServicePort {
     this.#timeoutMilliseconds = timeoutMilliseconds
   }
 
+  /**
+   * 存活探针：进程在跑就恒为 healthy，与依赖状态无关，用于区分「进程死了」与「依赖挂了」。
+   *
+   * @returns 固定的 healthy 状态。
+   */
   public health(): { readonly status: 'healthy' } {
     return { status: 'healthy' }
   }
 
+  /**
+   * 版本信息：从构造时冻结的快照读取，不触碰外部依赖。
+   *
+   * @returns 版本号、提交 SHA 与构建时间，字段名对齐对外契约的 snake_case。
+   */
   public version(): {
     readonly version: string
     readonly commit: string
@@ -48,10 +58,22 @@ export class HealthService implements HealthServicePort {
     }
   }
 
+  /**
+   * 切换排空开关：置为 true 后 `ready` 立即返回 not_ready，让负载均衡摘掉本实例。
+   *
+   * @param draining - 是否进入排空；进程停机流程据此止损，不阻断开机。
+   */
   public setDraining(draining: boolean): void {
     this.#draining = draining
   }
 
+  /**
+   * 就绪探针：并行探测 database/redis/storage，单个探针失败被归一为 error 而不外抛；
+   * 排空开关打开时短路返回 not_ready，不再探测。
+   *
+   * @param signal - 请求取消信号，同时作为各探针超时的父信号。
+   * @returns 就绪结果；任一探针失败或超时即为 not_ready（503）。
+   */
   public async ready(signal: AbortSignal): Promise<ReadinessResult> {
     if (this.#draining)
       return { status: 503, body: { status: 'not_ready', checks: { server: 'draining' } } }

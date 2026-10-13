@@ -33,6 +33,12 @@ export class ObservabilityProvider {
     this.#shutdown = shutdown
   }
 
+  /**
+   * 取出中性观测端口交给业务代码。
+   * 返回的是构造时固定的那一个实现，组装完成后不再变化：产品实例运行中途不切换观测后端，
+   * 因此调用方可以放心持有这个引用，不需要每次重新获取。
+   * @returns 该 Provider 持有的 tracer；生命周期与 Provider 一致
+   */
   public tracer(): TracerPort {
     return this.#tracer
   }
@@ -52,6 +58,12 @@ export class ObservabilityProvider {
  * - `otlp`：建 SDK Provider，配 `ParentBased(TraceIdRatioBased)` 采样与 BatchSpanProcessor。
  *   采样是父级优先的——上游决定采样时本地跟随，只有根 span 才按 `sampleRatio` 掷骰子。
  *   这样一条已经开始的链路不会在中途因为某个服务的采样率而断掉。
+ *
+ * 校验责任在这一层而不是调用方：服务名为空、采样率越界、exporter 不是这两种之一时
+ * 一律抛错，不做静默降级——配置错误应当让进程起不来，而不是悄悄退化成另一种后端。
+ * @param options - 观测配置；`exporter` 大小写与空白会被归一化，空值按 `structured` 处理
+ * @param dependencies - 注入点；`exporterFactory` 让测试免于建真实 exporter，`logSink` 决定结构化日志去向
+ * @returns 已装配好的 Provider；`otlp` 模式下它会持有一个需要关闭的 SDK Provider
  */
 export function createObservabilityProvider(
   options: ObservabilityProviderOptions,

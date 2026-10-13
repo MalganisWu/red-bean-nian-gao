@@ -9,14 +9,13 @@ interface SessionTaskDetailViewProps {
   onViewExecution: (executionId: string) => void
 }
 
-/** 会话内的任务详情视图；以 Tab 在概览与执行历史之间切换。 */
-export function SessionTaskDetailView({
-  taskId,
-  activeTab,
-  onBack,
-  onTabChange,
-  onViewExecution,
-}: SessionTaskDetailViewProps) {
+/**
+ * 会话内的任务详情视图；以 Tab 在概览与执行历史之间切换。
+ *
+ * @param props - 组件属性；字段语义见 `SessionTaskDetailViewProps`。
+ */
+export function SessionTaskDetailView(props: SessionTaskDetailViewProps) {
+  const { taskId, activeTab, onBack, onTabChange, onViewExecution } = props
   return (
     <TaskDetailPanel
       taskId={taskId}

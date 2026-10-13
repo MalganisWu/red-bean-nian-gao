@@ -15,6 +15,7 @@ export type SessionStoreErrorCode =
 
 /** 仓储层异常；`code` 是机器判据，`message` 只供日志，对外文案由用例层重新给。 */
 export class SessionStoreError extends Error {
+  /** 机器判据；用例层据此映射用户文案，不要拿 `message` 做分支。 */
   public readonly code: SessionStoreErrorCode
 
   public constructor(code: SessionStoreErrorCode, message: string) {

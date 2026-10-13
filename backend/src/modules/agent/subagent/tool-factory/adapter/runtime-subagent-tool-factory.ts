@@ -78,6 +78,9 @@ export class RuntimeSubAgentToolFactory {
    * 追加一个装饰器并返回**新的**工厂实例。
    * 不可变：同一个工厂会并发服务多个父运行的加载，就地追加会让先启动的那些也受影响。
    * 新装饰器追加在末尾，因此已有的在外层（与插件注册的顺序约定一致）。
+   *
+   * @param decorator - 待追加的子运行装饰器；追加在末尾，已有装饰器仍在外层
+   * @returns 含新装饰器的新工厂实例；原实例不变
    */
   public withRuntimeDecorator(decorator: ChildRuntimeDecorator): RuntimeSubAgentToolFactory {
     return new RuntimeSubAgentToolFactory({
@@ -86,6 +89,13 @@ export class RuntimeSubAgentToolFactory {
     })
   }
 
+  /**
+   * 把定义快照逐个组装为委派工具，产出模型可见的 schema 与分发 dispatcher。
+   * 二者出自同一批工具，必须成对使用，否则模型看到的清单与实际分派会错位。
+   *
+   * @param request - 本次构建请求：定义快照与父运行共享的模型、参数与展示注册表
+   * @returns schema 列表与 dispatcher；无定义时 schema 为空、dispatcher 为空表
+   */
   public build(request: BuildSubAgentToolsRequest): SubAgentToolSet {
     if (request.definitions.length === 0) {
       return { schemas: [], dispatcher: createRuntimeToolDispatcher([]) }

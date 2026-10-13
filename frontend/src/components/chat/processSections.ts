@@ -23,6 +23,10 @@ import type {
  * 作 narration；回合结束后（isStreaming=false）最后一个 content 晋升出区。
  *
  * 纯渲染层收束：不动持久化数据，同一函数处理实时与历史 sections。
+ *
+ * @param sections - 待收束的消息 section 列表。
+ * @param opts - 收束选项；`isStreaming` 决定末位 content 是否晋升出区。
+ * @returns 收束后的 `[process?, content?]` section 列表。
  */
 export function collapseToProcessFold(
   sections: MessageSection[],
@@ -161,6 +165,10 @@ function attachSubAgentsToParents(steps: ProcessStepItem[]): ProcessStepItem[] {
  * 起点 = meta.run_started_at（后端首事件打点，含首轮 LLM TTFB）；
  * 旧数据无此字段时回退到最早 section 时间戳。
  * ts=0 的 section（如持久化的 sub_agent）过滤；全部无效时返回 undefined（不显示）。
+ *
+ * @param sections - 本回合的消息 section 列表。
+ * @param meta - 回合元信息；`run_started_at` 作为耗时起点，缺失时回退到最早 section 时间戳。
+ * @returns 回合总耗时（毫秒）；无有效时间戳时返回 `undefined`（调用方据此隐藏耗时）。
  */
 export function roundTotalDurationMs(
   sections: MessageSection[],
@@ -180,12 +188,22 @@ export function roundTotalDurationMs(
   return Math.max(0, maxEnd - start)
 }
 
-/** 毫秒 → "12s" 展示格式（耗时显示唯一出口；最低显示 1s，避免小数秒跳动） */
+/**
+ * 毫秒 → "12s" 展示格式（耗时显示唯一出口；最低显示 1s，避免小数秒跳动）
+ *
+ * @param ms - 耗时毫秒数；负数按 0 处理。
+ * @returns 形如 `"12s"` 的展示字符串，最小为 `"1s"`。
+ */
 export function formatDurationMs(ms: number): string {
   return `${Math.max(1, Math.round(Math.max(0, ms) / 1000))}s`
 }
 
-/** 工具耗时显示口径：durationMs（数值）优先，回退旧字符串 duration；都无则不显示 */
+/**
+ * 工具耗时显示口径：durationMs（数值）优先，回退旧字符串 duration；都无则不显示
+ *
+ * @param t - 工具卡片；`durationMs` 为新字段，`duration` 为旧数据回落。
+ * @returns 格式化后的耗时文案；两者都缺失时返回 `undefined`（调用方据此隐藏）。
+ */
 export function toolDurationLabel(t: ToolCard): string | undefined {
   if (typeof t.durationMs === 'number') return formatDurationMs(t.durationMs)
   if (!t.duration) return undefined
@@ -197,6 +215,9 @@ export function toolDurationLabel(t: ToolCard): string | undefined {
  * 历史透传归一化：持久化 JSON 里工具耗时字段是 `duration`（毫秒数值，引擎 Task 1 起写入），
  * 运行时统一用 `durationMs`。加载历史会话时转换；旧数据无该字段则 durationMs 保持 undefined。
  * sub_agent 嵌套 sections 递归处理。
+ *
+ * @param sections - 从持久化 JSON 读出的 section 列表。
+ * @returns 归一化后的运行时 section 列表；旧数据无耗时字段时 `durationMs` 保持 `undefined`。
  */
 export function normalizePersistedSections(
   sections: readonly PersistedMessageSection[]

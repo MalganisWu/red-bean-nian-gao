@@ -14,6 +14,13 @@ import type {
  * 全部不可变：返回新数组/新 section，输入不被修改。
  */
 
+/**
+ * 追加一段正文增量：末位是 content 则就地拼接，否则新开一个 content section。
+ *
+ * @param sections - 组装中的 section 列表。
+ * @param content - 本次到达的正文增量片段。
+ * @returns 追加后的新 section 列表（不可变，输入不被修改）。
+ */
 export function applyToken(sections: MessageSection[], content: string): MessageSection[] {
   const last = sections[sections.length - 1]
   if (last && last.type === 'content') {
@@ -26,6 +33,11 @@ export function applyToken(sections: MessageSection[], content: string): Message
  * 追加一段推理增量。
  * 与相邻 section 的合并规则：紧邻 reason 且步骤号相同 → 并入同一项；
  * 紧邻 tool_group → 把整组工具收进新的 reason section，以保持「思考 → 工具 → 继续思考」的时序。
+ *
+ * @param sections - 组装中的 section 列表。
+ * @param step - 步骤号；与末位 reason 内最后一项相同时并入该项。
+ * @param content - 本次到达的推理增量片段。
+ * @returns 追加后的新 section 列表（不可变，输入不被修改）。
  */
 export function applyReasonStep(
   sections: MessageSection[],
@@ -60,7 +72,15 @@ export function applyReasonStep(
   ]
 }
 
-/** 登记一次工具调用为 running 并打上计时起点；params 为空对象时不写该字段。 */
+/**
+ * 登记一次工具调用为 running 并打上计时起点；params 为空对象时不写该字段。
+ *
+ * @param sections - 组装中的 section 列表。
+ * @param callId - 工具调用稳定 ID，后续按它结算结果。
+ * @param toolName - 工具名，仅用于展示。
+ * @param params - 调用参数；为空或省略时不写 `params` 字段。
+ * @returns 追加后的新 section 列表（不可变，输入不被修改）。
+ */
 export function applyToolStart(
   sections: MessageSection[],
   callId: string,
@@ -129,7 +149,14 @@ function mapToolInSection(
   return section
 }
 
-/** 按 callId 把工具标记为成功并写入结果，同时结算耗时。 */
+/**
+ * 按 callId 把工具标记为成功并写入结果，同时结算耗时。
+ *
+ * @param sections - 组装中的 section 列表。
+ * @param callId - 目标工具调用的稳定 ID。
+ * @param result - 工具返回的结果文本。
+ * @returns 打补丁后的新 section 列表；未命中的 callId 保持原样。
+ */
 export function applyToolResult(
   sections: MessageSection[],
   callId: string,
@@ -138,7 +165,14 @@ export function applyToolResult(
   return mapTool(sections, callId, (t) => ({ status: 'success', result, ...settleDuration(t) }))
 }
 
-/** 按 callId 把工具标记为失败并写入错误，同时结算耗时。 */
+/**
+ * 按 callId 把工具标记为失败并写入错误，同时结算耗时。
+ *
+ * @param sections - 组装中的 section 列表。
+ * @param callId - 目标工具调用的稳定 ID。
+ * @param error - 失败原因文本。
+ * @returns 打补丁后的新 section 列表；未命中的 callId 保持原样。
+ */
 export function applyToolFail(
   sections: MessageSection[],
   callId: string,
@@ -156,6 +190,9 @@ function settleRunningTool(tool: ToolCard): ToolCard {
  * 流结束前的兜底结算：没有 tool_result 的 Tool 统一派生为 incomplete。
  * 主流程、reason 内嵌 Tool、子 Agent 内层 sections 与纯渲染 process 都递归覆盖；
  * 同时把仍为 running 的委派标为 incomplete，避免终态页面永久显示“正在执行”。
+ *
+ * @param sections - 需要兜底结算的 section 列表。
+ * @returns 结算后的新 section 列表；已处于终态的工具保持原样。
  */
 export function settleIncompleteTools(sections: MessageSection[]): MessageSection[] {
   return sections.map(settleIncompleteSection)

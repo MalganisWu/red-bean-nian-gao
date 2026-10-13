@@ -47,6 +47,11 @@ export class ApprovalFactToolDispatcher implements AgentToolDispatcher {
    *
    * 挂起判定用**返回的信号**而不是工具名或 schema 的 `interrupting` 标记：
    * 信号是「本次调用确实挂起了」的事实，而标记只是静态声明（声明了也可能不挂起）。
+   *
+   * @param call - Runtime 透传的工具调用；挂起事实里的工具名与参数取自它
+   * @param context - 调用上下文；其 callId 是挂起事实与 resume 闭合消息的关联键
+   * @param signal - 中止信号，原样透传给被装饰的 dispatcher
+   * @returns 被装饰 dispatcher 的原始结果（本装饰器只旁观，不改写结果）
    */
   public async dispatch(
     call: AgentToolCall,

@@ -41,15 +41,36 @@ const RESERVED_ATTRIBUTES = new Set([
 export class PreferredTraceIdGenerator implements tracing.IdGenerator {
   readonly #preferred = new AsyncLocalStorage<string>()
 
+  /**
+   * 生成或沿用 trace ID，由 SDK 在建 span 时同步调用。
+   * 绑定只在 `within` 的回调期间存在：进入回调时把「期望的 trace ID」放进 AsyncLocalStorage，
+   * 回调结束即自动解绑，因此后续无关的根 span 不会继续复用这个 ID。
+   * 上下文里没有值、或值格式非法时退回随机新 ID，从而保证返回值一定是合法 trace ID。
+   * @returns 合法 trace ID；优先采用 `within` 绑定的值，否则新生成一个
+   */
   public generateTraceId(): string {
     const preferred = this.#preferred.getStore()
     return preferred !== undefined && isValidTraceId(preferred) ? preferred : newTraceId()
   }
 
+  /**
+   * 生成 span ID。
+   * 与 trace ID 不同，span ID 不需要与外部对齐，因此这里不查上下文、每次都是新的随机值——
+   * 唯一要保证的是格式合法，否则 SDK 会静默丢弃这个 span。
+   * @returns 新生成的合法 span ID
+   */
   public generateSpanId(): string {
     return newSpanId()
   }
 
+  /**
+   * 在「以指定 trace ID 建根 span」的上下文里执行回调，绑定随回调作用域自动生效与解除。
+   * 传入的 ID 非法（或为 `undefined`）时不绑定、直接执行回调，让 SDK 走随机 ID 分支——
+   * 一个坏的外部 trace ID 只应导致链路断开，不该让请求失败。
+   * @param traceId - 期望的根 trace ID，通常来自入站请求头；格式不合法则被忽略
+   * @param operation - 回调；其返回值与抛出的异常都原样透传
+   * @returns 回调的返回值
+   */
   public within<TValue>(traceId: string | undefined, operation: () => TValue): TValue {
     if (traceId === undefined || !isValidTraceId(traceId)) return operation()
     return this.#preferred.run(traceId, operation)
@@ -73,6 +94,11 @@ export class OTelTracer implements TracerPort {
    * 只有在**两级都没有**（即这是一个根 span）时才把 `trace.id` 交给 IDGenerator——
    * 子 span 的 trace ID 必须继承父级，此时再指定会切断链路。
    * 远端父只在没有本地活跃 span 时考虑：本地上下文才是更近的事实。
+   *
+   * 状态绑定不在这里发生：本方法只建 span，真正把它设为活跃的是返回对象上的 `within`，
+   * 因此「建 span」与「进入其上下文」是两个可以分开的步骤。
+   * @param start - 建 span 所需的名字与属性；名字还决定 span kind，属性中的保留键会被丢弃
+   * @returns 新建的 span 句柄；调用方负责最终调用其 `end`
    */
   public start(start: {
     readonly name: string

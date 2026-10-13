@@ -32,11 +32,27 @@ export class IdentityProfileService {
     this.#now = options.now ?? ((): Date => new Date())
   }
 
+  /**
+   * 读取指定用户，供「看自己」视图使用。
+   *
+   * 用户不存在时抛稳定的 NOT_FOUND 用例错误，由 Controller 映射 404；本方法不校验归属，
+   * 调用方必须保证 userId 来自 Principal 而非请求参数。
+   *
+   * @param userId - 要读取的用户 ID；读取目标，不做越权判断
+   * @param signal - 请求生命周期绑定的取消信号，透传给仓储查询
+   * @returns 领域用户实体；不含视图裁剪，投影由 presenter 负责
+   */
   public getSelf(userId: string, signal: AbortSignal): Promise<User> {
     return this.#requireUser(userId, signal)
   }
 
-  /** 只更新命令中显式出现的字段，其余保持原值，并刷新 updatedAt。 */
+  /**
+   * 只更新命令中显式出现的字段，其余保持原值，并刷新 updatedAt。
+   *
+   * @param command - 更新命令；`userId` 决定写入目标，未出现的可选字段一律不覆盖（不会置空）
+   * @param signal - 请求生命周期绑定的取消信号，透传给仓储读写
+   * @returns 更新后的领域用户实体，`updatedAt` 已是本次写入时间
+   */
   public async updateSelf(command: UpdateSelfCommand, signal: AbortSignal): Promise<User> {
     const user = await this.#requireUser(command.userId, signal)
     if (command.displayName !== undefined) user.displayName = command.displayName
@@ -47,10 +63,30 @@ export class IdentityProfileService {
     return user
   }
 
+  /**
+   * 读取指定用户，供公开资料视图使用。
+   *
+   * 与 `getSelf` 走同一条读取路径，差异只在 Controller 选了哪个投影；用户不存在同样抛
+   * NOT_FOUND，不会因视图不同而改变失败语义。
+   *
+   * @param userId - 要读取的用户 ID，允许指向他人；字段裁剪由上层视图负责
+   * @param signal - 请求生命周期绑定的取消信号，透传给仓储查询
+   * @returns 领域用户实体；本层不做权限与字段裁剪
+   */
   public getPublicUser(userId: string, signal: AbortSignal): Promise<User> {
     return this.#requireUser(userId, signal)
   }
 
+  /**
+   * 分页查询用户列表。
+   *
+   * 分页参数已在上游解析层归一化，此处不再夹取；无匹配时返回空列表，不抛错。
+   *
+   * @param offset - 起始偏移，非负整数
+   * @param limit - 每页条数，上游已限制在 1..100
+   * @param signal - 请求生命周期绑定的取消信号，透传给仓储查询
+   * @returns 用户分页结果；`total` 是命中总数，与 `users` 长度无关
+   */
   public listUsers(offset: number, limit: number, signal: AbortSignal): Promise<UserPage> {
     return this.#users.list(offset, limit, signal)
   }

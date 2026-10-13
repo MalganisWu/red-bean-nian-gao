@@ -26,6 +26,15 @@ export class PostgresRunFactRepository implements RunFactRepository {
     this.#database = database
   }
 
+  /**
+   * 建立 run 容器并落库；run_index 在同一条 INSERT..SELECT 内按会话分配，
+   * 依赖调用方已持有 session 锁串行化同一会话的 run，避免并发撞号。
+   * 未拿到 run_index（行形状异常）即抛错，调用方据此认定容器未建立。
+   *
+   * @param run - 本次运行的容器命令；runId 由调用方生成，用于错误定位
+   * @param signal - 传给 SQL 执行器的中止信号；中止即放弃创建，不留半条记录
+   * @returns 落库后的容器记录，run_index 由数据库分配
+   */
   public async create(run: StartSessionRunCommand, signal: AbortSignal): Promise<SessionRunRecord> {
     let result: Awaited<ReturnType<SqlExecutor['query']>>
     try {
@@ -76,6 +85,14 @@ export class PostgresRunFactRepository implements RunFactRepository {
     }
   }
 
+  /**
+   * 以 `ended_at IS NULL` 为 SQL 守卫追加一条事实，保证 append-only：
+   * run 已终态时拒绝写入，避免给已关闭的容器继续挂事实。
+   *
+   * @param runId - 目标 run 容器；不存在或已终态时抛错
+   * @param fact - 一条带 schemaVersion 的事实，序列化后并入 JSONB
+   * @param signal - SQL 中止信号；中止即放弃本次追加
+   */
   public async appendFact(runId: string, fact: RunFact, signal: AbortSignal): Promise<void> {
     let result: Awaited<ReturnType<SqlExecutor['query']>>
     try {
@@ -95,6 +112,14 @@ export class PostgresRunFactRepository implements RunFactRepository {
     }
   }
 
+  /**
+   * 提交 run 终态（status / ended_at / 取消归属 / error），同样以 `ended_at IS NULL` 守卫。
+   * 重复终态化会抛错而不是覆盖首个终态——首个终态才是这次运行的真实归属。
+   *
+   * @param runId - 目标 run 容器；不存在或已终态时抛错
+   * @param command - 终态命令；取消归属与结束时刻由调用方给出
+   * @param signal - SQL 中止信号
+   */
   public async finalize(
     runId: string,
     command: FinalizeSessionRunCommand,
@@ -129,6 +154,13 @@ export class PostgresRunFactRepository implements RunFactRepository {
     }
   }
 
+  /**
+   * 按 run_index 升序读取会话的全部 run 容器及其事实序列；行经信任边界校验后映射。
+   *
+   * @param sessionId - 会话 ID；无记录时返回空数组而非 undefined
+   * @param signal - SQL 中止信号
+   * @returns 会话内的 run 记录，按 run_index 升序
+   */
   public async listBySession(
     sessionId: string,
     signal: AbortSignal

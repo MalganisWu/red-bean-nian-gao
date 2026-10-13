@@ -30,6 +30,7 @@ export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[keyof typeof AUTH_ERROR_CO
 
 /** 认证异常；`code` 是机器判据，`message` 只供日志，不进响应体。 */
 export class AuthError extends Error {
+  /** 机器判据：记录失败类别，供上层映射 HTTP 语义；`message` 只进日志，不得进响应体。 */
   public readonly code: AuthErrorCode
 
   public constructor(code: AuthErrorCode, message: string, cause?: unknown) {

@@ -22,6 +22,13 @@ import type {
 export class MemoryMessageBuffer implements MessageBuffer {
   readonly #messages = new Map<string, AgentMessage[]>()
 
+  /**
+   * 追加一条消息；写入内部状态的是深拷贝，调用方后续改动原对象不会影响缓冲。
+   *
+   * @param sessionId - 目标会话标识，决定消息归入哪个键。
+   * @param message - 待缓冲的消息；会被结构化拷贝后保存。
+   * @param signal - 取消信号；已中止时返回 rejected Promise，而非静默成功。
+   */
   public append(sessionId: string, message: AgentMessage, signal: AbortSignal): Promise<void> {
     const aborted = abortFailure(signal)
     if (aborted !== undefined) return Promise.reject(aborted)
@@ -31,12 +38,26 @@ export class MemoryMessageBuffer implements MessageBuffer {
     return Promise.resolve()
   }
 
+  /**
+   * 只读窥视缓冲内容，不清除。
+   *
+   * @param sessionId - 目标会话标识。
+   * @param signal - 取消信号；已中止时返回 rejected Promise。
+   * @returns 内部消息的深拷贝；调用方就地修改不会污染缓冲。
+   */
   public peek(sessionId: string, signal: AbortSignal): Promise<readonly AgentMessage[]> {
     const aborted = abortFailure(signal)
     if (aborted !== undefined) return Promise.reject(aborted)
     return Promise.resolve(structuredClone(this.#messages.get(sessionId) ?? []))
   }
 
+  /**
+   * 取出并清空缓冲（消费语义）。
+   *
+   * @param sessionId - 目标会话标识。
+   * @param signal - 取消信号；已中止时返回 rejected Promise，且不清空缓冲。
+   * @returns 本次消费掉的深拷贝消息；重复调用返回空数组。
+   */
   public flush(sessionId: string, signal: AbortSignal): Promise<readonly AgentMessage[]> {
     const aborted = abortFailure(signal)
     if (aborted !== undefined) return Promise.reject(aborted)
@@ -45,6 +66,12 @@ export class MemoryMessageBuffer implements MessageBuffer {
     return Promise.resolve(messages)
   }
 
+  /**
+   * 丢弃整个缓冲；幂等，键不存在时同样成功。
+   *
+   * @param sessionId - 目标会话标识。
+   * @param signal - 取消信号；已中止时返回 rejected Promise。
+   */
   public clear(sessionId: string, signal: AbortSignal): Promise<void> {
     const aborted = abortFailure(signal)
     if (aborted !== undefined) return Promise.reject(aborted)
@@ -52,6 +79,14 @@ export class MemoryMessageBuffer implements MessageBuffer {
     return Promise.resolve()
   }
 
+  /**
+   * 写入某一代缓冲；键里带 revision，各代互不干扰。
+   *
+   * @param sessionId - 目标会话标识，与 generation 一起决定分代键。
+   * @param generation - 目标分代；只用其 `revision` 参与拼键。
+   * @param message - 待缓冲的消息。
+   * @param signal - 取消信号；已中止时返回 rejected Promise。
+   */
   public appendGeneration(
     sessionId: string,
     generation: MessageBufferGeneration,
@@ -61,6 +96,14 @@ export class MemoryMessageBuffer implements MessageBuffer {
     return this.append(generationKey(sessionId, generation), message, signal)
   }
 
+  /**
+   * 只读窥视某一代缓冲，不清除。
+   *
+   * @param sessionId - 目标会话标识，与 generation 一起决定分代键。
+   * @param generation - 目标分代；只读它对应的键。
+   * @param signal - 取消信号；已中止时返回 rejected Promise。
+   * @returns 该代的深拷贝消息。
+   */
   public peekGeneration(
     sessionId: string,
     generation: MessageBufferGeneration,
@@ -69,6 +112,13 @@ export class MemoryMessageBuffer implements MessageBuffer {
     return this.peek(generationKey(sessionId, generation), signal)
   }
 
+  /**
+   * 清除某一代缓冲；键不存在时幂等成功。
+   *
+   * @param sessionId - 目标会话标识，与 generation 一起决定分代键。
+   * @param generation - 目标分代；只删它对应的键。
+   * @param signal - 取消信号；已中止时返回 rejected Promise。
+   */
   public clearGeneration(
     sessionId: string,
     generation: MessageBufferGeneration,
@@ -102,7 +152,16 @@ export class MemorySessionStore implements FencedSessionRepository {
     this.#now = now
   }
 
-  /** 已存在但不属于该用户 → `NOT_FOUND`（不是「已存在」），与生产实现的所有权隐藏一致。 */
+  /**
+   * 取得会话，不存在则按给定的 id 与归属创建一个空会话。
+   *
+   * 已存在但不属于该用户 → `NOT_FOUND`（不是「已存在」），与生产实现的所有权隐藏一致。
+   *
+   * @param sessionId - 目标会话标识；不存在时以它作为新会话主键。
+   * @param userId - 会话归属用户，决定能否读到已有会话。
+   * @param signal - 取消信号；已中止时返回 rejected Promise 而不创建。
+   * @returns 会话的深拷贝；调用方改动不会影响内部状态。
+   */
   public getOrCreate(sessionId: string, userId: string, signal: AbortSignal): Promise<Session> {
     const aborted = abortFailure(signal)
     if (aborted !== undefined) return Promise.reject(aborted)
@@ -125,6 +184,16 @@ export class MemorySessionStore implements FencedSessionRepository {
     return Promise.resolve(cloneSession(session))
   }
 
+  /**
+   * 按标识读取会话，不创建。
+   *
+   * 不存在与不属于该用户收敛到同一条 `NOT_FOUND`，调用方无法据错误码探测他人会话。
+   *
+   * @param sessionId - 目标会话标识。
+   * @param userId - 归属校验依据；不匹配即视为不存在。
+   * @param signal - 取消信号；已中止时返回 rejected Promise。
+   * @returns 会话的深拷贝。
+   */
   public getById(sessionId: string, userId: string, signal: AbortSignal): Promise<Session> {
     const aborted = abortFailure(signal)
     if (aborted !== undefined) return Promise.reject(aborted)
@@ -144,6 +213,9 @@ export class MemorySessionStore implements FencedSessionRepository {
    *
    * 注意 `session.revision` 是**就地自增**的：调用方手上的对象会随之更新，
    * 于是同一次会话里的连续保存可以复用同一个对象。
+   *
+   * @param session - 待保存的会话快照；其 `revision`/`fencingToken` 是 CAS 比较基准，成功后 `revision` 被就地 +1。
+   * @param signal - 取消信号；已中止时返回 rejected Promise 且不写入。
    */
   public save(session: Session, signal: AbortSignal): Promise<void> {
     const aborted = abortFailure(signal)
@@ -172,7 +244,16 @@ export class MemorySessionStore implements FencedSessionRepository {
     return Promise.resolve()
   }
 
-  /** 高水位只前进：`token < current` 报 `STALE_FENCE`，相等与更大都直接写入。`0n` 为无操作。 */
+  /**
+   * 推进会话的 fencing 高水位。
+   *
+   * 高水位只前进：`token < current` 报 `STALE_FENCE`，相等与更大都直接写入。`0n` 为无操作。
+   *
+   * @param sessionId - 目标会话标识。
+   * @param userId - 归属校验依据；不匹配即视为不存在。
+   * @param token - 新的围栏序号；`0n` 表示「未启用 fencing」，直接返回不做写入。
+   * @param signal - 取消信号；已中止时返回 rejected Promise。
+   */
   public advanceFence(
     sessionId: string,
     userId: string,
@@ -191,6 +272,18 @@ export class MemorySessionStore implements FencedSessionRepository {
     return Promise.resolve()
   }
 
+  /**
+   * 列出某个用户的会话摘要，按最近更新在前排序。
+   *
+   * 排序不依赖时钟：`#order` 记录保存顺序，读取时反转；游标因此是 session id 而非时间戳，
+   * 这与生产实现（基于 `updated_at` 的键集分页）刻意不同。
+   *
+   * @param userId - 只返回属于该用户的会话。
+   * @param cursor - 上一页末条的 session id；空串表示首页，命不中也从头部开始。
+   * @param limit - 页大小；非正数按 20 兜底。
+   * @param signal - 取消信号；已中止时返回 rejected Promise。
+   * @returns 摘要列表；不含 runtimeState 与完整消息列表。
+   */
   public listByUser(
     userId: string,
     cursor: string,

@@ -9,13 +9,13 @@ interface TaskActionsMenuProps {
   onDelete: () => void
 }
 
-/** 任务卡片的操作菜单；删除走二次确认，删除进行中时禁用交互。 */
-export function TaskActionsMenu({
-  taskTitle,
-  confirmingDelete = false,
-  deleting = false,
-  onDelete,
-}: TaskActionsMenuProps) {
+/**
+ * 任务卡片的操作菜单；删除走二次确认，删除进行中时禁用交互。
+ *
+ * @param props - 组件属性；字段语义见 `TaskActionsMenuProps`。
+ */
+export function TaskActionsMenu(props: TaskActionsMenuProps) {
+  const { taskTitle, confirmingDelete = false, deleting = false, onDelete } = props
   if (deleting) {
     return (
       <span

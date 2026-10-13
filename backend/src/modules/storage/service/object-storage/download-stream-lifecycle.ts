@@ -2,6 +2,12 @@ import type { Readable } from 'node:stream'
 
 /**
  * 将 HTTP 请求取消绑定到 MinIO 下载流，并在流结束、关闭或报错时解除监听，避免长生命周期信号持有流。
+ *
+ * 流的所有权说明：本函数不消费流，只搭一条「取消 → 销毁」的单向通路；正常路径下由流自身的
+ * end/close/error 触发解绑，被取消时立即 `destroy` 上游连接，防止半读连接泄漏。
+ *
+ * @param body - 待托管的下载流；调用方保留消费权，本函数只负责在取消时销毁它
+ * @param signal - 请求生命周期信号；它可能长期存活，因此流终结后必须解除监听
  */
 export function bindDownloadStreamToAbort(body: Readable, signal: AbortSignal): void {
   /** 流已自然结束：摘掉全部监听，不再保持与长生命周期信号的联动。 */

@@ -50,7 +50,10 @@ export class FastifyHttpServer implements HttpServer {
     await this.#closed.promise
   }
 
-  /** 优雅关闭，且可被中止打断——超时后由 `ServerApplication` 改用 `close()` 强制收尾。 */
+  /**
+   * 优雅关闭，且可被中止打断——超时后由 `ServerApplication` 改用 `close()` 强制收尾。
+   * @param signal - 关闭的时间预算；到点即拒绝 Promise，让上层有机会走强制关闭
+   */
   public async shutdown(signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
     await raceWithAbort(this.#gracefulClose(), signal)

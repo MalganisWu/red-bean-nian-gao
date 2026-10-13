@@ -93,7 +93,11 @@ function isCompaction(value: unknown): value is TrajectoryCompactionDto {
   )
 }
 
-/** 会话轨迹响应的运行时校验（前端响应 decoder 与契约测试共用）。 */
+/**
+ * 会话轨迹响应的运行时校验（前端响应 decoder 与契约测试共用）。
+ * @param value - 待判定的轨迹响应；轮次、压缩、结束态与 token 汇总全部逐层校验，任一不合法即判假。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isSessionTrajectory(value: unknown): value is SessionTrajectoryDto {
   if (!isRecord(value)) return false
   if (!isString(value['sessionId']) || !isString(value['title'])) return false

@@ -18,6 +18,13 @@ export class PreparedAgentLoader implements AgentLoader {
     this.#preparation = preparation
   }
 
+  /**
+   * 在源 Loader 的配置上附加宿主准备步骤（如恢复策略），把补丁点在交给 Runtime 前即定死。
+   * @param agentId 目标 agent 主键
+   * @param signal 中止信号，透传给源 Loader
+   * @param context 加载上下文，透传给源 Loader
+   * @returns 附加了宿主准备步骤的配置快照
+   */
   public async load(
     agentId: string,
     signal: AbortSignal,

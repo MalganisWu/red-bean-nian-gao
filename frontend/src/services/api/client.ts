@@ -12,7 +12,18 @@ async function readJson(response: Response): Promise<unknown> {
   return JSON.parse(source)
 }
 
-/** 带 auth 拦截的 HTTP 客户端 */
+/**
+ * 带 auth 拦截的 HTTP 客户端
+ *
+ * 统一处理传输层关注点：令牌临近过期时先自动刷新、注入 Bearer 与 JSON Content-Type、401 清空会话、
+ * 非 2xx 把响应体转成 AppError 后抛出。返回前把原始响应体交给 `decode` 做运行时校验，
+ * 把不可信的 `unknown` 收窄为调用方声明的可信类型。
+ *
+ * @param path - 经 API_ROUTES 拼出的完整路径；调用方不得手写路径字面量。
+ * @param options - fetch 选项；未显式指定 Content-Type 且带非 FormData body 时自动补 application/json。
+ * @param decode - 响应体校验/解包器；负责把未知响应收窄为 TValue，形状不符时应抛错。
+ * @returns 校验通过后的响应数据。
+ */
 export async function apiCall<TValue>(
   path: string,
   options: RequestInit,

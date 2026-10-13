@@ -112,7 +112,13 @@ export class TaskExecutionService {
     this.#now = options.now ?? ((): Date => new Date())
   }
 
-  /** 完整执行一次定时任务：建快照 → 跑 Agent → 落库/重试/投递，全程带 span 与 traceId。 */
+  /**
+   * 完整执行一次定时任务：建快照 → 跑 Agent → 落库/重试/投递，全程带 span 与 traceId。
+   *
+   * @param taskId - 待执行任务标识；运行期会据此重新加载任务状态。
+   * @param lease - 调度租约；fencing token 决定本次写入资格，丢失即中断落库。
+   * @param signal - 取消信号，通常来自调度器的执行超时与父级取消。
+   */
   public async run(taskId: string, lease: ScheduledTaskLease, signal: AbortSignal): Promise<void> {
     const traceId = this.#traceIdFactory()
     const span = this.#tracer.start({

@@ -19,6 +19,10 @@ export interface AskCardData {
 /**
  * 从持久化展示 section 中移除造成挂起的提问工具。
  * 非法 section 数据原样返回，避免仅展示层的解析失败擦除会话历史。
+ *
+ * @param sections - 展示 section 数组；非数组时原样返回，不做兜底构造。
+ * @param callId - 要剔除的提问工具 call id；只匹配 tool_group 内的同名调用。
+ * @returns 过滤后的新数组；整组工具被剔空时该 section 一并移除。
  */
 export function filterAskToolGroup(sections: unknown, callId: string): unknown {
   if (!Array.isArray(sections)) return sections
@@ -44,6 +48,10 @@ export function filterAskToolGroup(sections: unknown, callId: string): unknown {
 
 /**
  * 修复被中断的工具批次，同时保留刻意悬空、等待后续 resume 请求完成的 interrupt 调用。
+ *
+ * @param messages - 从 buffer 恢复出的增量消息，可能缺 tool result。
+ * @param interruptCallId - 本次要保留悬空的 interrupt 调用 id；缺省空串表示没有刻意悬空的调用。
+ * @returns 补齐了中断 tool result 的新消息数组；空输入直接返回空数组。
  */
 export function validateAndFix(
   messages: readonly AgentMessage[],
@@ -75,7 +83,12 @@ export function validateAndFix(
   return repaired
 }
 
-/** 历史里是否还存在 pending 卡片；跨全部消息扫描，只要有一张未处理就为真。 */
+/**
+ * 历史里是否还存在 pending 卡片；跨全部消息扫描，只要有一张未处理就为真。
+ *
+ * @param messages - 会话的展示消息历史。
+ * @returns 存在任一 pending 卡片时为真；调用方据此拒绝发起新一轮运行。
+ */
 export function hasPendingCard(messages: readonly DisplayMessage[]): boolean {
   return messages.some((message): boolean =>
     sectionsFrom(message).some((section): boolean => cardFromSection(section)?.status === 'pending')
@@ -86,6 +99,10 @@ export function hasPendingCard(messages: readonly DisplayMessage[]): boolean {
  * 找一张**仍处于 pending** 的卡片。
  * 卡片存在但已 answered/refused 时返回 undefined，与「根本没这张卡」走同一条分支——
  * 调用方据此判定「这个交互已经处理过了」，从而把重复的应答请求挡掉。
+ *
+ * @param messages - 会话的展示消息历史。
+ * @param interactionId - 目标交互标识；只认这一张卡片的当前状态。
+ * @returns pending 状态的卡片数据；已作答/拒答或压根不存在时均为 undefined。
  */
 export function findPendingCard(
   messages: readonly DisplayMessage[],
@@ -106,6 +123,10 @@ export function findPendingCard(
  * 把用户作答转成 ask 工具的返回值。
  * 两条分支给出的是**语义不同的载荷**：正常作答回传原问题与答案；拒答则给一段明确要求
  * 模型不要重复追问的文案——只回一个空的 answers 会被模型理解成「用户还没答」，从而再问一遍。
+ *
+ * @param card - 被作答的卡片；正常作答分支会把它的 `questions` 原样回传。
+ * @param marker - 用户的作答标记；`refused` 为真时走拒答分支，忽略答案内容。
+ * @returns 序列化后的工具返回值 JSON 串。
  */
 export function buildAnswerToolResult(card: AskCardData, marker: AnswerMarker): string {
   if (marker.refused) {
@@ -128,6 +149,9 @@ export function buildAnswerToolResult(card: AskCardData, marker: AnswerMarker): 
  * 破坏它意味着有人绕过卡片回答路径继续推进了会话——那样 resume 时补进来的
  * tool 结果会落在一条早已过期的上下文里，模型看到的是「问题之后已经聊过别的」的错乱历史。
  * 这里刻意抛错而不是修补：这类结构损坏无法可靠地自动修复，早点暴露比留下一个语义错乱的历史强。
+ *
+ * @param messages - 待校验的 Agent 消息历史。
+ * @param interactionId - 目标 ask 调用 id；历史里找不到它同样视为不变量被破坏。
  */
 export function assertAskIsLast(messages: readonly AgentMessage[], interactionId: string): void {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -145,7 +169,13 @@ export function assertAskIsLast(messages: readonly AgentMessage[], interactionId
   throw new Error(`断言失败：未找到 interaction_id ${interactionId} 对应的 ask tool_call`)
 }
 
-/** 把作答写回卡片所在 section（状态置 answered 或 refused）；未命中卡片的消息原样返回。 */
+/**
+ * 把作答写回卡片所在 section（状态置 answered 或 refused）；未命中卡片的消息原样返回。
+ *
+ * @param messages - 会话的展示消息历史。
+ * @param marker - 用户作答标记；决定把卡片置为 `answered` 还是 `refused`。
+ * @returns 新的消息数组；只有命中的那条消息被复制改写，其余保持同一引用。
+ */
 export function resolveCard(
   messages: readonly DisplayMessage[],
   marker: AnswerMarker
@@ -182,6 +212,11 @@ function resolveCardInMessage(message: DisplayMessage, marker: AnswerMarker): Di
  *
  * `merged` 标志保证只插一次：卡片只应出现一次，但万一历史里有重复，
  * 反复插入会把同一段内容复制多份。
+ *
+ * @param messages - 卡片所在的既有展示消息历史。
+ * @param interactionId - 目标卡片标识，决定插在哪条消息的哪个位置。
+ * @param continuationMessages - resume 之后产生的展示消息；section 会被取出插入卡片之后。
+ * @returns 合并后的新消息数组；continuation 为空时返回原历史的浅拷贝。
  */
 export function mergeContinuation(
   messages: readonly DisplayMessage[],
@@ -227,6 +262,10 @@ export function mergeContinuation(
  * 场景是崩溃恢复——checkpoint 里的已有消息与 buffer 里的增量消息在边界处会有重叠
  * （同一条消息既进了 checkpoint 又留在 buffer）。不识别的话，恢复后模型会看到重复的对话轮次。
  * 用深比较而不是按 id 匹配：`AgentMessage` 没有稳定主键，内容相同即视为同一条。
+ *
+ * @param existing - 已提交进 checkpoint 的历史，作为拼接的左段。
+ * @param recovered - 从 buffer 恢复出的增量消息，作为右段。
+ * @returns 去重后的新数组；没有重叠时等价于直接拼接两段。
  */
 export function appendWithoutOverlap(
   existing: readonly AgentMessage[],

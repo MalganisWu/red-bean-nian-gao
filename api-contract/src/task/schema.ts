@@ -47,7 +47,11 @@ function isTaskStatus(value: unknown): value is TaskExecutionStatus {
   return ['pending', 'running', 'completed', 'failed'].includes(String(value))
 }
 
-/** 任务实体的守卫；两个时间字段可选，其余全部必填。 */
+/**
+ * 任务实体的守卫；两个时间字段可选，其余全部必填。
+ * @param value - 待判定的任务对象；`RunAt` / `NextRunAt` 可选，其余必填字段缺一即判假。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isTask(value: unknown): value is TaskDto {
   if (
     !isRecord(value) ||
@@ -78,7 +82,11 @@ function isTaskExecutionSummary(value: unknown): value is TaskExecutionSummaryDt
   )
 }
 
-/** 列表项的守卫：在任务实体之上要求 `latest_execution` 键存在（值可为 null）。 */
+/**
+ * 列表项的守卫：在任务实体之上要求 `latest_execution` 键存在（值可为 null）。
+ * @param value - 待判定的列表项；在任务实体判据之上，`latest_execution` 键必须存在。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isTaskListItem(value: unknown): value is TaskListItemDto {
   return (
     isRecord(value) &&
@@ -88,14 +96,22 @@ export function isTaskListItem(value: unknown): value is TaskListItemDto {
   )
 }
 
-/** 任务列表页的守卫；逐项过 `isTaskListItem`。 */
+/**
+ * 任务列表页的守卫；逐项过 `isTaskListItem`。
+ * @param value - 待判定的列表响应；`tasks` 每项合法且 `next_cursor` 为字符串。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isTaskList(value: unknown): value is TaskListDto {
   return (
     isRecord(value) && isArrayOf(value['tasks'], isTaskListItem) && isString(value['next_cursor'])
   )
 }
 
-/** 执行记录的守卫；展示消息逐条过 `isPersistedDisplayMessage`。 */
+/**
+ * 执行记录的守卫；展示消息逐条过 `isPersistedDisplayMessage`。
+ * @param value - 待判定的执行记录；标识字段与可空文案字段都必查，`DisplayMessages` 逐条合法。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isTaskExecution(value: unknown): value is TaskExecutionDto {
   return (
     isRecord(value) &&
@@ -113,7 +129,11 @@ export function isTaskExecution(value: unknown): value is TaskExecutionDto {
   )
 }
 
-/** 执行记录列表页的守卫；逐条过 `isTaskExecution`。 */
+/**
+ * 执行记录列表页的守卫；逐条过 `isTaskExecution`。
+ * @param value - 待判定的列表响应；`executions` 每条合法且 `next_cursor` 为字符串。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isTaskExecutionList(value: unknown): value is TaskExecutionListDto {
   return (
     isRecord(value) &&
@@ -122,7 +142,11 @@ export function isTaskExecutionList(value: unknown): value is TaskExecutionListD
   )
 }
 
-/** 偏好行的守卫；`collapsed_override` 只接受 null 或布尔。 */
+/**
+ * 偏好行的守卫；`collapsed_override` 只接受 null 或布尔。
+ * @param value - 待判定的偏好行；`execution_id` 必需，三个时间/状态字段按可空判据校验。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isExecutionViewState(value: unknown): value is ExecutionViewStateDto {
   return (
     isRecord(value) &&

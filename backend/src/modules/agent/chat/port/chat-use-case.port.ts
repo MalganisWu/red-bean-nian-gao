@@ -25,6 +25,7 @@ export interface ChatRunLifecyclePort {
 
 /** 应用层可预期的 Chat 输入错误，不携带 HTTP 状态语义。 */
 export class ChatUseCaseError extends Error {
+  /** 稳定错误码，供 Controller 做分支翻译；当前只承载 `missing_user_message` 一种语义。 */
   public readonly code: 'missing_user_message'
 
   public constructor(code: 'missing_user_message', message: string) {

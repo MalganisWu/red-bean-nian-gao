@@ -128,6 +128,17 @@ export class PostgresDatabase implements TransactionalSqlExecutor {
     this.#pool = pool
   }
 
+  /**
+   * 在池上执行一条 SQL，不做任何隐式事务包装。
+   * 本层**不做 SQL 注入校验或参数转义**：`sql` 是调用方给定的语句文本，占位符使用
+   * `$1` 形式并靠 `parameters` 传值；把外部输入拼进 SQL 文本是调用方的责任。
+   * 取消只在前后检查 `signal`，因此查询失败（语法、约束、连接中断）时异常原样向上抛，
+   * 不加包装，由调用方决定重试还是上抛。
+   * @param sql - SQL 文本，占位符用 `$1` / `$2`
+   * @param parameters - 与占位符一一对应的参数值，避免把外部输入拼进 SQL 文本
+   * @param signal - 取消信号，查询前后各检查一次，已中止则抛错
+   * @returns 查询结果；`rowCount` 已把 pg 的 `null` 归一成 0
+   */
   public async query(
     sql: string,
     parameters: readonly unknown[],
@@ -149,6 +160,9 @@ export class PostgresDatabase implements TransactionalSqlExecutor {
    * 回滚本身失败时，把「原始错误 + 回滚错误」聚合成 `AggregateError` 抛出，
    * 而不是让回滚错误顶掉原始错误：排障时前者才是根因。
    * `release()` 放在 finally，保证无论提交、回滚还是回滚失败，连接都会还给池子。
+   * @param signal - 取消信号；操作返回后到 `COMMIT` 之前再查一次，已中止则走回滚而非提交
+   * @param operation - 事务体；只能通过收到的 `transaction` 执行查询，否则会跑到事务之外
+   * @returns 事务体返回的值，仅在 `COMMIT` 成功后才会交给调用方
    */
   public async transaction<TValue>(
     signal: AbortSignal,
@@ -211,6 +225,10 @@ class TransactionExecutor implements SqlExecutor {
  * 建池只说明参数合法，不代表连得上，所以这里用 `SELECT 1` 做一次真实往返。
  * 探测失败时必须把已经建好的池关掉——`pg` 的 Pool 会持有后台定时器与 socket，
  * 不关就是一个进程无法退出的泄漏。若连关闭也失败，两个错误一起抛，别让清理失败掩盖根因。
+ * @param databaseUrl - 连接串；空值直接抛错，不尝试用默认值兜底
+ * @param signal - 启动期取消信号，建池前与探测后各检查一次
+ * @param factory - 造池工厂，测试可注入内存实现以避开真实数据库
+ * @returns 已完成 `SELECT 1` 探测的数据库对象；任何一步失败都抛错且不返回半初始化对象
  */
 export async function connectPostgres(
   databaseUrl: string,

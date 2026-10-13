@@ -15,6 +15,8 @@ const CATALOG_TOOL_IDS = Object.freeze(['sys_get_time', 'sys_http_request', 'sys
  *
  * 目录工具缺失时**直接抛错**而不是跳过：这只可能发生在产品依赖的 SDK 版本被换掉时，
  * 静默跳过会让 agent 少一个工具却毫无提示，而这类版本错配恰恰是必须立刻发现的那种问题。
+ * @param hostTools - 宿主显式选择的 Runtime 工具，通常来自 `createHostTools`；缺省即只注册目录工具
+ * @returns 固定名为 `runtime-builtins` 的插件；目录工具按固定顺序先登记，宿主工具紧随其后
  */
 export function runtimeBuiltinProvider(hostTools: readonly Tool[] = []): ToolProviderPlugin {
   const selectedHostTools = [...hostTools]

@@ -10,6 +10,7 @@ export type IdentityApplicationErrorCode =
 
 /** Identity 用例统一使用的稳定错误，Controller 只按错误码映射 HTTP 语义。 */
 export class IdentityApplicationError extends Error {
+  /** 稳定错误码：Controller 只按它映射 HTTP 语义（冲突→409、不存在→404），不解析 message。 */
   public readonly code: IdentityApplicationErrorCode
 
   public constructor(code: IdentityApplicationErrorCode, message: string, cause?: unknown) {

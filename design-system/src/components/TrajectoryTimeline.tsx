@@ -196,14 +196,11 @@ function segLabel(r: TrajectoryRecord): string {
  * 失败段就地红色显示在所属泳道；子 Agent 是工具泳道内的空心段。
  * 支持拖选时间区间聚焦（onRangeFocus 回调区间内记录集合）、Ctrl/⌘+滚轮缩放、
  * 右键/Esc/清除按钮复位。
+ *
+ * @param props - 组件属性；字段语义见 `TrajectoryTimelineProps`。
  */
-export function TrajectoryTimeline({
-  turns,
-  compaction,
-  selectedId,
-  onSelect,
-  onRangeFocus,
-}: TrajectoryTimelineProps) {
+export function TrajectoryTimeline(props: TrajectoryTimelineProps) {
+  const { turns, compaction, selectedId, onSelect, onRangeFocus } = props
   const [mode, setMode] = useState<'time' | 'seq'>('time')
   const positions = usePositions(turns, compaction, mode)
   const [rangeSel, setRangeSel] = useState<{ l: number; r: number } | null>(null)

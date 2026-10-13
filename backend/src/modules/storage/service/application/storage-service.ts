@@ -45,6 +45,17 @@ export class StorageService {
     this.#now = now
   }
 
+  /**
+   * 上传对象，key 由本服务生成。
+   *
+   * 命名规则固定为 `uploads/{userId}/{时间戳}{扩展名}`：调用方不参与命名，从根上杜绝越权写入
+   * 他人前缀；扩展名经白名单化（仅短小写字母数字），拿不到就整体省略。内容包成只读流交给
+   * Adapter，流的消费与销毁责任随之转移。
+   *
+   * @param command - 上传命令；`userId` 决定 key 前缀，`contents` 以 Buffer 传入、在此转为流
+   * @param signal - 请求生命周期绑定的取消信号，透传给底层 Adapter
+   * @returns 写入对象的元信息
+   */
   public upload(command: UploadObjectCommand, signal: AbortSignal): Promise<ObjectInfo> {
     const key = `uploads/${command.userId}/${String(this.#now().getTime())}${safeUploadExtension(command.filename)}`
     return this.#storage.upload(
@@ -58,6 +69,18 @@ export class StorageService {
     )
   }
 
+  /**
+   * 打开对象下载流。
+   *
+   * 先 `stat` 判定存在性再打开流：MinIO 对不存在的 key 在打开阶段抛错，若不预检会冒泡成 500；
+   * 预检命中 `undefined` 时抛 NOT_FOUND，由 Controller 映射 404，与 delete 的语义一致。key 先
+   * 经归属校验，越权 key 与不存在同样收敛为 404，不泄漏他人对象是否存在。
+   *
+   * @param userId - 归属用户 ID；必须是 key 前缀 `uploads/{userId}/` 的持有者
+   * @param key - 请求指定的对象 key；越权或非法一律按不存在或非法入参拒绝
+   * @param signal - 请求生命周期绑定的取消信号，透传到流的生命周期
+   * @returns 下载流与元信息；流的所有权交给调用方消费
+   */
   public async download(userId: string, key: string, signal: AbortSignal): Promise<ObjectDownload> {
     const ownedKey = ownedObjectKey(userId, key)
     // 先 stat 判定存在性再打开下载流：MinIO 对不存在的 key 在 getObject/statObject
@@ -69,10 +92,29 @@ export class StorageService {
     return this.#storage.download(ownedKey, signal)
   }
 
+  /**
+   * 删除对象。
+   *
+   * key 先经归属校验再交给底层；底层删除对不存在的对象是幂等的，因此重复删除不报错。
+   *
+   * @param userId - 归属用户 ID，决定可删除的 key 前缀
+   * @param key - 请求指定的对象 key；越权 key 按不存在拒绝
+   * @param signal - 请求生命周期绑定的取消信号，透传给底层 Adapter
+   */
   public delete(userId: string, key: string, signal: AbortSignal): Promise<void> {
     return this.#storage.delete(ownedObjectKey(userId, key), signal)
   }
 
+  /**
+   * 签发下载预签名 URL。
+   *
+   * 与 `presignPut` 共用 `#presign`：归属校验与有效期夹取都在其中完成，两个入口只在签名动作上
+   * 不同。签发的 URL 交给客户端直连对象存储，服务端不代理字节。
+   *
+   * @param command - 预签名命令；`key` 会补上归属前缀，`expiresSeconds` 缺省取 15 分钟
+   * @param signal - 请求生命周期绑定的取消信号，透传给底层 Adapter
+   * @returns 预签名 URL 与实际采用的有效期（秒），后者可能与请求值不同
+   */
   public presignGet(
     command: PresignObjectCommand,
     signal: AbortSignal
@@ -80,6 +122,15 @@ export class StorageService {
     return this.#presign(command, signal, 'get')
   }
 
+  /**
+   * 签发上传预签名 URL。
+   *
+   * 与 `presignGet` 对称，共用 `#presign`；服务端只产出 URL，不创建对象，实际上传由客户端完成。
+   *
+   * @param command - 预签名命令；`key` 会补上归属前缀，`expiresSeconds` 缺省取 15 分钟
+   * @param signal - 请求生命周期绑定的取消信号，透传给底层 Adapter
+   * @returns 预签名 URL 与实际采用的有效期（秒）
+   */
   public presignPut(
     command: PresignObjectCommand,
     signal: AbortSignal

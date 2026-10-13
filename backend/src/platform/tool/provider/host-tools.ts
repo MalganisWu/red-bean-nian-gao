@@ -32,6 +32,7 @@ import type { FileReadLedger, Tool } from 'red-bean-qing-tuan/tools'
  * 单独决定。
  *
  * 新增工具只注册、不自动授权：是否可达由各 Agent 的 `sys_tool_ids` 决定，默认 Agent 不获得。
+ * @returns 本次新建的工具实例，已共享同一个读取账本；每次调用都是独立的一份，不要跨实例复用
  */
 export function createHostTools(): readonly Tool[] {
   const ledger: FileReadLedger = new MemoryFileReadLedger()

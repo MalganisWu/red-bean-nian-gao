@@ -91,6 +91,7 @@ export class LlmProviderRegistry {
    * 三处严格：provider 名归一化后为空即报错；查不到就抛「unsupported」；
    * 工厂返回 `null`/`undefined` 也当作失败——这是 provider 插件表达「这个配置我造不出来」的方式，
    * 静默放过会让 Runtime 拿到一个不是 adapter 的东西，报错位置离根因很远。
+   * @returns Runtime SDK 认得的工厂函数；它内部查的是构造期封闭的静态表，运行期不会再变
    */
   public adapterFactory(): LlmAdapterFactory {
     /** 按归一化后的 provider 名查表并构造 adapter；名字为空、查不到或工厂返回空都算失败。 */

@@ -124,7 +124,11 @@ function isDisplayMessageMeta(value: unknown): value is DisplayMessageMetaDto {
   )
 }
 
-/** 持久化展示消息的守卫；`sections` 与 `meta` 可选，但给了就必须逐层合法。 */
+/**
+ * 持久化展示消息的守卫；`sections` 与 `meta` 可选，但给了就必须逐层合法。
+ * @param value - 待判定的展示消息；`role` 与 `timestamp` 必需，可选字段给了就必须逐层合法。
+ * @returns 形状成立时为 true，否则 false（不抛错、不做兼容填充）。
+ */
 export function isPersistedDisplayMessage(value: unknown): value is PersistedDisplayMessageDto {
   if (
     !isRecord(value) ||

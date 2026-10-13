@@ -61,7 +61,12 @@ export const SUB_EXECUTION_COLUMNS = `
   completed_at, revision
 `
 
-/** 将领域记录序列化为 INSERT 参数，不让 SQL 字段泄漏到生命周期服务。 */
+/**
+ * 将领域记录序列化为 INSERT 参数，不让 SQL 字段泄漏到生命周期服务。
+ *
+ * @param record - 待序列化的领域记录；可选字段缺省时写 null
+ * @returns 与 SUB_EXECUTION_COLUMNS 顺序一致的参数数组
+ */
 export function subExecutionValues(record: SubExecutionRecord): readonly unknown[] {
   return [
     record.executionId,
@@ -90,7 +95,12 @@ export function subExecutionValues(record: SubExecutionRecord): readonly unknown
   ]
 }
 
-/** 数据库 unknown row 在进入领域前必须完成结构校验和命名转换。 */
+/**
+ * 数据库 unknown row 在进入领域前必须完成结构校验和命名转换。
+ *
+ * @param value - 数据库返回的 unknown 行；结构不符即抛错，绝不带脏数据进领域
+ * @returns 通过校验并转换命名后的领域记录
+ */
 export function mapSubExecutionRow(value: unknown): SubExecutionRecord {
   const parsed = subExecutionRowSchema.safeParse(value)
   if (!parsed.success) throw new Error('invalid sub execution row', { cause: parsed.error })

@@ -24,7 +24,14 @@ export class TrajectoryController {
     this.#dependencies = dependencies
   }
 
-  /** 查询会话轨迹；会话不存在映射为 404 应用错误。 */
+  /**
+   * 查询会话轨迹；会话不存在映射为 404 应用错误，其余失败折叠为统一 500 并记录诊断。
+   *
+   * @param userId - 当前登录用户，决定归属范围；越权与不存在收敛到同一条 404。
+   * @param sessionId - 目标会话标识，取自路径参数且已过契约校验。
+   * @param signal - 请求取消信号，透传到仓储，客户端断开时中止查询。
+   * @returns 轨迹 wire DTO；投影口径由服务层决定，本层不做二次加工。
+   */
   public async get(
     userId: string,
     sessionId: string,

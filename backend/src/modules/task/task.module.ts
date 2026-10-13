@@ -109,7 +109,12 @@ class DefaultTaskPersistence implements TaskPersistence {
   }
 }
 
-/** 提前建立 Task 私有持久化能力，供工具与完整 Module 在同一所有者内组装。 */
+/**
+ * 提前建立 Task 私有持久化能力，供工具与完整 Module 在同一所有者内组装。
+ *
+ * @param database - 事务型 SQL 执行器，六个仓储共用同一连接入口。
+ * @returns 只暴露工具与模块组装能力的 TaskPersistence，不泄漏内部仓储。
+ */
 export function createTaskPersistence(database: TransactionalSqlExecutor): TaskPersistence {
   const queries = new PostgresTaskQueryRepository(database)
   return new DefaultTaskPersistence({
@@ -122,7 +127,12 @@ export function createTaskPersistence(database: TransactionalSqlExecutor): TaskP
   })
 }
 
-/** 组装 Task Module 的投递、执行、调度和 HTTP 入站 Port。 */
+/**
+ * 组装 Task Module 的投递、执行、调度和 HTTP 入站 Port。
+ *
+ * @param options - 组装选项；`persistence` 之外的字段原样转交给内部组装。
+ * @returns Task Module 的输出面，含投递队列、调度器、用例服务与后台任务。
+ */
 export function createTaskModule(options: {
   readonly persistence: TaskPersistence
   readonly redis: RedisConnection

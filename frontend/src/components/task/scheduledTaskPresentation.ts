@@ -48,7 +48,12 @@ function validDate(value: string | null | undefined): Date | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date
 }
 
-/** 任务标题：取 task_input 的首个非空行并截断到 48 字；输入为空时回落为「未命名任务」。 */
+/**
+ * 任务标题：取 task_input 的首个非空行并截断到 48 字；输入为空时回落为「未命名任务」。
+ *
+ * @param task - 源任务；只读 `TaskInput`。
+ * @returns 展示用标题，保证非空。
+ */
 export function taskTitle(task: Task): string {
   const source = task.TaskInput.trim() || '未命名任务'
   const firstLine =
@@ -59,20 +64,35 @@ export function taskTitle(task: Task): string {
   return firstLine.length > 48 ? `${firstLine.slice(0, 47)}…` : firstLine
 }
 
-/** 完整指令文本；与标题相同时返回 `undefined`，避免详情页把同一句话渲染两遍。 */
+/**
+ * 完整指令文本；与标题相同时返回 `undefined`，避免详情页把同一句话渲染两遍。
+ *
+ * @param task - 源任务；只读 `TaskInput`。
+ * @returns 与标题不同的完整指令；指令为空或与标题等价时返回 `undefined`。
+ */
 export function taskInstruction(task: Task): string | undefined {
   const instruction = task.TaskInput.trim()
   if (!instruction || instruction === taskTitle(task)) return undefined
   return instruction
 }
 
-/** 由启用状态与调度类型推出生命周期：单次且已停 = 已结束，周期且已停 = 暂停。 */
+/**
+ * 由启用状态与调度类型推出生命周期：单次且已停 = 已结束，周期且已停 = 暂停。
+ *
+ * @param task - 源任务；读取 `IsActive` 与 `ScheduleType`。
+ * @returns 生命周期三态之一。
+ */
 export function toScheduledTaskLifecycle(task: Task): ScheduledTaskLifecycle {
   if (task.IsActive) return 'active'
   return task.ScheduleType === 'once' ? 'ended' : 'paused'
 }
 
-/** 把调度配置渲染成一行可读文案；只识别常见 cron 形态，认不出的一律回落为「周期任务」。 */
+/**
+ * 把调度配置渲染成一行可读文案；只识别常见 cron 形态，认不出的一律回落为「周期任务」。
+ *
+ * @param task - 源任务；读取 `ScheduleType`、`RunAt` 与 `CronExpr`。
+ * @returns 单行调度文案；无法解析的 cron 回落为「周期任务」。
+ */
 export function formatScheduleLabel(task: Task): string {
   if (task.ScheduleType === 'once') {
     return isAbsentTime(task.RunAt) ? '单次任务' : `单次 · ${formatShortDateTime(task.RunAt)}`
@@ -100,7 +120,13 @@ export function formatScheduleLabel(task: Task): string {
   return '周期任务'
 }
 
-/** 由起止时间算耗时；缺任一端或时间倒挂时返回 `undefined`，调用方据此隐藏耗时。 */
+/**
+ * 由起止时间算耗时；缺任一端或时间倒挂时返回 `undefined`，调用方据此隐藏耗时。
+ *
+ * @param startedAt - 开始时间（ISO 字符串）；缺失或非法时判为不可算。
+ * @param completedAt - 完成时间（ISO 字符串）；早于开始时间时判为不可算。
+ * @returns 形如 `"1.2s"` 的耗时文案，不足 1 秒返回 `"<1s"`；不可算时返回 `undefined`。
+ */
 export function formatExecutionDuration(
   startedAt: string | null | undefined,
   completedAt: string | null | undefined
@@ -114,7 +140,13 @@ export function formatExecutionDuration(
   return `${(duration / 1000).toFixed(1)}s`
 }
 
-/** 把一次执行投影成列表摘要行：失败态展示错误、其余展示结果；`unread` 表示尚未被查看。 */
+/**
+ * 把一次执行投影成列表摘要行：失败态展示错误、其余展示结果；`unread` 表示尚未被查看。
+ *
+ * @param execution - 执行记录或列表摘要；读取起止时间、状态与结果字段。
+ * @param viewState - 该执行的查看态；缺失时 `unread` 为 `false`。
+ * @returns Design System 列表组件可直接消费的摘要行。
+ */
 export function toScheduledTaskRunSummary(
   execution: TaskExecution | TaskExecutionSummary,
   viewState?: ExecutionViewState
@@ -134,6 +166,11 @@ export function toScheduledTaskRunSummary(
 /**
  * 把任务投影成列表项。
  * `nextRunLabel` 按生命周期三态给出不同措辞；`latest_execution` 缺失时不渲染最近一次执行区块。
+ *
+ * @param task - 列表项源任务，含可选的 `latest_execution`。
+ * @param viewState - 最近一次执行的查看态；缺失时该区块按未读处理。
+ * @param options - 可选项；`showSessionTitle` 控制是否展示来源会话标题，默认展示。
+ * @returns Design System 列表组件可直接消费的列表项数据。
  */
 export function toScheduledTaskListItem(
   task: TaskListItem,

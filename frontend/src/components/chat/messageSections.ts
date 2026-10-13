@@ -9,6 +9,10 @@ import type { MessageSection } from '@/types/chat'
  *
  * 纯渲染层收束：不动持久化数据；同一函数处理实时流与历史 sections。
  * 前提：上游 sections append-only，收束是纯净重算，无状态残留。
+ *
+ * @param sections - 待归一化的消息 section 列表，实时流与历史共用同一份输入。
+ * @param opts - 可选项；`isStreaming` 为真时无法预知最终 content，全部 content 进 process 作过程叙述。
+ * @returns 收束后的 `[process?, content?]` section 列表，顺序与到达时序一致。
  */
 export function normalizeSections(
   sections: MessageSection[],

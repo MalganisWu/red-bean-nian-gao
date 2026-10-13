@@ -24,7 +24,15 @@ async function readJson(response: Response): Promise<unknown> {
   return JSON.parse(source)
 }
 
-/** POST-based SSE 连接管理器（支持 Bearer Header） */
+/**
+ * POST-based SSE 连接管理器（支持 Bearer Header）
+ *
+ * 内置首事件看门狗：建连后 30s 内收不到任何事件即按连接失败上报并中止，避免半开连接让 isStreaming 永久悬挂。
+ * chat 是一次性流，出错不重连：错误统一走 onError、结束走 onClose。
+ *
+ * @param options - 连接参数（端点、请求体与 onEvent / onError / onClose 回调）；url 缺省为对话端点。
+ * @returns 用于中止连接的 AbortController；调用方应保存以便取消。
+ */
 export function connectSSE(options: SSEConnectionOptions): AbortController {
   const ctrl = new AbortController()
   const token = useAuthStore.getState().token

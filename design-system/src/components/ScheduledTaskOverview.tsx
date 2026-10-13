@@ -28,20 +28,25 @@ function latestStatusIndicatorClass(status: ScheduledTaskRunSummary['status']): 
   return 'bg-foreground-muted'
 }
 
-/** 任务概览只呈现稳定定义与最近一次摘要，不承载完整运行历史。 */
-export function ScheduledTaskOverview({
-  scheduleLabel,
-  nextRunLabel,
-  nextRunTone = 'success',
-  retryLabel,
-  triggerLabel,
-  timezone,
-  cron,
-  instruction,
-  latestRun,
-  onViewLatest,
-  onViewHistory,
-}: ScheduledTaskOverviewProps) {
+/**
+ * 任务概览只呈现稳定定义与最近一次摘要，不承载完整运行历史。
+ *
+ * @param props - 组件属性；字段语义见 `ScheduledTaskOverviewProps`。
+ */
+export function ScheduledTaskOverview(props: ScheduledTaskOverviewProps) {
+  const {
+    scheduleLabel,
+    nextRunLabel,
+    nextRunTone = 'success',
+    retryLabel,
+    triggerLabel,
+    timezone,
+    cron,
+    instruction,
+    latestRun,
+    onViewLatest,
+    onViewHistory,
+  } = props
   return (
     <div>
       <section className="pt-[31px]">

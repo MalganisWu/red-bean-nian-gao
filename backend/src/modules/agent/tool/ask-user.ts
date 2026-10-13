@@ -62,7 +62,9 @@ interface AskQuestion {
  * 少了它，这个工具会退化成一个「立刻返回空内容」的普通工具跑完，用户永远看不到卡片。
  */
 export class AskUserTool implements AgentTool {
+  /** 工具对外名称（`sys_ask_user`）；pipeline 与卡片投影层据此识别「这次挂起是一次提问」。 */
   public readonly name = ASK_USER_TOOL_NAME
+  /** 工具 schema；`interrupting: true` 是它成立的前提，Runtime 靠该静态声明在调用处形成中断屏障。 */
   public readonly schema: AgentToolSchema = {
     type: 'function',
     function: {
@@ -73,6 +75,14 @@ export class AskUserTool implements AgentTool {
     interrupting: true,
   }
 
+  /**
+   * 校验参数并挂起：不产生正文结果，只返回 `interrupt` 信号等待用户作答。
+   * 已中止时直接 reject；参数非法或拿不到 callId 时同样 reject，绝不静默退化成普通空结果工具。
+   * @param value 工具入参 JSON；按 questions 结构逐字段校验
+   * @param context 本次调用上下文；用其 callId 作为卡片的 interaction_id
+   * @param signal 中止信号；已中止时以 signal.reason 为由 reject
+   * @returns 带 `interrupt` 信号的工具结果（content 为空），Runtime 据此暂停执行
+   */
   public execute(
     value: AgentJsonValue,
     context: AgentToolCallContext,
@@ -102,7 +112,10 @@ export class AskUserTool implements AgentTool {
   }
 }
 
-/** 为全局 composition root 创建 Agent Module 拥有的提问工具。 */
+/**
+ * 为全局 composition root 创建 Agent Module 拥有的提问工具。
+ * @returns 新的 AskUserTool 实例
+ */
 export function createAskUserTool(): AgentTool {
   return new AskUserTool()
 }

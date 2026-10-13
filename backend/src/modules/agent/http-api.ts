@@ -32,7 +32,13 @@ export interface TrajectoryRouteDependencies extends TrajectoryControllerDepende
   readonly authService: AuthServicePort
 }
 
-/** 创建 Chat Controller 与认证边界，再把纯路由表注册到 Fastify。 */
+/**
+ * 创建 Chat Controller 与认证边界，再把纯路由表注册到 Fastify。
+ *
+ * @param server - 已建好但尚未监听的 Fastify 实例；本函数只注册路由，不启动服务。
+ * @param dependencies - Chat 用例 Port 与认证服务；由本 Module 的组装入口提供，路由层不自行构造。
+ * @returns 无返回值；注册是副作用，失败时直接抛出而不是返回错误。
+ */
 export function registerChatRoutes(
   server: FastifyInstance,
   dependencies: ChatRouteDependencies
@@ -44,7 +50,13 @@ export function registerChatRoutes(
   )
 }
 
-/** 创建 Session Controller 与认证边界，再把纯路由表注册到 Fastify。 */
+/**
+ * 创建 Session Controller 与认证边界，再把纯路由表注册到 Fastify。
+ *
+ * @param server - 已建好但尚未监听的 Fastify 实例；本函数只注册路由，不启动服务。
+ * @param dependencies - Session 用例 Port 与认证服务；路由层不自行构造依赖。
+ * @returns 无返回值；注册是副作用，失败时直接抛出。
+ */
 export function registerSessionRoutes(
   server: FastifyInstance,
   dependencies: SessionRouteDependencies
@@ -56,7 +68,13 @@ export function registerSessionRoutes(
   )
 }
 
-/** 创建 Trajectory Controller 与认证边界，再把纯路由表注册到 Fastify。 */
+/**
+ * 创建 Trajectory Controller 与认证边界，再把纯路由表注册到 Fastify。
+ *
+ * @param server - 已建好但尚未监听的 Fastify 实例；本函数只注册路由，不启动服务。
+ * @param dependencies - Trajectory 用例 Port 与认证服务；路由层不自行构造依赖。
+ * @returns 无返回值；注册是副作用，失败时直接抛出。
+ */
 export function registerTrajectoryRoutes(
   server: FastifyInstance,
   dependencies: TrajectoryRouteDependencies

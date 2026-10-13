@@ -40,10 +40,20 @@ export class RunFactStepBuffer {
   #attempts: MutableAttempt[] = []
   #open: MutableAttempt | undefined
 
+  /**
+   * 是否已积累任何步骤事实（attempt / 思考 / 正文任一非空）。
+   * 终态补记用它判断缓冲里是否还有内容可落，避免为无内容的步骤产出噪声事实。
+   * @returns 三者任一非空时为 true，全空时为 false
+   */
   get hasContent(): boolean {
     return this.#attempts.length > 0 || this.#thinking !== '' || this.#content !== ''
   }
 
+  /**
+   * 开启一次新的 LLM attempt；若上一个 attempt 仍悬挂未闭合（流被外部放弃），
+   * 先用同一时刻补闭它，保证 attempt 序列始终完整可回放。
+   * @param now 本次 attempt 的起始时刻（epoch 毫秒）
+   */
   beginAttempt(now: number): void {
     // 上一个 attempt 悬挂未闭合（流被外部放弃）时先闭合，保证 attempt 序列完整。
     if (this.#open !== undefined) this.endAttempt(now)
@@ -57,7 +67,10 @@ export class RunFactStepBuffer {
     if (this.#startedAt === undefined) this.#startedAt = now
   }
 
-  /** 首个 usage 生效：与 SDK 的 usageCounted 口径一致，后续 usage 块忽略。 */
+  /**
+   * 首个 usage 生效：与 SDK 的 usageCounted 口径一致，后续 usage 块忽略。
+   * @param usage 本次 attempt 观察到的 token 用量快照
+   */
   recordUsage(usage: AgentTokenUsage): void {
     const open = this.#open
     if (open === undefined || open.usage !== null) return
@@ -68,13 +81,21 @@ export class RunFactStepBuffer {
     }
   }
 
+  /**
+   * 标记当前 attempt 失败；只认首个错误（与 usage 的「首个生效」口径一致），
+   * 后续错误块忽略；无悬挂 attempt 时为空操作。
+   * @param message 归一化后的错误描述
+   */
   markError(message: string): void {
     const open = this.#open
     if (open === undefined || open.error !== undefined) return
     open.error = message
   }
 
-  /** 空响应重试的追认：最后一个已闭合但无错误的 attempt 改判为失败。 */
+  /**
+   * 空响应重试的追认：最后一个已闭合但无错误的 attempt 改判为失败。
+   * @param message 归一化后的错误描述，通常为空响应重试的固定文案
+   */
   markLastClosedError(message: string): void {
     const last = this.#attempts.at(-1)
     if (last !== undefined && last.error === undefined) {
@@ -84,6 +105,10 @@ export class RunFactStepBuffer {
     this.markError(message)
   }
 
+  /**
+   * 闭合当前悬挂的 attempt 并把它归档进 attempts 序列；无悬挂 attempt 时为空操作（幂等）。
+   * @param now 本次 attempt 的结束时刻（epoch 毫秒）
+   */
   endAttempt(now: number): void {
     const open = this.#open
     if (open === undefined) return
@@ -96,6 +121,7 @@ export class RunFactStepBuffer {
    * 取走最后一个已闭合 attempt 的时长并从缓冲移除（G2：压缩摘要调用归属到
    * compaction 事实，同时避免其混入下一步 assistant 事实的 attempts）。
    * 无已闭合 attempt 时返回 null 且不移除。
+   * @returns 被取走的已闭合 attempt 时长（毫秒）；无可取 attempt 时为 null
    */
   takeLastAttemptDuration(): number | null {
     const last = this.#attempts.at(-1)
@@ -106,15 +132,29 @@ export class RunFactStepBuffer {
     return Math.max(0, last.endedAt - last.startedAt)
   }
 
+  /**
+   * 追加一截思考增量到当前步骤缓冲；同一步骤内多次调用是累加而非覆盖。
+   * @param content 本帧的思考增量文本
+   */
   appendThinking(content: string): void {
     this.#thinking += content
   }
 
+  /**
+   * 追加一截正文增量，作为终态补记的兜底正文；已提交的 assistant 消息以消息内容为准，
+   * 此处的累积只在消息未被观察到的路径（用户打断 / 崩溃）下使用。
+   * @param content 本帧的正文增量文本
+   */
   appendContent(content: string): void {
     this.#content += content
   }
 
-  /** 结算快照并清空缓冲；空步骤返回 undefined（恢复/回放路径不产生噪声事实）。 */
+  /**
+   * 结算快照并清空缓冲；空步骤返回 undefined（恢复/回放路径不产生噪声事实）。
+   * @param content 本次提交的 assistant 正文，作为快照正文的权威来源
+   * @param now 结算时刻（epoch 毫秒），用于闭合仍悬挂的 attempt
+   * @returns 步骤快照；缓冲与传入正文皆空时返回 undefined
+   */
   settle(content: string, now: number): StepSnapshot | undefined {
     if (this.#open !== undefined) this.endAttempt(now)
     const hasMessage = content !== ''
@@ -124,7 +164,11 @@ export class RunFactStepBuffer {
     return snapshot
   }
 
-  /** 终态补记快照：正文用已观察到的增量兜底，缓冲随后清空。 */
+  /**
+   * 终态补记快照：正文用已观察到的增量兜底，缓冲随后清空。
+   * @param now 补记时刻（epoch 毫秒），用于闭合仍悬挂的 attempt
+   * @returns 步骤快照；缓冲为空时返回 undefined（不为空步骤落空事实）
+   */
   flush(now: number): StepSnapshot | undefined {
     if (this.#open !== undefined) this.endAttempt(now)
     if (!this.hasContent) return undefined
@@ -164,7 +208,12 @@ export class RunFactStepBuffer {
   }
 }
 
-/** 把步骤快照固化成 assistant 事实；缺 `startedAt` 时时长记 0，不留空。 */
+/**
+ * 把步骤快照固化成 assistant 事实；缺 `startedAt` 时时长记 0，不留空。
+ * @param snapshot 由 settle / flush 产出的步骤终态快照
+ * @param now 事实落库时刻（epoch 毫秒），决定事实的 `at` 字段
+ * @returns 可直接追加进事实日志的 assistant 事实
+ */
 export function assistantFactFromSnapshot(snapshot: StepSnapshot, now: number): RunAssistantFact {
   return {
     type: 'assistant',
@@ -178,7 +227,11 @@ export function assistantFactFromSnapshot(snapshot: StepSnapshot, now: number): 
   }
 }
 
-/** 由一次工具调用构造 tool 事实；`result`/`error`/`status` 缺省时不写该键，与存量记录保持一致。 */
+/**
+ * 由一次工具调用构造 tool 事实；`result`/`error`/`status` 缺省时不写该键，与存量记录保持一致。
+ * @param input 单次工具调用的标识、参数与结束状态
+ * @returns 可直接追加进事实日志的 tool 事实
+ */
 export function toolFact(input: {
   readonly callId: string
   readonly name: string

@@ -18,6 +18,7 @@ import type { QuestionCardAnswer } from '@/components/retroui/QuestionCard'
 // 卡片是消息 sections 里的一个 type="card" section（非独立字段），
 // 保证「提问 + 卡片 + 续跑」在一条消息里、卡片位置在中间。
 
+/** 询问卡片的数据载荷；即消息 sections 里 type="card" 段的 `card` 字段。 */
 export type CardSectionData = CardSectionDataDto
 
 /** 仅存在于前端运行期；失败时卡片仍保持 pending，允许原地重试。 */
@@ -32,6 +33,7 @@ export interface CardSubmissionState {
 
 // ── Chat Request（来自共享 API 契约）──────────────────
 
+/** 发起一轮对话的请求体；结构由共享契约定义，此处仅作类型别名透传。 */
 export type ChatRequest = ChatRequestDto
 /** 一条对话消息（用户或助手）；结构等同共享契约的同名 DTO。 */
 export type ChatMessage = ChatMessageDto
@@ -42,6 +44,7 @@ export type AnswerRequest = AnswerRequestDto
 
 // ── Message Sections（线性渲染分段）───────────────────
 
+/** 思考流中的一步：序号 + 文本；渲染层按 index 顺序拼装 reason section。 */
 export interface ReasonStep {
   index: number
   content: string
@@ -79,6 +82,7 @@ export type PersistedToolCard = PersistedToolCardDto
 // 线格式与后端 SubAgentSectionData 一致（字段 snake_case 透传，session 历史不经过转换层）。
 // sections 与主消息同构递归复用；parent_call_id 同时用于实时与历史回放恢复父工具层级。
 
+/** 子 Agent 委派段的载荷；sections 与主消息同构递归，parent_call_id 用于还原父工具层级。 */
 export interface SubAgentSectionData {
   agent_id: string
   agent_name: string
@@ -96,6 +100,7 @@ export interface SubAgentSectionData {
 // 匹配 parent_call_id 的 sub_agent 嵌入父 tool，未匹配数据保留独立步骤。
 // 纯渲染形态，不存在于持久化（spec: process-fold-timeline §2）。
 
+/** 过程折叠区的一步；kind 决定其余字段，属纯渲染形态，不落库。 */
 export interface ProcessStepItem {
   kind: 'think' | 'narration' | 'tool' | 'sub_agent' | 'approval'
   /** think / narration 的文本 */
@@ -126,6 +131,7 @@ export type PersistedMessageSection = PersistedMessageSectionDto
 
 // ── 消息来源 / 元信息（TaskResultCard 用）─────────────
 
+/** 定时任务来源的元信息；用于在结果消息上标注该轮来自哪条调度的运行。 */
 export type ScheduledTaskMeta = ScheduledTaskMetaDto
 /** 展示元信息：定时任务来源、本轮运行开始时间，或过程块的终止状态。 */
 export type DisplayMessageMeta = DisplayMessageMetaDto

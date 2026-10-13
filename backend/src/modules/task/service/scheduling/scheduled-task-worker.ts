@@ -26,6 +26,12 @@ export class ScheduledTaskWorker {
     this.#scanIntervalMilliseconds = scanIntervalMilliseconds
   }
 
+  /**
+   * 启动扫描循环，直到父信号中止或 `stop` 被调用；首次扫描刻意延后一个间隔，
+   * 避开进程启动期的数据库迁移与连接池预热。重复调用会抛错，循环只允许起一次。
+   *
+   * @param parent - 父级停止信号，与内部停止信号合并后一并中断循环。
+   */
   public async start(parent: AbortSignal): Promise<void> {
     if (this.#started) throw new Error('scheduled task worker already started')
     this.#started = true
@@ -55,6 +61,9 @@ export class ScheduledTaskWorker {
     }
   }
 
+  /**
+   * 停止扫描循环并等待在途 worker 排空；abort 幂等，可重复调用。
+   */
   public async stop(): Promise<void> {
     this.#stopController.abort(new Error('scheduled task worker stopped'))
     await this.#scheduler.waitForIdle()

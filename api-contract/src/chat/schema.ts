@@ -71,7 +71,11 @@ export const answerRequestSchema: z.ZodType<AnswerRequestDto> = z
     'answers or refused is required'
   )
 
-/** 卡片问题的形状守卫；`id` 与 `text` 必需，说明、选项与选择方式可选。 */
+/**
+ * 卡片问题的形状守卫；`id` 与 `text` 必需，说明、选项与选择方式可选。
+ * @param value - 待判定的一帧/一项；缺 `id` 或 `text` 直接判假。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isQuestion(value: unknown): value is QuestionDto {
   if (!isRecord(value) || !isString(value['id']) || !isString(value['text'])) return false
   return (
@@ -83,7 +87,11 @@ export function isQuestion(value: unknown): value is QuestionDto {
   )
 }
 
-/** 作答的形状守卫；`kind` 必须是四个已知取值之一，未知取值一律判假。 */
+/**
+ * 作答的形状守卫；`kind` 必须是四个已知取值之一，未知取值一律判假。
+ * @param value - 待判定的作答对象；`kind` 必须是四个已知取值之一。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isQuestionAnswer(value: unknown): value is QuestionAnswerDto {
   if (!isRecord(value)) return false
   if (!['option', 'multi', 'custom', 'skip'].includes(String(value['kind']))) return false
@@ -93,7 +101,11 @@ export function isQuestionAnswer(value: unknown): value is QuestionAnswerDto {
   )
 }
 
-/** `start` 帧：request_id / session_id / trace_id 三者齐备。 */
+/**
+ * `start` 帧：request_id / session_id / trace_id 三者齐备。
+ * @param value - 待判定的一帧；三个 id 字段缺一即判假。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isStartEvent(value: unknown): value is StartEventDto {
   return (
     isRecord(value) &&
@@ -103,12 +115,20 @@ export function isStartEvent(value: unknown): value is StartEventDto {
   )
 }
 
-/** `token` 帧：只有正文增量，`content` 是唯一必需字段。 */
+/**
+ * `token` 帧：只有正文增量，`content` 是唯一必需字段。
+ * @param value - 待判定的一帧；`content` 非字符串即判假。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isTokenEvent(value: unknown): value is TokenEventDto {
   return isRecord(value) && isString(value['content'])
 }
 
-/** `status` 帧：`content` 必需，`code` / `attempt` / `max_attempts` 可选。 */
+/**
+ * `status` 帧：`content` 必需，`code` / `attempt` / `max_attempts` 可选。
+ * @param value - 待判定的一帧；`content` 非字符串即判假，可选字段给了就必须合法。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isStatusEvent(value: unknown): value is StatusEventDto {
   return (
     isRecord(value) &&
@@ -119,7 +139,11 @@ export function isStatusEvent(value: unknown): value is StatusEventDto {
   )
 }
 
-/** `reason` 帧：content 与 step / timestamp 都必需。 */
+/**
+ * `reason` 帧：content 与 step / timestamp 都必需。
+ * @param value - 待判定的一帧；三个必需字段缺一即判假。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isReasonEvent(value: unknown): value is ReasonEventDto {
   return (
     isRecord(value) &&
@@ -129,7 +153,11 @@ export function isReasonEvent(value: unknown): value is ReasonEventDto {
   )
 }
 
-/** `tool_start` 帧：`params` 允许为 null（参数不是可解析的 JSON 对象时）。 */
+/**
+ * `tool_start` 帧：`params` 允许为 null（参数不是可解析的 JSON 对象时）。
+ * @param value - 待判定的一帧；`params` 为 null 或对象皆可，其余判假。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isToolStartEvent(value: unknown): value is ToolStartEventDto {
   return (
     isRecord(value) &&
@@ -139,7 +167,11 @@ export function isToolStartEvent(value: unknown): value is ToolStartEventDto {
   )
 }
 
-/** `tool_result` 帧：`error` 可选，有值即表示这次工具调用失败。 */
+/**
+ * `tool_result` 帧：`error` 可选，有值即表示这次工具调用失败。
+ * @param value - 待判定的一帧；`error` 给了就必须是字符串，其余必填字段缺一即判假。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isToolResultEvent(value: unknown): value is ToolResultEventDto {
   return (
     isRecord(value) &&
@@ -150,22 +182,38 @@ export function isToolResultEvent(value: unknown): value is ToolResultEventDto {
   )
 }
 
-/** `error` 帧：业务码 + 对外文案。 */
+/**
+ * `error` 帧：业务码 + 对外文案。
+ * @param value - 待判定的一帧；`code` 必须是数字、`message` 必须是字符串。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isErrorEvent(value: unknown): value is ErrorEventDto {
   return isRecord(value) && isNumber(value['code']) && isString(value['message'])
 }
 
-/** `done` 帧：收尾帧，带 token 用量与会话 ID。 */
+/**
+ * `done` 帧：收尾帧，带 token 用量与会话 ID。
+ * @param value - 待判定的一帧；`tokens_used` 非数字或 `session_id` 非字符串即判假。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isDoneEvent(value: unknown): value is DoneEventDto {
   return isRecord(value) && isNumber(value['tokens_used']) && isString(value['session_id'])
 }
 
-/** `heartbeat` 帧：只有时间戳。 */
+/**
+ * `heartbeat` 帧：只有时间戳。
+ * @param value - 待判定的一帧；`timestamp` 非数字即判假。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isHeartbeatEvent(value: unknown): value is HeartbeatEventDto {
   return isRecord(value) && isNumber(value['timestamp'])
 }
 
-/** `compaction` 帧：`trigger` 必须是 auto / manual 之一，三个 token 计数均为数字。 */
+/**
+ * `compaction` 帧：`trigger` 必须是 auto / manual 之一，三个 token 计数均为数字。
+ * @param value - 待判定的一帧；`trigger` 取值未知或 token 计数非数字即判假。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isCompactionEvent(value: unknown): value is CompactionEventDto {
   return (
     isRecord(value) &&
@@ -176,7 +224,11 @@ export function isCompactionEvent(value: unknown): value is CompactionEventDto {
   )
 }
 
-/** `card` 帧：`status` 限定 pending / answered / refused 三态，questions 逐项过 `isQuestion`。 */
+/**
+ * `card` 帧：`status` 限定 pending / answered / refused 三态，questions 逐项过 `isQuestion`。
+ * @param value - 待判定的一帧；`status` 取值未知或任一 question 不合法即判假。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isCardEvent(value: unknown): value is CardEventDto {
   return (
     isRecord(value) &&
@@ -186,7 +238,11 @@ export function isCardEvent(value: unknown): value is CardEventDto {
   )
 }
 
-/** `agent_event` 信封：只校验外层标识与「有 event 字段」，内层载荷由调用方按 event_type 继续判。 */
+/**
+ * `agent_event` 信封：只校验外层标识与「有 event 字段」，内层载荷由调用方按 event_type 继续判。
+ * @param value - 待判定的一帧；只查外层标识字段与 `event` 键是否存在，不深入内层载荷。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isSubAgentEnvelope(value: unknown): value is SubAgentEnvelopeDto {
   return (
     isRecord(value) &&

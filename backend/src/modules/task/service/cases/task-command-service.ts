@@ -32,7 +32,14 @@ export class TaskCommandService {
     this.#dependencies = dependencies
   }
 
-  /** 启停任务（软启停，不删数据）：先校验所有权，再落库。 */
+  /**
+   * 启停任务（软启停，不删数据）：先校验所有权，再落库。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param taskId - 目标任务标识。
+   * @param isActive - 目标启停状态；直接覆盖任务的 `isActive`。
+   * @param signal - 取消信号，透传到仓储。
+   */
   public async setActive(
     userId: string,
     taskId: string,
@@ -50,7 +57,13 @@ export class TaskCommandService {
     }
   }
 
-  /** 软删除任务：所有权由仓储的 `WHERE user_id` 保证，NOT_FOUND/NOT_AUTHORIZED 统一翻译。 */
+  /**
+   * 软删除任务：所有权由仓储的 `WHERE user_id` 保证，NOT_FOUND/NOT_AUTHORIZED 统一翻译。
+   *
+   * @param userId - 当前登录用户，由仓储谓词校验归属。
+   * @param taskId - 目标任务标识。
+   * @param signal - 取消信号，透传到仓储。
+   */
   public async delete(userId: string, taskId: string, signal: AbortSignal): Promise<void> {
     try {
       await this.#dependencies.commandRepository.softDeleteTask(userId, taskId, signal)
@@ -63,6 +76,13 @@ export class TaskCommandService {
    * 更新执行记录的已读/折叠视图状态。
    * 校验顺序固定为：任务所有权 → 执行记录存在性 → upsert；
    * 三个失败面分别映射 FORBIDDEN / EXECUTION_NOT_FOUND / 基础设施失败。
+   *
+   * @param userId - 当前登录用户，用于归属校验。
+   * @param taskId - 目标任务标识。
+   * @param executionId - 目标执行记录标识；不存在时映射 EXECUTION_NOT_FOUND。
+   * @param patch - 已读与折叠覆盖值；`collapsedOverride` 为 `undefined` 表示不覆盖该列。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns upsert 后的视图状态。
    */
   public async updateViewState(
     userId: string,

@@ -464,6 +464,9 @@ export type TurnItem =
  *
  * 所以这里**不把工具收进请求的子项**：那样等于把独立阶段当成请求的成员，与模型冲突。
  * 分组只按位置切段，`next request` 之前的系统执行独立成项；视觉上仍是请求 → 其产出 → 系统执行。
+ *
+ * @param records - 一轮内按时序排列的扁平记录。
+ * @returns 按阶段切分的项列表；系统执行与请求平级，不挂进任何请求。
  */
 export function groupRequests(records: readonly TrajectoryRecord[]): TurnItem[] {
   const items: TurnItem[] = []
@@ -1237,18 +1240,21 @@ function computeIntervalsBefore(
  *
  * 响应式：组件根节点是唯一的容器查询上下文；窄容器（检查器打开把记录表压窄时）让出「耗时条」列，
  * 保「记录」列可读——固定列不会让步，若不主动退让，被牺牲的必然是最重要的一列。
+ *
+ * @param props - 组件属性；字段语义见 `TrajectoryLedgerProps`。
  */
-export function TrajectoryLedger({
-  turns,
-  compaction,
-  sessionEnd,
-  scaleMs,
-  filterText,
-  onFilterChange,
-  selectedId,
-  onSelect,
-  focusIds,
-}: TrajectoryLedgerProps) {
+export function TrajectoryLedger(props: TrajectoryLedgerProps) {
+  const {
+    turns,
+    compaction,
+    sessionEnd,
+    scaleMs,
+    filterText,
+    onFilterChange,
+    selectedId,
+    onSelect,
+    focusIds,
+  } = props
   const [collapsedTurns, setCollapsedTurns] = useState<ReadonlySet<number>>(new Set())
   /**
    * 请求级折叠：折叠某次调用的工具执行，收成一行 `… N 个工具调用 · name, name`。

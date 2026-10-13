@@ -23,21 +23,26 @@ export interface ScheduledTaskHeaderProps {
   headingLevel?: 1 | 2 | undefined
 }
 
-/** 任务详情共享对象头：只描述任务本身，并承载概览 / 执行记录的稳定导航。 */
-export function ScheduledTaskHeader({
-  title,
-  source,
-  kindLabel,
-  lifecycle,
-  activeTab,
-  historyCount,
-  backLabel,
-  onBack,
-  onTabChange,
-  primaryAction,
-  moreAction,
-  headingLevel = 2,
-}: ScheduledTaskHeaderProps) {
+/**
+ * 任务详情共享对象头：只描述任务本身，并承载概览 / 执行记录的稳定导航。
+ *
+ * @param props - 组件属性；字段语义见 `ScheduledTaskHeaderProps`。
+ */
+export function ScheduledTaskHeader(props: ScheduledTaskHeaderProps) {
+  const {
+    title,
+    source,
+    kindLabel,
+    lifecycle,
+    activeTab,
+    historyCount,
+    backLabel,
+    onBack,
+    onTabChange,
+    primaryAction,
+    moreAction,
+    headingLevel = 2,
+  } = props
   const Heading = headingLevel === 1 ? 'h1' : 'h2'
 
   /** 渲染一个详情页签：选中态由 `activeTab` 决定，历史页签附带条数。 */

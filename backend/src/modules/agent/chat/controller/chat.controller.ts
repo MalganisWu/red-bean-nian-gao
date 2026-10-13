@@ -28,6 +28,10 @@ export class ChatController {
    * 发起对话。只翻译**这一层能理解**的错误码，其余原样上抛——
    * 应用层错误没有 HTTP 语义，把它映射成状态码是 Controller 的职责；
    * 而基础设施错误该由全局错误处理器统一兜底，在这里顺手转换只会丢掉原始类型。
+   *
+   * @param input - 已通过契约校验的新建/续聊请求 DTO；缺省 sessionId/agentId 的补齐由应用层负责。
+   * @param context - 认证与链路上下文；userId/signal/traceId 直接透传，本层不做归属判断。
+   * @returns 已启动的一次运行（含首帧 start 事件与句柄），由路由层投影为 SSE 帧流。
    */
   public async start(input: ChatRequestDto, context: ChatRequestContext): Promise<StartedChatRun> {
     try {
@@ -40,11 +44,27 @@ export class ChatController {
     }
   }
 
+  /**
+   * 按当前用户与 request_id 取消单个请求。取消是幂等的「尽力投递」：目标运行已结束也不报错，
+   * 因为调用方关心的是「别再继续」这一意图，而非目标当时是否仍在运行。
+   *
+   * @param userId - 当前登录用户，与 requestId 共同定位取消键，避免跨用户误取消。
+   * @param requestId - 要取消的运行标识（即首帧 start 事件里的 requestId）。
+   * @returns 固定成功文案的包装对象，由路由层套进响应信封。
+   */
   public async cancel(userId: string, requestId: string): Promise<{ readonly message: string }> {
     await this.#chat.cancel({ userId, requestId })
     return { message: '取消信号已发送' }
   }
 
+  /**
+   * 回答询问卡片：把用户提交的答案恢复成一次运行，走与新建对话同一条流式出口。
+   * 只翻译本层能理解的「交互不存在或已处理」为 409，其余错误原样上抛。
+   *
+   * @param input - 已校验的回答请求 DTO；session_id 与 interaction_id 必填。
+   * @param context - 认证与链路上下文，字段含义同 `start`。
+   * @returns 恢复出的运行（含首帧 start 事件与句柄），由路由层投影为 SSE 帧流。
+   */
   public async answer(
     input: AnswerRequestDto,
     context: ChatRequestContext

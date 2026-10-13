@@ -85,6 +85,7 @@ export type TaskRepositoryErrorCode =
 
 /** 仓储层异常。`code` 是机器判据，`message` 只供日志——对外文案由用例层重新给。 */
 export class TaskRepositoryError extends Error {
+  /** 机器可判定的失败分类；用例层据它决定映射与重试，不靠 message 文本。 */
   public readonly code: TaskRepositoryErrorCode
 
   public constructor(code: TaskRepositoryErrorCode, message: string, cause?: unknown) {

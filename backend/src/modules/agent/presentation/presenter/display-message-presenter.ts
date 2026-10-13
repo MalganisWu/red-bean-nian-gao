@@ -1,7 +1,11 @@
 import type { AgentJsonObject, AgentJsonValue } from '../../model/json-value.js'
 import type { DisplayMessage, MessageMeta } from '../model/display-message.js'
 
-/** 将 Agent 展示模型按稳定字段规则投影为可持久化 JSON；函数无状态且不持有外部资源。 */
+/**
+ * 将 Agent 展示模型按稳定字段规则投影为可持久化 JSON；函数无状态且不持有外部资源。
+ * @param message 产品展示消息；空 content / 空 source 与空 cards 等可选字段按规则省略，保证投影稳定
+ * @returns 可直接落库的 JSON 对象（键名沿用 snake_case）
+ */
 export function serializeDisplayMessage(message: DisplayMessage): AgentJsonObject {
   const payload: Record<string, AgentJsonValue> = { role: message.role }
   if (message.content !== undefined) payload['content'] = message.content

@@ -15,6 +15,13 @@ import { fromRuntimeMessages, toRuntimeMessages } from './runtime-message-mapper
  * 数据库里也不需要为 SDK 的内部字段建列。
  */
 export class RuntimeStateCodec implements RuntimeStateAppender {
+  /**
+   * 将追加的消息并入状态信封：无既有状态时造一个最小 Checkpoint，有则按消息键去重后合并，
+   * 避免恢复增量与主快照尾部重叠造成重复消息。
+   * @param state 既有运行时状态信封；undefined 表示本次运行尚无快照
+   * @param messages 待追加的产品消息；为空数组时原样返回 state（不产生无谓的重新序列化）
+   * @returns 追加后的新状态信封；无消息可加时返回原 state
+   */
   public appendMessages(
     state: StoredRuntimeState | undefined,
     messages: readonly AgentMessage[]
@@ -29,6 +36,8 @@ export class RuntimeStateCodec implements RuntimeStateAppender {
  * 两道检查各挡一类问题：**引擎名**挡住「拿另一个 SDK 的状态来解析」；
  * **版本号**挡住「升级 SDK 后解析旧 payload」——后者最危险，
  * 因为结构相似时解析不会报错，只会悄悄产生语义错乱的状态。宁可拒绝加载。
+ * @param state 业务侧状态信封（引擎名 + 版本 + 不透明 payload）
+ * @returns 校验通过后解析出的 qing-tuan Checkpoint
  */
 export function parseStoredRuntimeState(state: StoredRuntimeState): Checkpoint {
   if (state.engine !== 'qing-tuan') throw new Error('不支持的 Runtime 状态引擎')

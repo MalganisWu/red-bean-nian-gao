@@ -28,20 +28,25 @@ interface ChatMessagesProps {
   cardSubmission?: CardSubmissionState | null | undefined
 }
 
-/** 消息区：渲染历史与流式中的消息，并承载底部跟随滚动与错误重试入口。 */
-export function ChatMessages({
-  messages,
-  isStreaming,
-  streamingStartedAt,
-  sentAt,
-  error,
-  onDismissError,
-  onRetry,
-  pendingSections,
-  onCardConfirm,
-  onCardRefuse,
-  cardSubmission,
-}: ChatMessagesProps) {
+/**
+ * 消息区：渲染历史与流式中的消息，并承载底部跟随滚动与错误重试入口。
+ *
+ * @param props - 组件属性；字段语义见 `ChatMessagesProps`。
+ */
+export function ChatMessages(props: ChatMessagesProps) {
+  const {
+    messages,
+    isStreaming,
+    streamingStartedAt,
+    sentAt,
+    error,
+    onDismissError,
+    onRetry,
+    pendingSections,
+    onCardConfirm,
+    onCardRefuse,
+    cardSubmission,
+  } = props
   const scrollRef = useScrollAnchor(messages, pendingSections)
   const [currentNavId, setCurrentNavId] = useState<string | undefined>(undefined)
   const loadExecutionViewStates = useTaskStore((state) => state.loadExecutionViewStates)

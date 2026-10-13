@@ -67,14 +67,11 @@ function renderProcessCopy(content: string): ReactNode {
 /**
  * 一轮回复的单一过程轨道。思考、进展、工具、子任务和确认只按时间排序，
  * 不显示类型标签或步骤编号。等待确认时，即使收起历史步骤，确认节点仍常显。
+ *
+ * @param props - 组件属性；字段语义见 `ProcessFoldProps`。
  */
-export function ProcessFold({
-  steps,
-  status,
-  isStreaming,
-  totalDuration,
-  defaultExpanded,
-}: ProcessFoldProps) {
+export function ProcessFold(props: ProcessFoldProps) {
+  const { steps, status, isStreaming, totalDuration, defaultExpanded } = props
   const resolvedStatus = status ?? (isStreaming ? 'running' : 'completed')
   // 只在挂载时根据初始状态决定开合。awaiting/running 转为 completed 时保留
   // 当前展开状态，避免确认回答和刚追加的续跑步骤在 DONE 瞬间被自动收起。

@@ -58,6 +58,14 @@ export class DeliveryQueue implements TaskResultDeliveryPort {
     this.#now = now
   }
 
+  /**
+   * 把一次执行结果登记进会话的投递队列；条目以 `taskId:executionId` 去重。
+   *
+   * @param sessionId - 目标会话；空串表示无会话归属，静默跳过。
+   * @param taskId - 任务标识，与执行 ID 一起构成去重键。
+   * @param executionId - 执行记录标识，构成队列条目的另一半。
+   * @param signal - 取消信号，透传到队列存储。
+   */
   public async enqueue(
     sessionId: string,
     taskId: string,
@@ -68,6 +76,14 @@ export class DeliveryQueue implements TaskResultDeliveryPort {
     await this.#store.rightPush(queueKey(sessionId), entryKey(taskId, executionId), signal)
   }
 
+  /**
+   * 入队后立即对账并排空，是调度链投递结果的入口。
+   *
+   * @param sessionId - 目标会话。
+   * @param taskId - 任务标识，与执行 ID 一起构成去重键。
+   * @param executionId - 执行记录标识。
+   * @param signal - 取消信号，透传到入队、对账与排空三步。
+   */
   public async queueDeliverExecution(
     sessionId: string,
     taskId: string,
@@ -79,12 +95,24 @@ export class DeliveryQueue implements TaskResultDeliveryPort {
     await this.drain(sessionId, signal)
   }
 
+  /**
+   * 对账单会话：把库中尚未标记投递的执行补回队列，修复「落库成功但入队丢失」。
+   *
+   * @param sessionId - 目标会话；空串表示无会话归属，静默跳过。
+   * @param signal - 取消信号，透传到库查询与补入队。
+   */
   public async reconcile(sessionId: string, signal: AbortSignal): Promise<void> {
     if (sessionId === '') return
     const executions = await this.#executions.listUndeliveredExecutions(sessionId, signal)
     await this.#enqueueMissing(sessionId, executions, signal)
   }
 
+  /**
+   * 全量对账：扫出所有未投递执行，按会话分组补入队列后逐个排空。
+   * 无会话归属的执行记录无处投递，直接跳过。
+   *
+   * @param signal - 取消信号，透传到每个会话的对账与排空。
+   */
   public async reconcileAll(signal: AbortSignal): Promise<void> {
     const executions = await this.#executions.listUndeliveredExecutions('', signal)
     const bySession = new Map<string, AgentTaskExecution[]>()
@@ -112,6 +140,9 @@ export class DeliveryQueue implements TaskResultDeliveryPort {
    * 这条流程保证了任何时刻条目都在某一侧，不会两头都不在。
    * 失败时 `requeue` 放回，然后分两种：**会话有待处理交互**就安静退出（等下次 drain 再来），
    * 其余错误上抛（让调用方看到）。两种都是先放回再决定，顺序不能反。
+   *
+   * @param sessionId - 目标会话；空串表示无会话归属，静默跳过。
+   * @param signal - 取消信号，透传到队列存储与投递写入，抢到锁后贯穿整轮排空。
    */
   public async drain(sessionId: string, signal: AbortSignal): Promise<void> {
     if (sessionId === '') return

@@ -35,8 +35,11 @@ function reasonItemToSteps(item: ReasonItem): ProcessStep[] {
 
 /**
  * 兼容入口：ReasoningBlock 不再拥有独立视觉语言，而是归入统一 Process 轨道。
+ *
+ * @param props - 组件属性；字段语义见 `ReasoningBlockProps`。
  */
-export function ReasoningBlock({ items, isStreaming, defaultExpanded }: ReasoningBlockProps) {
+export function ReasoningBlock(props: ReasoningBlockProps) {
+  const { items, isStreaming, defaultExpanded } = props
   const steps = items.flatMap<ProcessStep>(reasonItemToSteps)
 
   return (

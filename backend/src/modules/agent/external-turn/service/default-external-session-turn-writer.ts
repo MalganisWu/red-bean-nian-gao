@@ -31,6 +31,14 @@ export class DefaultExternalSessionTurnWriter implements ExternalSessionTurnWrit
     this.#runtimeState = runtimeState
   }
 
+  /**
+   * 写入外部回合：优先沿用请求携带的 fencingToken，否则尝试获取 Session lease。
+   * 拿不到 lease 或会话仍有 pending 卡片时返回 `deferred`；externalId 已存在返回 `duplicate`；
+   * 正常写入返回 `written`。一次写入完整持有并释放 lease，避免并发回合互相覆盖。
+   * @param turn 外部回合数据，含 sessionId 与展示 / 运行时消息
+   * @param signal 中止信号，透传给仓储与锁
+   * @returns 写入结果：`written` / `deferred` / `duplicate`
+   */
   public async write(
     turn: ExternalSessionTurn,
     signal: AbortSignal

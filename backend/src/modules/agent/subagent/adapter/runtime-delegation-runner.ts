@@ -77,6 +77,10 @@ export class RuntimeChildRunner implements AgentChildRunner {
    * 保存放在 `finally` 是必要的：子运行失败或挂起时同样要留下执行记录，
    * 否则父 Agent 拿到的 `executionId` 指向一条不存在的记录，无法续跑也无从排障。
    * 保存用独立的 30s 超时信号——父运行的取消不该让这条记录丢失。
+   *
+   * @param request - 父 Agent 的委派请求；executionId 空串表示新建，非空且带 resume 表示续跑
+   * @param signal - 父运行的中止信号；与持久租约信号合流后驱动执行（租约丢失即取消）
+   * @returns 子运行结果；被取消时返回 cancelled 结果，其余执行错误抛出，正常路径按 outcome 状态返回
    */
   public async runChild(
     request: AgentChildRunRequest,

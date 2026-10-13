@@ -41,10 +41,22 @@ export class DisplayMessageCollector {
     this.#buildSections = options.buildSections
   }
 
+  /**
+   * 当前已收集的展示消息快照。
+   * 返回值经 `structuredClone` 深拷贝：调用方修改它不会影响收集器内部状态。
+   * @returns 展示消息的只读快照副本
+   */
   public get messages(): readonly DisplayMessage[] {
     return structuredClone(this.#messages)
   }
 
+  /**
+   * Runtime user 消息回调；触发时机为 Runtime 提交一条 user 消息时。
+   * 用 `context.sessionId` 标记 run 起点后转发给 collectMessage。
+   * @param context Runtime 回调上下文，提供本次运行的 sessionId
+   * @param message Runtime 提交的消息
+   * @param signal 中止信号；已中止则立即抛出
+   */
   public onUserMessage(
     context: PresentationContext,
     message: AgentMessage,
@@ -53,7 +65,12 @@ export class DisplayMessageCollector {
     return this.collectMessage(context.sessionId, message, signal)
   }
 
-  /** 供高层 Runtime Adapter 使用，避免业务层为了展示投影构造 RuntimeContext。 */
+  /**
+   * 供高层 Runtime Adapter 使用，避免业务层为了展示投影构造 RuntimeContext。
+   * @param sessionId 当前运行会话 ID；与上次不同即视为一次新运行的起点，刷新 runStartedAt
+   * @param message Runtime 提交的消息；仅非空 user 正文与无 toolCalls 的 assistant 正文会入列
+   * @param signal 中止信号；入口先 `throwIfAborted`，中止时不产生任何展示消息
+   */
   public collectMessage(
     sessionId: string,
     message: AgentMessage,
@@ -86,6 +103,13 @@ export class DisplayMessageCollector {
     return Promise.resolve()
   }
 
+  /**
+   * Runtime assistant 消息回调；触发时机为 Runtime 提交一条 assistant 消息时。
+   * 只有正文非空且不带 toolCalls 的才算「已完成的助手内容」，其余（工具轮次的协议结构）不入列。
+   * @param context Runtime 回调上下文，提供本次运行的 sessionId
+   * @param message Runtime 提交的 assistant 消息
+   * @param signal 中止信号；已中止则立即抛出
+   */
   public onAssistantMessage(
     context: PresentationContext,
     message: AgentMessage,
@@ -94,6 +118,13 @@ export class DisplayMessageCollector {
     return this.collectMessage(context.sessionId, message, signal)
   }
 
+  /**
+   * Runtime tool 消息回调；触发时机为 Runtime 提交一条 tool 消息时。
+   * tool 信封只保留在 LLM context，展示层不接收，因此这里只走统一的 run 起点标记。
+   * @param context Runtime 回调上下文，提供本次运行的 sessionId
+   * @param message Runtime 提交的 tool 消息
+   * @param signal 中止信号；已中止则立即抛出
+   */
   public onToolMessage(
     context: PresentationContext,
     message: AgentMessage,
@@ -102,6 +133,10 @@ export class DisplayMessageCollector {
     return this.collectMessage(context.sessionId, message, signal)
   }
 
+  /**
+   * 直接追加一条展示消息（深拷贝后入列），供中断卡片投影等非 Runtime 回调路径使用。
+   * @param message 待追加的展示消息；入列前 `structuredClone`，外部后续修改不影响内部
+   */
   public append(message: DisplayMessage): void {
     this.#messages.push(structuredClone(message))
   }

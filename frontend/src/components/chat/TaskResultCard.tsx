@@ -27,8 +27,13 @@ function nextRunLabel(task: Task): string {
   return formatDateTime(task.NextRunAt, '待调度')
 }
 
-/** 定时任务事件外壳：任务信息与执行结果独立折叠，正文继续复用普通 MessageCard。 */
-export function TaskResultCard({ message, isLatest = false }: TaskResultCardProps) {
+/**
+ * 定时任务事件外壳：任务信息与执行结果独立折叠，正文继续复用普通 MessageCard。
+ *
+ * @param props - 组件属性；字段语义见 `TaskResultCardProps`。
+ */
+export function TaskResultCard(props: TaskResultCardProps) {
+  const { message, isLatest = false } = props
   const meta = message.meta?.scheduled_task
   const executionID = meta?.execution_id ?? ''
   const [detailsExpanded, setDetailsExpanded] = useState(false)

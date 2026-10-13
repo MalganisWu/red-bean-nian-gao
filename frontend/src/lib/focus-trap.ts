@@ -11,7 +11,12 @@ export interface TabKeyEvent {
   preventDefault(): void
 }
 
-/** 把 Tab 键限制在容器内循环（模态框焦点圈定）；非 Tab 键或容器缺失时原样放行。 */
+/**
+ * 把 Tab 键限制在容器内循环（模态框焦点圈定）；非 Tab 键或容器缺失时原样放行。
+ *
+ * @param e - 键盘事件；仅拦截 Tab，其余键不改动默认行为。
+ * @param container - 焦点圈定的容器；为 null 或无可见可聚焦元素时不拦截。
+ */
 export function trapTabFocus(e: TabKeyEvent, container: HTMLElement | null): void {
   if (e.key !== 'Tab' || !container) return
   const focusables = Array.from(

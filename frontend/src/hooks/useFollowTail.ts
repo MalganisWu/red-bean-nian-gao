@@ -33,8 +33,12 @@ export interface FollowTail {
  * - 跟随意图存在 ref 里（滚动事件高频触发，不需要每次都重渲染）；
  * - 自动滚动的 effect 只做 DOM 写入、不做 setState（react-hooks 规则：effect 体内不同步 setState）；
  * - 暂停只在本轮流式内有效：active 翻假（流结束/切会话）即复位，下一轮流重新跟随。
+ *
+ * @param props - 跟随选项；active 是跟随生效期（false 时复位跟随意图），contentKey 引用变化即视为内容增长。
+ * @returns 需绑定到滚动容器的 containerRef 与 onScroll 处理器。
  */
-export function useFollowTail({ active, contentKey }: FollowTailOptions): FollowTail {
+export function useFollowTail(props: FollowTailOptions): FollowTail {
+  const { active, contentKey } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const followRef = useRef(true)
 

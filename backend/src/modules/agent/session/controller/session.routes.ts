@@ -16,6 +16,10 @@ import { parseSessionId, parseSessionPagination } from './session-request-parser
 /**
  * 路由文件承载端点、认证策略、请求解包与成功信封；
  * Controller 保持与 Fastify 解耦的用例签名（入参标量 + 返回 DTO），此处不内联任何 Schema/serializer。
+ *
+ * @param server - 目标 Fastify 实例，路由就地注册到它上面，无返回值供调用方串联。
+ * @param controller - 会话查询控制器；本函数只接线，不持有其生命周期。
+ * @param authenticate - 认证前置钩子，两条路由都必须挂上，缺失即等同于开放访问。
  */
 export function registerSessionRoutes(
   server: FastifyInstance,

@@ -10,7 +10,16 @@ export interface StorageModule {
   readonly health: StorageHealthPort
 }
 
-/** 创建并初始化 Storage Module；Bucket 生命周期由该模块拥有。 */
+/**
+ * 创建并初始化 Storage Module；Bucket 生命周期由该模块拥有。
+ *
+ * 是 Module 内实现选择的事实来源：跨 Module 只暴露用例服务与健康 Port，MinIO 具体类不外泄。
+ * 组装即触发一次 bucket 就绪检查，因此本函数是异步的，且失败会让启动失败。
+ *
+ * @param config - `config.minio` 段；凭据等敏感字段只在此透传，不落日志
+ * @param signal - 启动期取消信号，透传给 bucket 就绪检查
+ * @returns 对象用例服务与健康探针
+ */
 export async function createStorageModule(
   config: AppConfig['minio'],
   signal: AbortSignal

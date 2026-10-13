@@ -37,6 +37,16 @@ export class DefaultSessionQueryService {
     this.#repository = repository
   }
 
+  /**
+   * 按用户列出会话摘要。
+   *
+   * 结果条数恰好等于请求的 limit 时才给出下一页游标——少一条就说明后面没有了，
+   * 此时给游标会让调用方多发一次注定为空的请求。
+   *
+   * @param query - 列表查询入参；`cursor` 空串表示首页。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 本页摘要与下一页游标，末页时游标为空串。
+   */
   public async list(query: ListSessionsQuery, signal: AbortSignal): Promise<SessionQueryPage> {
     const sessions = await this.#repository.listByUser(
       query.userId,
@@ -52,6 +62,16 @@ export class DefaultSessionQueryService {
     }
   }
 
+  /**
+   * 读取单个会话聚合。
+   *
+   * 把仓储的 `NOT_FOUND` 翻译成语用层的 `SessionNotFoundError`：越权与不存在在仓储层
+   * 已是同一条错误，这里保持同一分支，Controller 才好统一映射成 404。
+   *
+   * @param query - 详情查询入参，必须同时带 `sessionId` 与 `userId`。
+   * @param signal - 取消信号，透传到仓储。
+   * @returns 目标会话聚合；不存在或不属于该用户时抛 `SessionNotFoundError`。
+   */
   public async detail(query: GetSessionQuery, signal: AbortSignal): Promise<Session> {
     try {
       return await this.#repository.getById(query.sessionId, query.userId, signal)

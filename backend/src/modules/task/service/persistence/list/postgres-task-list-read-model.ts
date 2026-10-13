@@ -18,6 +18,15 @@ export class PostgresTaskListReadModel implements TaskListRepository {
     this.#database = database
   }
 
+  /**
+   * 按用户分页列出任务列表项；会话标题与最近执行摘要由 SQL 一次取回，避免 N+1。
+   *
+   * @param userId - 任务所有者，直接进 `WHERE` 谓词。
+   * @param cursor - 上一页末条的编码游标；空串或畸形游标退化为取首页。
+   * @param limit - 本页最大条数；非正数在此即抛错。
+   * @param signal - 取消信号，透传到库查询。
+   * @returns 本页列表项与下一页游标。
+   */
   public async listItemsByUser(
     userId: string,
     cursor: string,
@@ -66,6 +75,14 @@ export class PostgresTaskListReadModel implements TaskListRepository {
     }
   }
 
+  /**
+   * 列出某会话下的任务列表项；同时按用户过滤，越权会话得到空列表。
+   *
+   * @param sessionId - 目标会话标识。
+   * @param userId - 任务所有者，用于归属过滤。
+   * @param signal - 取消信号，透传到库查询。
+   * @returns 该会话的列表项，按创建时间倒序。
+   */
   public async listItemsBySession(
     sessionId: string,
     userId: string,

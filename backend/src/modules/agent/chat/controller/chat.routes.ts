@@ -29,6 +29,10 @@ import { streamFrames } from './chat-stream.js'
  * 端点执行链路（Fastify 生命周期，自左向右）：onRequest(全局 Abort+CORS+trace)
  * → preHandler auth → handler zod 校验 → Controller 业务 → SSE 帧流 / 成功信封；
  * 错误由全局 setErrorHandler 统一输出。各端点差异见下方链路指纹注释。
+ *
+ * @param server - 目标 Fastify 实例，三条路由就地注册到它上面。
+ * @param controller - Chat 用例控制器；本函数只接线，不持有其生命周期。
+ * @param authenticate - 认证前置钩子，三条路由都必须挂上，缺失即等同于开放访问。
  */
 export function registerChatRoutes(
   server: FastifyInstance,

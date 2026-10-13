@@ -45,6 +45,16 @@ export class IdentityRegistrationService {
     this.#now = options.now ?? ((): Date => new Date())
   }
 
+  /**
+   * 注册新用户：先做唯一性预检查，再散列密码并写库。
+   *
+   * 预检查只优化常见失败文案，数据库唯一约束才是并发注册的最终边界；撞约束时翻译为
+   * CONFLICT 用例错误，调用方据此回 409。
+   *
+   * @param command - 注册命令；`password` 仍为明文，仅在本方法内交给散列器，不落库也不外泄
+   * @param signal - 请求生命周期绑定的取消信号，透传给仓储与散列过程
+   * @returns 组装完成的领域用户实体，`passwordHash` 已是散列值
+   */
   public async register(command: RegisterIdentityCommand, signal: AbortSignal): Promise<User> {
     // 预检查只优化常见失败文案；数据库唯一约束才是并发注册的最终一致性边界。
     await this.#assertUnique(command, signal)

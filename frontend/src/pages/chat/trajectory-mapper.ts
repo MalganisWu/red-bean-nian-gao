@@ -21,7 +21,12 @@ import type {
  * 契约类型不得直接进组件；所有时间格式化集中在本模块。
  */
 
-/** epoch 毫秒 → HH:MM:SS。 */
+/**
+ * epoch 毫秒 → HH:MM:SS。
+ *
+ * @param ms - epoch 毫秒时间戳。
+ * @returns 本地时区的 `HH:MM:SS` 展示字符串。
+ */
 export function formatEpochToClock(ms: number): string {
   const d = new Date(ms)
   const p = (n: number) => String(n).padStart(2, '0')
@@ -96,7 +101,12 @@ export interface SessionTrajectoryView {
   readonly spanMs: number
 }
 
-/** 会话轨迹响应 → 组件可直接消费的视图模型。 */
+/**
+ * 会话轨迹响应 → 组件可直接消费的视图模型。
+ *
+ * @param dto - 后端会话轨迹响应；时间字段为 epoch 毫秒。
+ * @returns 视图模型；所有时间已转成 `HH:MM:SS`，可选字段缺失时不产出对应键。
+ */
 export function mapSessionTrajectory(dto: SessionTrajectoryDto): SessionTrajectoryView {
   return {
     sessionId: dto.sessionId,

@@ -117,20 +117,45 @@ export class LoggerContext {
     this.#defaultLogger = defaultLogger
   }
 
+  /**
+   * 取出当前执行上下文绑定的 logger。
+   * 绑定只在 `run` 的回调期间存在：进入回调时绑定、回调返回（同步返回或 Promise 落定）
+   * 后自动解绑；在这之外调用拿到的是默认 logger，因此后台任务与测试不会意外继承
+   * 某个请求的字段。
+   * @returns 当前上下文的 logger；未处于任何 `run` 上下文时为默认 logger
+   */
   public current(): Logger {
     return this.#storage.getStore() ?? this.#defaultLogger
   }
 
+  /**
+   * 在指定 logger 的上下文中执行回调，绑定随回调的作用域自动生效与失效。
+   * 绑定是异步安全的：回调内部（含 await 之后恢复的部分）派生的异步任务继续看到同一个
+   * logger，而并发执行的其他上下文互不可见——这正是请求级字段不串号的原因。
+   * 嵌套调用时内层 logger 覆盖外层，回调结束即恢复外层。
+   * @param logger - 该上下文内 `current()` 返回的实例
+   * @param operation - 回调；其返回值与同步抛出都原样透传，不做包装
+   * @returns 回调的返回值
+   */
   public run<TValue>(logger: Logger, operation: () => TValue): TValue {
     return this.#storage.run(logger, operation)
   }
 
+  /**
+   * 替换上下文之外的兜底 logger，通常在组装期把根 logger 换成带进程级字段的版本。
+   * 它不影响任何已经开始的 `run` 上下文，只决定此后 `current()` 在无绑定时的返回值。
+   * @param logger - 新的默认 logger，覆盖构造时传入的那个
+   */
   public setDefault(logger: Logger): void {
     this.#defaultLogger = logger
   }
 }
 
-/** 造一个根 logger；请求级字段一律经 `child` 派生，避免并发请求互相污染。 */
+/**
+ * 造一个根 logger；请求级字段一律经 `child` 派生，避免并发请求互相污染。
+ * @param options - 构造选项；`format` 非 `json` 一律按 `text` 处理，`level` 无法识别时退回 `info`
+ * @returns 已按选项定级的 logger；它自身不带任何字段，字段靠 `child` 逐层叠加
+ */
 export function createLogger(options: LoggerOptions): Logger {
   return new StructuredLogger(options)
 }
@@ -140,6 +165,8 @@ export function createLogger(options: LoggerOptions): Logger {
  * 刻意不抛错：一个拼错的 LOG_LEVEL 不该让服务起不来；但也不能悄悄变成 `debug`
  * （那会在生产环境刷出大量日志），所以收口到中间的 `info`。
  * 顺带接受 `warning` 这个常见别名。
+ * @param value - 配置或环境变量里的级别文本，大小写与前后空白都会归一化
+ * @returns 归一化后的级别；任何无法识别的输入都收敛为 `info`，绝不抛错
  */
 export function parseLogLevel(value: string): LogLevel {
   const normalized = value.trim().toLowerCase()

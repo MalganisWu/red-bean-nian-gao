@@ -49,10 +49,17 @@ export class RevisionHeartbeatLease implements ChildExecutionLease {
     this.#schedule()
   }
 
+  /**
+   * 租约的中止信号；aborted 即为失去所有权（续租失败或租期到期）。
+   * 调用方应在保存前据此放弃写入，避免覆盖已接管实例的结果。
+   *
+   * @returns 持续持有则保持未中止，失去所有权时被 abort
+   */
   public get signal(): AbortSignal {
     return this.#controller.signal
   }
 
+  /** 释放租约：清除两个定时器并标记已释放，之后既不续租也不再中止。 */
   public release(): void {
     this.#released = true
     clearTimeout(this.#heartbeatTimer)

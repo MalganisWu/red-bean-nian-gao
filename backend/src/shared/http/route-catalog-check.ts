@@ -15,6 +15,9 @@ export interface RouteCatalogChecker {
  * - 目录有、实际无 → 端点漏注册；
  * - 实际有、目录无 → 存在绕过 bindRoute 的裸注册（路径/参数语法不一致同样暴露）。
  * 认证方向的钩子一致性由 `bindRoute` 的启动断言负责，本检查只对账 method+path。
+ * @param server - 目标 Fastify 实例；本函数会先注册收集钩子。
+ * @param expected - 期望的契约目录，缺省取 `API_ROUTES`。
+ * @returns 对账句柄；在全部路由注册完成后调用其 `verify()`。
  */
 export function routeCatalogChecker(
   server: FastifyInstance,
@@ -48,7 +51,10 @@ export function routeCatalogChecker(
   }
 }
 
-/** 校验已注册完成的服务器：便捷入口，等价于"先收集、后 verify"。 */
+/**
+ * 校验已注册完成的服务器：便捷入口，等价于"先收集、后 verify"。
+ * @param server - 已完成路由注册的 Fastify 实例。
+ */
 export function verifyRouteCatalog(server: FastifyInstance): void {
   routeCatalogChecker(server).verify()
 }

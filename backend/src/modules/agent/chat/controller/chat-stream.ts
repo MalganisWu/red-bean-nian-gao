@@ -24,6 +24,17 @@ const STREAM_STEP_KINDS = Object.freeze({
  * - **心跳**：模型长时间不吐字时靠它维持连接（网关通常会掐掉静默连接）。
  * - **收尾归属**：`finally` 里按「断连信号是否已触发」区分 `client_disconnected` 与 `consumer_closed`，
  *   这个区别会进终态记录，用于分辨「用户关掉了页面」和「服务端主动结束」。
+ *
+ * 事件序列契约：首帧恒为 `start`；随后按上游事件顺序发帧，相邻且同 `step` 的 reason 帧在此合并；
+ * 模型静默超过 `heartbeatMilliseconds` 时插入心跳帧，仅用于保活、不代表业务进展；
+ * 上游迭代结束后不再补帧。断连与收尾由 `finally` 承担——先归还上游迭代器，再无条件关闭句柄。
+ *
+ * @param handle - 运行句柄，提供事件迭代器与收尾用的 `close`；帧流结束时由本函数负责关闭。
+ * @param start - 首帧 `start` 事件，携带 requestId/sessionId/traceId，让前端先拿到运行标识。
+ * @param disconnectSignal - 客户端断连信号；一旦触发即停止发帧，并按 `client_disconnected` 收尾。
+ * @param heartbeatMilliseconds - 静默多少毫秒后补一帧心跳；取值应小于网关的空闲连接超时。
+ * @param now - 心跳时间戳的取时函数，默认 `Date.now`，测试可注入固定时钟。
+ * @returns 逐帧 SSE 文本的异步生成器；顺序为 start → 事件（含合并后的 reason 与心跳）→ 终态。
  */
 export async function* streamFrames(
   handle: ChatRunHandle,

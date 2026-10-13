@@ -6,7 +6,14 @@ interface InfiniteScrollControls {
   handleScroll: UIEventHandler<HTMLDivElement>
 }
 
-/** 滚动到底部（剩余 <50px）时触发 loadMore（TasksPage / SessionSidebar 共用） */
+/**
+ * 滚动到底部（剩余 <50px）时触发 loadMore（TasksPage / SessionSidebar 共用）
+ *
+ * @param loadMore - 触底时的加载回调；是否重复触发由 hasMore / loading 共同拦截，调用方无需自行防抖。
+ * @param hasMore - 是否还有下一页；为 false 时触底不再回调。
+ * @param loading - 是否正在加载；为 true 时抑制触底回调，避免同一次滚动并发发起多页请求。
+ * @returns 列表容器 ref 与 onScroll 处理器。
+ */
 export function useInfiniteScroll(
   loadMore: () => void,
   hasMore: boolean,

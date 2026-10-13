@@ -463,6 +463,12 @@ export class PostgresMigrator implements MigrationRunnerPort {
     this.#migrations = validateCatalog(migrations)
   }
 
+  /**
+   * 建立迁移历史表（幂等，`CREATE TABLE IF NOT EXISTS`），让后续读写历史有表可依。
+   * 这是 `status` / `up` / `down` 的共同前置：它们各自先调用本方法，而不是假设调用方已经建过表。
+   * 失败时统一包装成 `initialize migrations` 前缀的错误，便于区分「建表失败」与后续步骤的失败。
+   * @param signal - 取消信号，透传给底层查询
+   */
   public async initialize(signal: AbortSignal): Promise<void> {
     try {
       await this.#database.query(
@@ -480,6 +486,14 @@ export class PostgresMigrator implements MigrationRunnerPort {
     }
   }
 
+  /**
+   * 列出冻结目录中每条迁移的当前状态，供 CLI 与健康检查展示。
+   * 只读：它不会执行任何 DDL 或写入历史表，因此可以安全地在启动前重复调用。
+   * 输出顺序恒等于目录定义顺序，与数据库里的历史行序无关。
+   * 读取到与实际目录不符的历史时会抛错——这表示各环境的 schema 已经分叉，必须人工介入。
+   * @param signal - 取消信号，透传给底层查询
+   * @returns 每条目录迁移的状态；未在历史中出现过的条目为 `pending`
+   */
   public async status(signal: AbortSignal): Promise<readonly MigrationStatus[]> {
     await this.initialize(signal)
     const applied = await this.#loadApplied(this.#database, signal)
@@ -491,6 +505,13 @@ export class PostgresMigrator implements MigrationRunnerPort {
     )
   }
 
+  /**
+   * 应用所有尚未执行的迁移，整体在一个事务里完成。
+   * 事务内**先取 advisory lock 再读历史**，两个实例并发启动时因此不会各自算出同一批 pending 并重复执行；
+   * 任一条语句失败都会回滚整个事务，不会留下「跑了一半」的 schema。
+   * @param signal - 取消信号，透传给事务内的所有查询
+   * @returns 本次应用的批次；没有 pending 时返回 `groupId` 为 0、`migrationNames` 为空的空批次
+   */
   public async up(signal: AbortSignal): Promise<MigrationGroup> {
     await this.initialize(signal)
     /*
@@ -532,6 +553,8 @@ export class PostgresMigrator implements MigrationRunnerPort {
    * 回滚**最近一个分组**，且按定义顺序的逆序执行。
    * 逆序是必须的：后面的 migration 可能依赖前面建的表/列，正序回滚会先删掉依赖方。
    * `toReversed()` 不改原数组——冻结目录必须保持原样。
+   * @param signal - 取消信号，透传给事务内的所有查询
+   * @returns 本次回滚的批次；历史为空时返回 `groupId` 为 0、`migrationNames` 为空的空批次
    */
   public async down(signal: AbortSignal): Promise<MigrationGroup> {
     await this.initialize(signal)

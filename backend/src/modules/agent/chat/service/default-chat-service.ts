@@ -56,7 +56,12 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
     this.#idGenerator = options.idGenerator
   }
 
-  /** 发起新一轮对话。前置要求：会话需有本轮 user 消息（否则拒绝）；缺省 sessionId/agentId 补默认值。 */
+  /**
+   * 发起新一轮对话。前置要求：会话需有本轮 user 消息（否则拒绝）；缺省 sessionId/agentId 补默认值。
+   *
+   * @param command - 发起命令；messages 必须含本轮 user 消息，另有 userId 决定取消键与归属。
+   * @returns 启动后的运行句柄与首帧 start 事件；启动中登记进 `#startingRuns` 以便停机排空。
+   */
   public start(command: StartChatCommand): Promise<StartedChatRun> {
     const messages = selectMessagesForTurn(command.messages, command.sessionId)
     if (messages.length === 0) {
@@ -65,12 +70,21 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
     return this.#trackStart(this.#startRun(this.#newRunInput(command, messages)))
   }
 
-  /** 回答询问卡片：把答案包装为 AnswerMarker 走 resume 语义；回答路径不携带新消息。 */
+  /**
+   * 回答询问卡片：把答案包装为 AnswerMarker 走 resume 语义；回答路径不携带新消息。
+   *
+   * @param command - 回答命令；interactionId 必填，answers 缺省视为空对象、refused 缺省视为否。
+   * @returns 恢复出的运行句柄与首帧 start 事件，与 `start` 共用同一套登记与清理。
+   */
   public answer(command: AnswerChatCommand): Promise<StartedChatRun> {
     return this.#trackStart(this.#startRun(this.#resumeRunInput(command)))
   }
 
-  /** 取消单个请求：走取消注册表（按 userId+requestId），不作用于整个会话。 */
+  /**
+   * 取消单个请求：走取消注册表（按 userId+requestId），不作用于整个会话。
+   *
+   * @param command - 取消命令；userId 与 requestId 共同构成取消键，缺一不可定位目标运行。
+   */
   public async cancel(command: CancelChatCommand): Promise<void> {
     await this.#cancelRegistry.cancel(cancelRegistryKey(command.userId, command.requestId))
   }
@@ -85,6 +99,8 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
    *
    * 中止信号是内部 `#shutdownController`，不是调用方传进来的：后者只用来限制**等待时长**，
    * 不该决定「哪些运行要停」。
+   *
+   * @param signal - 调用方的等待上限信号；只约束本方法等多久，不决定要停哪些运行，已中止则立即抛出。
    */
   public async shutdown(signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
@@ -213,13 +229,23 @@ export class DefaultChatService implements ChatUseCasePort, ChatRunLifecyclePort
   }
 }
 
-/** 取消键 = 用户 + 请求；带上 userId 是为了让不同用户的同 requestId 不会互相取消。 */
+/**
+ * 取消键 = 用户 + 请求；带上 userId 是为了让不同用户的同 requestId 不会互相取消。
+ *
+ * @param userId - 发起该请求的用户标识，保证取消作用域不跨用户。
+ * @param requestId - 运行标识（首帧 start 事件的 requestId），同一用户内唯一。
+ * @returns 注册表使用的取消键字符串，注册与注销两处必须用同一算法生成。
+ */
 export function cancelRegistryKey(userId: string, requestId: string): string {
   return `${userId}:${requestId}`
 }
 
 /**
  * 新会话保留完整种子消息；已有会话只接受本轮最后一条用户消息，避免客户端重复提交历史。
+ *
+ * @param messages - 客户端提交的完整消息列表，可能夹带历史轮次。
+ * @param sessionId - 已有会话标识；缺省表示新会话，此时整份种子原样透传。
+ * @returns 该轮真正要落库的消息数组；已有会话无 user 消息时返回空数组，由调用方判空拒绝。
  */
 export function selectMessagesForTurn(
   messages: StartChatCommand['messages'],

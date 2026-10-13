@@ -61,6 +61,10 @@ export class SessionLifecycle implements SessionRunServicePort {
   /**
    * 加载会话运行状态：拿锁 → 恢复/创建会话 → 推进 fencing → 组装恢复消息与 resume 参数。
    * 失败语义：锁冲突/交互冲突抛用户可读错误；任何失败都会释放已取得的锁。
+   *
+   * @param request - 本次运行的入参（会话、用户、checkpoint 与待写入消息），决定加载与恢复的基准。
+   * @param signal - 取消信号，透传到取锁、仓储与缓冲。
+   * @returns 组装好的运行状态；含恢复消息、resume 参数与锁句柄，调用方负责在 `save` 后释放。
    */
   public async load(request: SessionLoadRequest, signal: AbortSignal): Promise<SessionRunState> {
     const lock = await this.#acquire(request, signal)
@@ -136,6 +140,10 @@ export class SessionLifecycle implements SessionRunServicePort {
   /**
    * 保存一次运行的结果。lease 已丢失时拒绝持久化（写入资格已失效，落库会破坏 fencing 语义）；
    * 执行成功走完成路径，否则走恢复路径；无论成败都释放锁。
+   *
+   * @param state - `load` 产出的运行状态，携带 checkpoint 基准 revision 与锁句柄。
+   * @param outcome - 本次执行的结果；`executionError` 有无决定走完成还是恢复路径。
+   * @param signal - 取消信号，透传到仓储与缓冲。
    */
   public async save(
     state: SessionRunState,

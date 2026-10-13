@@ -45,8 +45,11 @@ function waveWidth(distance: number): number {
  * 轮次导航边沟：每一轮用户消息一根小横杠，垂直居中于轨道。
  * 悬停或键盘聚焦出摘要卡（fixed，不抢交互），点击回调 onSelect（滚动定位由调用方做）。
  * 纯展示组件：数据派生与锚点跳转都在调用方。
+ *
+ * @param props - 组件属性；字段语义见 `RoundNavProps`。
  */
-export function RoundNav({ entries, currentId, onSelect }: RoundNavProps) {
+export function RoundNav(props: RoundNavProps) {
+  const { entries, currentId, onSelect } = props
   const [hover, setHover] = useState<HoverState | null>(null)
   const [wavePosition, setWavePosition] = useState<number | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)

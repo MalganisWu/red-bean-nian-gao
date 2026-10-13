@@ -43,6 +43,11 @@ export class SectionCollector implements ChildSectionCollector, SectionEventColl
     this.#now = now
   }
 
+  /**
+   * 消费一个中性运行时事件并更新 section 时间线。
+   * 收到与当前缓冲不同类的事件时先 flush 当前类，让「边想边调工具边说」的交错顺序原样保留。
+   * @param event 发往 SSE 的同一批中性事件之一；status / compaction 不产生 section，直接返回
+   */
   public collect(event: AgentRuntimeEvent): void {
     switch (event.type) {
       case 'reason': {
@@ -92,7 +97,10 @@ export class SectionCollector implements ChildSectionCollector, SectionEventColl
     }
   }
 
-  /** 取快照前必须把三个缓冲全部 flush，否则最后一段内容会留在缓冲里丢失。 */
+  /**
+   * 取快照前必须把三个缓冲全部 flush，否则最后一段内容会留在缓冲里丢失。
+   * @returns 已 flush 完成的 section 时间线深拷贝，可供持久化或 SSE 投影
+   */
   public build(): AgentJsonValue {
     this.#flushReason()
     this.#flushContent()

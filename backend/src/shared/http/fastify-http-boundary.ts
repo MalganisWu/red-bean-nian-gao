@@ -105,6 +105,8 @@ const NEVER_ABORTED_SIGNAL = new AbortController().signal
  *
  * fail-closed 点：认证配置缺失在启动期失败（bindRoute 断言）；错误信封不泄漏内部信息；
  * body 超限提前拒绝；CORS 仅放行配置白名单。
+ * @param options - 建 server 的选项；除 `idGenerator` 外均可注入，便于测试替换 tracer、trace 提取器与 CORS 白名单。
+ * @returns 已挂好钩子与错误处理的 Fastify 实例，尚未开始监听。
  */
 export function createHttpServer(options: HttpServerOptions): FastifyInstance {
   const jsonBodyLimit = positiveInteger(options.jsonBodyLimit, DEFAULT_JSON_BODY_LIMIT)
@@ -316,12 +318,20 @@ function handleRequestError(
   void reply.status(response.status).send(response.body)
 }
 
-/** 取本次请求的 trace ID；请求没走到 trace hook 时返回空串。 */
+/**
+ * 取本次请求的 trace ID；请求没走到 trace hook 时返回空串。
+ * @param request - 当前 Fastify 请求。
+ * @returns 本次请求的 trace ID；未走到 trace hook 时为空串。
+ */
 export function requestTraceId(request: FastifyRequest): string {
   return requestTraceIds.get(request) ?? ''
 }
 
-/** 取本次请求的取消信号；无控制器时返回永不中止的兜底信号，调用方因此不必判空。 */
+/**
+ * 取本次请求的取消信号；无控制器时返回永不中止的兜底信号，调用方因此不必判空。
+ * @param request - 当前 Fastify 请求。
+ * @returns 本次请求的取消信号；无控制器时为永不中止的兜底信号。
+ */
 export function requestAbortSignal(request: FastifyRequest): AbortSignal {
   return requestAbortControllers.get(request)?.signal ?? NEVER_ABORTED_SIGNAL
 }
@@ -344,6 +354,10 @@ export class FixedWindowRateLimiter {
     this.#lastCleanup = this.#now()
   }
 
+  /**
+   * 生成限流 preHandler 钩子：按客户端 IP 判定配额，超限时写 `retry-after` 并抛 429。
+   * @returns 绑定到本实例配额的 Fastify 异步 preHandler 钩子。
+   */
   public preHandler(): preHandlerAsyncHookHandler {
     /** 按客户端 IP 判定配额；超限时写 `retry-after` 并抛 429。 */
     const rateLimitGuard = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {

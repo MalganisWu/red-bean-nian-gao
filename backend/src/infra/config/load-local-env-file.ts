@@ -7,6 +7,7 @@ import { config as loadDotenv } from 'dotenv'
  *   这也是生产可以不提供该文件的原因。
  * - **文件不存在即无操作**：生产与纯环境变量运行都不需要它，缺失不是错误。
  * - 只在**进程入口**调用：`config.ts` 保持「读 YAML + 读传入 environment」的纯职责，测试不触碰真实文件。
+ * @param directory - 存放 `.env.local` 的目录，通常传后端的运行根目录；文件不存在时静默跳过
  */
 export function loadLocalEnvFile(directory: string): void {
   loadDotenv({ path: `${directory}/.env.local`, override: false, quiet: true })

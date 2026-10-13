@@ -33,6 +33,9 @@ export interface TrajectoryDegradationLogger {
  *
  * 降级语义：审计视图不因脏数据整页报错——事实日志不可读（历史脏数据 / 未来版本记录，R9
  * 拒绝重放）时整体回退 G0 投影并记录诊断；基础设施故障照常上抛。
+ *
+ * 数据源选择：有 run 记录走事实投影，无记录或事实不可读回退展示消息投影，
+ * 两条路径产出的 `SessionTrajectory` 形状一致，调用方无需分支。
  */
 export class DefaultTrajectoryService {
   readonly #sessions: SessionRepository
@@ -52,7 +55,14 @@ export class DefaultTrajectoryService {
     this.#logger = logger
   }
 
-  /** 读取会话轨迹；会话不存在抛 SessionNotFoundError（Controller 映射为 404）。 */
+  /**
+   * 读取会话轨迹；会话不存在抛 SessionNotFoundError（Controller 映射为 404）。
+   * 会话存在但事实日志不可读时降级为展示消息投影，不整页报错。
+   *
+   * @param query - 查询条件；userId 参与归属校验，越权与不存在收敛为同一 404。
+   * @param signal - 请求取消信号，串行透传给会话、事实与子执行三处仓储。
+   * @returns 会话轨迹；投影口径随数据源不同，但字段形状对调用方保持一致。
+   */
   public async get(query: GetTrajectoryQuery, signal: AbortSignal): Promise<SessionTrajectory> {
     let session
     try {

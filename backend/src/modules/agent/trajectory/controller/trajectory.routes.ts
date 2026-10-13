@@ -23,6 +23,10 @@ function parseTrajectorySessionId(value: unknown): string {
 /**
  * 轨迹路由承载端点、认证策略、请求解包与成功信封；
  * Controller 保持与 Fastify 解耦的用例签名，此处不内联任何 Schema/serializer。
+ *
+ * @param server - 目标 Fastify 实例，路由就地注册到它上面。
+ * @param controller - 轨迹查询控制器；本函数只接线，不持有其生命周期。
+ * @param authenticate - 认证前置钩子，必须挂上，缺失即等同于开放访问。
  */
 export function registerTrajectoryRoutes(
   server: FastifyInstance,

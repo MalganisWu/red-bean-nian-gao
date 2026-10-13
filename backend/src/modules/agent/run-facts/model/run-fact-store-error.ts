@@ -13,6 +13,7 @@ export type RunFactStoreErrorCode =
 
 /** facts / run 行的校验失败；只用于信任边界上的「读不懂」，基础设施故障不要套用这个类型。 */
 export class RunFactStoreError extends Error {
+  /** 校验失败码；调用方据此区分「读不懂记录」与基础设施故障。 */
   public readonly code: RunFactStoreErrorCode
 
   public constructor(code: RunFactStoreErrorCode, message: string, options?: { cause?: unknown }) {

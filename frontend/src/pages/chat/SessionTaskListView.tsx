@@ -16,12 +16,13 @@ interface SessionTaskListViewProps {
   onSelectExecution: (taskId: string, executionId: string) => void
 }
 
-/** 会话内的任务列表视图；支持按生命周期筛选，并可进入任务详情或某次执行。 */
-export function SessionTaskListView({
-  onBack,
-  onSelectTask,
-  onSelectExecution,
-}: SessionTaskListViewProps) {
+/**
+ * 会话内的任务列表视图；支持按生命周期筛选，并可进入任务详情或某次执行。
+ *
+ * @param props - 组件属性；字段语义见 `SessionTaskListViewProps`。
+ */
+export function SessionTaskListView(props: SessionTaskListViewProps) {
+  const { onBack, onSelectTask, onSelectExecution } = props
   const [filter, setFilter] = useState<ScheduledTaskFilter>('all')
   const activeSessionId = useChatStore((state) => state.activeSessionId)
   const sessionTasks = useTaskStore((state) => state.sessionTasks)

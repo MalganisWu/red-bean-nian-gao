@@ -63,6 +63,10 @@ export interface AgentModule extends AgentTaskCapabilities {
 /**
  * 先创建 Agent 的无环核心。Task 依赖这些能力创建调度与投递，再由 createAgentModule
  * 把 Task 提供的结果投递 Port 接回普通对话；Agent 不感知 Task 内部实现。
+ *
+ * @param options - 本 Module 需要的全部基础设施与 Registry；构造完成后不再替换，
+ *   因此组装期一旦封闭就不能再追加 Provider。
+ * @returns 只含 Agent 自身能力的核心对象，尚未接回 Task 的投递 Port。
  */
 export function createAgentModuleCore(options: {
   readonly database: SqlExecutor
@@ -156,7 +160,14 @@ export function createAgentModuleCore(options: {
   }
 }
 
-/** 完成 Agent Module 的用例组装，并向 Composition Root 返回 HTTP 层所需的入站 Port。 */
+/**
+ * 完成 Agent Module 的用例组装，并向 Composition Root 返回 HTTP 层所需的入站 Port。
+ *
+ * @param core - createAgentModuleCore 产出的无环核心；本函数只补齐跨 Module 的投递能力。
+ * @param deliveryQueue - Task 提供的子执行结果投递 Port；由 Composition Root 接线，Agent 不感知其实现。
+ * @param idGenerator - 进程级 ID 生成器；与 core 分开传入是因为它不属于 Agent 的领域能力。
+ * @returns 组装完成的 Agent Module，公开 HTTP 层所需的入站 Port。
+ */
 export function createAgentModule(
   core: AgentModuleCore,
   deliveryQueue: TaskResultDeliveryPort,

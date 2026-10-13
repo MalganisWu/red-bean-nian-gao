@@ -62,7 +62,11 @@ function mountPreviewToasts(): () => void {
   return clearPreviewToasts
 }
 
-/** 「通知」组件页：三种语义的通知示例，固定 id 便于重复预览。 */
+/**
+ * 「通知」组件页：三种语义的通知示例，固定 id 便于重复预览。
+ *
+ * @returns 该组件页渲染出的元素。
+ */
 export function ToastPage(): React.ReactElement {
   useEffect(mountPreviewToasts, [])
 

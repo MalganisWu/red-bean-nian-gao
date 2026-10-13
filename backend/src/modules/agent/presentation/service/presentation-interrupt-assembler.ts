@@ -36,13 +36,21 @@ export class PresentationInterruptAssembler {
     this.#buildSections = options.buildSections
   }
 
+  /**
+   * 组装中断投影并写入 pipeline metadata：先本地追加卡片，再把展示历史快照装进 context。
+   * @param context Runtime 回调上下文；其 metadata 是节点之间共享的可变袋，快照写在这里
+   * @param interrupt 中断的中性调用信息（toolCallId 与 arguments）
+   */
   public assemble(context: PresentationContext, interrupt: PresentationInterrupt): Promise<void> {
     this.assembleInterrupt(interrupt)
     installLoadedDisplayMessages(context, this.#display.messages)
     return Promise.resolve()
   }
 
-  /** 高层 Runtime 完成后直接提交中断投影，不要求业务层构造 RuntimeContext。 */
+  /**
+   * 高层 Runtime 完成后直接提交中断投影，不要求业务层构造 RuntimeContext。
+   * @param interrupt 中断的中性调用信息；据此摘除发起中断的工具并替换为 pending 的 ask-card
+   */
   public assembleInterrupt(interrupt: PresentationInterrupt): void {
     const sections = filterInterruptTool(this.#buildSections?.(), interrupt.toolCallId)
     sections.push({
@@ -58,7 +66,11 @@ export class PresentationInterruptAssembler {
   }
 }
 
-/** 向宿主 pipeline 节点提供持久化展示历史的只读快照。 */
+/**
+ * 向宿主 pipeline 节点提供持久化展示历史的只读快照。
+ * @param context Runtime 回调上下文；快照写入其 metadata 的展示历史键
+ * @param messages 展示历史；`structuredClone` 后存入，节点不应就地修改
+ */
 export function installLoadedDisplayMessages(
   context: PresentationContext,
   messages: readonly DisplayMessage[]

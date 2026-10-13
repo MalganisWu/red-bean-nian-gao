@@ -48,6 +48,12 @@ export interface BuildApplicationOptions {
  *
  * 整个函数体跑在 `buildManaged` 里：中途任一步失败，前面已建好的资源会被按登记顺序反向释放，
  * 不会留下半启动的进程。
+ *
+ * 组装只在启动期发生一次，返回的实例即完整能力图；调用方不应再往里注册 Provider 或用例。
+ * @param config - 已通过校验的应用配置；本层不再做配置合法性检查，直接按其取值接线
+ * @param startupSignal - 启动期取消信号，透传给所有建连动作；中途中止会让已建资源被释放
+ * @param options - 可注入的组装选项；目前只有构建版本信息一项，缺省时为 `{}`
+ * @returns 已组装完成、尚未启动监听的应用实例
  */
 export function buildApplication(
   config: AppConfig,

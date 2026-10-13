@@ -34,6 +34,14 @@ export class MinioObjectStorage implements ObjectStorage {
     this.#region = config.region
   }
 
+  /**
+   * 确保目标 bucket 存在，不存在则创建。
+   *
+   * 只在启动期调用一次；创建时按配置决定是否带 region。任何失败都包装后重抛并保留 cause，
+   * 让启动期失败直接拒绝启动，而不是带着不可用的存储降级运行。
+   *
+   * @param signal - 启动期取消信号；创建前后各检查一次，避免带着已取消的上下文继续
+   */
   public async ensureBucket(signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
     try {
@@ -52,6 +60,17 @@ export class MinioObjectStorage implements ObjectStorage {
     }
   }
 
+  /**
+   * 上传对象到 bucket。
+   *
+   * 传入的 `body` 会被 `putObject` 完整消费，流的消费与销毁责任在本方法内即告结束；成功后再
+   * stat 回读元信息，保证返回的 size/etag 来自服务端而非本地推断。`putObject` 成功即对象完整，
+   * 失败不会留下半成品对象。
+   *
+   * @param input - 待写入对象的 key、内容流、大小与 MIME 类型；key 由应用层生成
+   * @param signal - 请求生命周期绑定的取消信号；上传前后各检查一次
+   * @returns 服务端确认后的对象元信息
+   */
   public async upload(input: UploadInput, signal: AbortSignal): Promise<ObjectInfo> {
     signal.throwIfAborted()
     try {
@@ -65,6 +84,17 @@ export class MinioObjectStorage implements ObjectStorage {
     }
   }
 
+  /**
+   * 打开对象下载流。
+   *
+   * 返回的 `body` 是未消费的流，所有权交给调用方；本适配器只负责把它与请求取消绑定（见
+   * `bindDownloadStreamToAbort`）。打开或 stat 失败时会主动 `destroy` 已开的流，避免留下
+   * 半开的 MinIO 连接。
+   *
+   * @param key - 对象 key；不存在时底层抛 NoSuchKey，这里包装后重抛
+   * @param signal - 请求生命周期绑定的取消信号，取消时销毁下载流
+   * @returns 下载流与对象元信息；流由调用方负责消费
+   */
   public async download(key: string, signal: AbortSignal): Promise<ObjectDownload> {
     signal.throwIfAborted()
     let body: Awaited<ReturnType<Client['getObject']>> | undefined
@@ -80,6 +110,14 @@ export class MinioObjectStorage implements ObjectStorage {
     }
   }
 
+  /**
+   * 删除对象。
+   *
+   * 对不存在的 key 不报错（MinIO 语义即幂等），调用方因此可以安全重试。
+   *
+   * @param key - 要删除的对象 key
+   * @param signal - 请求生命周期绑定的取消信号，删除前后各检查一次
+   */
   public async delete(key: string, signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
     try {
@@ -90,6 +128,16 @@ export class MinioObjectStorage implements ObjectStorage {
     }
   }
 
+  /**
+   * 读取对象元信息，用于存在性预检。
+   *
+   * `NoSuchKey` 与 `NotFound` 两种「不存在」被归一成 `undefined` 而非抛错，把「不存在」与
+   * 「访问失败」区分开；其余错误包装后重抛，避免把故障误判成对象缺失。
+   *
+   * @param key - 要探测的对象 key
+   * @param signal - 请求生命周期绑定的取消信号，查询前后各检查一次
+   * @returns 对象元信息；对象不存在时返回 `undefined`
+   */
   public async stat(key: string, signal: AbortSignal): Promise<ObjectInfo | undefined> {
     signal.throwIfAborted()
     try {
@@ -102,6 +150,16 @@ export class MinioObjectStorage implements ObjectStorage {
     }
   }
 
+  /**
+   * 签发下载预签名 URL。
+   *
+   * 只做签名，不校验对象是否存在（MinIO 预签名不看存在性）；客户端拿着 URL 直连存储，有效期
+   * 因此由应用层夹取后传入。失败包装后重抛。
+   *
+   * @param input - 对象 key 与有效期（秒）
+   * @param signal - 请求生命周期绑定的取消信号，签名前后各检查一次
+   * @returns 预签名下载 URL
+   */
   public async presignGet(input: PresignInput, signal: AbortSignal): Promise<string> {
     signal.throwIfAborted()
     try {
@@ -119,6 +177,15 @@ export class MinioObjectStorage implements ObjectStorage {
     }
   }
 
+  /**
+   * 签发上传预签名 URL。
+   *
+   * 与 `presignGet` 对称，只做签名；服务端不创建对象，实际上传由客户端用该 URL 完成。
+   *
+   * @param input - 对象 key 与有效期（秒）
+   * @param signal - 请求生命周期绑定的取消信号，签名前后各检查一次
+   * @returns 预签名上传 URL
+   */
   public async presignPut(input: PresignInput, signal: AbortSignal): Promise<string> {
     signal.throwIfAborted()
     try {

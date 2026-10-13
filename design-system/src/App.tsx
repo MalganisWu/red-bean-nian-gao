@@ -137,6 +137,10 @@ function applyTheme(theme: 'light' | 'dark'): void {
   window.localStorage.setItem('rbng-design-theme', theme)
 }
 
+/**
+ * 展示站根组件：左侧按分组渲染页签导航，右侧按当前页签懒加载对应展示页。
+ * 主题开关只改根元素 class 与本地存储，展示页无需感知主题——它们全部消费语义 token。
+ */
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('philosophy')
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>

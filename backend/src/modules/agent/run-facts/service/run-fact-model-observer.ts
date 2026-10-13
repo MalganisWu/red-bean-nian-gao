@@ -21,6 +21,14 @@ export class RunFactModelObserver implements AgentModelAdapter {
     this.#inner = inner
   }
 
+  /**
+   * 观察一次 LLM 请求：建 attempt、转发调用，并把连接建立阶段的错误归到本 attempt 后上抛。
+   * 只记录不改变语义——失败仍交由 SDK 的重试循环处理。
+   *
+   * @param request - 主运行的模型请求，原样透传给内层 adapter
+   * @param signal - 中止信号，原样透传
+   * @returns 内层 adapter 的 chunk 流，经 `#watch` 旁路观察 usage 与错误
+   */
   public async streamCompletion(
     request: AgentModelRequest,
     signal: AbortSignal

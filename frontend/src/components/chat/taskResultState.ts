@@ -11,12 +11,12 @@ interface DefaultCollapsedInput {
  * 定时任务结果卡片的默认折叠态。
  * 优先级：用户的手动覆盖 > 自动规则；自动规则只在「已完成、非最新、且已被看过」时折叠——
  * 未读结果若默认收起，用户会以为任务没有产出。
+ *
+ * @param props - 折叠判定输入；字段语义见 `DefaultCollapsedInput`。
+ * @returns 该结果卡片是否默认收起。
  */
-export function getTaskResultDefaultCollapsed({
-  status,
-  isLatest,
-  viewState,
-}: DefaultCollapsedInput): boolean {
+export function getTaskResultDefaultCollapsed(props: DefaultCollapsedInput): boolean {
+  const { status, isLatest, viewState } = props
   if (viewState?.collapsed_override !== null && viewState?.collapsed_override !== undefined) {
     return viewState.collapsed_override
   }

@@ -73,17 +73,20 @@ function isInterruptedStep(step: ProcessStepItem): boolean {
  * 思考、叙述、工具、子 Agent 与确认按时序进入同一条 Process 时间线。
  * 最终回答裸排 Markdown；只有 fenced code block 使用独立容器与复制动作。
  * 流式中折叠区默认展开 + 动态总耗时；回合结束自动收拢、总耗时定格（包络公式）。
+ *
+ * @param props - 组件属性；字段语义见 `MessageCardProps`。
  */
-export function MessageCard({
-  content,
-  sections,
-  isStreaming,
-  meta,
-  onCardConfirm,
-  onCardRefuse,
-  cardSubmission,
-  terminalStatus,
-}: MessageCardProps) {
+export function MessageCard(props: MessageCardProps) {
+  const {
+    content,
+    sections,
+    isStreaming,
+    meta,
+    onCardConfirm,
+    onCardRefuse,
+    cardSubmission,
+    terminalStatus,
+  } = props
   const normalized = sections ? normalizeSections(sections, { isStreaming }) : undefined
 
   // 流式中总耗时按整秒更新：从首个有效 section 时间戳起计（≈ 收到首个事件）

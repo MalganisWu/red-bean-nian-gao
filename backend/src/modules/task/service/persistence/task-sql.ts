@@ -99,6 +99,9 @@ export interface SerializedExecution {
  * 把领域执行记录转成落库形态。
  * 展示消息必须**先经 Presenter 转成 DTO 再序列化**，不能直接 `JSON.stringify(execution)`：
  * 落库的是 wire 形状的快照，读取方（列表与导出）依赖这个稳定的字段约定。
+ *
+ * @param execution - 领域执行记录；展示消息须经 Presenter 转 DTO，不能整体 JSON 序列化。
+ * @returns 原执行记录与已序列化的展示消息 JSON 两件套。
  */
 export function serializeExecution(execution: AgentTaskExecution): SerializedExecution {
   return {
@@ -107,6 +110,14 @@ export function serializeExecution(execution: AgentTaskExecution): SerializedExe
   }
 }
 
+/**
+ * 向 `agent_task_executions` 插入一条执行记录；可空字段以 NULL 落库。
+ * 调用方需保证同一 execution_id 不会被重复插入。
+ *
+ * @param database - 目标 SQL 执行器，可以是事务内的执行器。
+ * @param serialized - `serializeExecution` 产出的落库形态。
+ * @param signal - 取消信号，透传到库查询。
+ */
 export async function insertExecution(
   database: SqlExecutor,
   serialized: SerializedExecution,
@@ -139,27 +150,52 @@ export async function insertExecution(
   )
 }
 
-/** 空串在库里统一存 NULL，避免「空串」与「未设置」两种表示并存导致查询条件要写两遍。 */
+/**
+ * 空串在库里统一存 NULL，避免「空串」与「未设置」两种表示并存导致查询条件要写两遍。
+ *
+ * @param value - 待转换文本；空串转 NULL，其余原样返回。
+ * @returns 空串对应 `null`，否则原值。
+ */
 export function emptyStringToNull(value: string): string | null {
   return value === '' ? null : value
 }
 
-/** 分页 limit 的前置校验；`context` 会进错误信息，用来定位是哪个查询传了非法值。 */
+/**
+ * 分页 limit 的前置校验；`context` 会进错误信息，用来定位是哪个查询传了非法值。
+ *
+ * @param limit - 待校验的页大小，必须为正整数。
+ * @param context - 调用点标签，仅用于错误信息定位。
+ */
 export function requirePositiveLimit(limit: number, context: string): void {
   if (!Number.isInteger(limit) || limit <= 0) throw new Error(`${context}: limit 必须大于 0`)
 }
 
-/** 「任务不存在」与「无权操作」共用一个错误码，使调用方无法靠错误差异探测他人任务是否存在。 */
+/**
+ * 「任务不存在」与「无权操作」共用一个错误码，使调用方无法靠错误差异探测他人任务是否存在。
+ *
+ * @returns NOT_AUTHORIZED 仓储错误。
+ */
 export function notAuthorizedError(): TaskRepositoryError {
   return new TaskRepositoryError(TASK_REPOSITORY_ERROR_CODES.NOT_AUTHORIZED, '任务不存在或无权操作')
 }
 
-/** 执行租约已失效：说明另一个调度者已接手这次执行，本次写入应当放弃而不是覆盖。 */
+/**
+ * 执行租约已失效：说明另一个调度者已接手这次执行，本次写入应当放弃而不是覆盖。
+ *
+ * @returns STALE_EXECUTION 仓储错误。
+ */
 export function staleExecutionError(): TaskRepositoryError {
   return new TaskRepositoryError(TASK_REPOSITORY_ERROR_CODES.STALE_EXECUTION, '任务执行租约已失效')
 }
 
-/** 给解析失败补上调用点上下文；否则行数据校验错误在日志里看不出是哪个查询产生的。 */
+/**
+ * 给解析失败补上调用点上下文；否则行数据校验错误在日志里看不出是哪个查询产生的。
+ *
+ * @param value - 待解析的原始值，通常是数据库行。
+ * @param parser - 解析器；抛错时被包上上下文再上抛。
+ * @param context - 调用点标签，仅用于错误信息定位。
+ * @returns 解析成功的结果；解析失败时抛出带上下文的错误。
+ */
 export function parseWithContext<TValue>(
   value: unknown,
   parser: (input: unknown) => TValue,

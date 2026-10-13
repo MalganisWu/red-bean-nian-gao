@@ -22,6 +22,12 @@ export class PostgresSubExecutionRepository implements SubExecutionRepository {
     this.#database = database
   }
 
+  /**
+   * 插入一条新的子执行记录；主键冲突等基础设施错误补上操作上下文后抛出。
+   *
+   * @param record - 待落库的领域记录；revision 等字段由调用方初始化
+   * @param signal - SQL 中止信号
+   */
   public async create(record: SubExecutionRecord, signal: AbortSignal): Promise<void> {
     try {
       await this.#database.query(
@@ -36,6 +42,13 @@ export class PostgresSubExecutionRepository implements SubExecutionRepository {
     }
   }
 
+  /**
+   * 按执行 ID 读取子执行记录；不存在返回 undefined 而不是抛错，交由调用方决定语义。
+   *
+   * @param executionId - 子执行 ID
+   * @param signal - SQL 中止信号
+   * @returns 命中则为领域记录，未命中为 undefined
+   */
   public async getById(
     executionId: string,
     signal: AbortSignal
@@ -53,6 +66,13 @@ export class PostgresSubExecutionRepository implements SubExecutionRepository {
     }
   }
 
+  /**
+   * 列出会话内仍为 pending 的子执行，供恢复流程收束。
+   *
+   * @param sessionId - 会话 ID
+   * @param signal - SQL 中止信号
+   * @returns pending 状态的记录；无则为空数组
+   */
   public async listPending(
     sessionId: string,
     signal: AbortSignal
@@ -71,6 +91,13 @@ export class PostgresSubExecutionRepository implements SubExecutionRepository {
     }
   }
 
+  /**
+   * 按创建时间升序列出会话的全部子执行记录；行经信任边界校验后映射。
+   *
+   * @param sessionId - 会话 ID
+   * @param signal - SQL 中止信号
+   * @returns 会话内的子执行记录，按 created_at 升序
+   */
   public async listBySession(
     sessionId: string,
     signal: AbortSignal
@@ -90,6 +117,15 @@ export class PostgresSubExecutionRepository implements SubExecutionRepository {
     }
   }
 
+  /**
+   * 以 revision CAS 认领一条 pending 子执行：成功则 revision 自增并返回新记录。
+   * 行未命中（已被他人认领或 revision 不符）时抛 RESUME_CONFLICT，绝不覆盖他人认领。
+   *
+   * @param executionId - 子执行 ID
+   * @param revision - 期望的当前 revision；不符即冲突
+   * @param signal - SQL 中止信号
+   * @returns 认领后的记录，revision 已自增
+   */
   public async claimPending(
     executionId: string,
     revision: bigint,
@@ -115,6 +151,14 @@ export class PostgresSubExecutionRepository implements SubExecutionRepository {
     )
   }
 
+  /**
+   * 以 revision CAS 认领续跑：仅当状态为可恢复态，或 running 且 updated_at 早于租期阈值时成功。
+   * 未命中抛 RESUME_CONFLICT——旧 owner 的租约未过期时不得抢占。
+   *
+   * @param record - 待认领的记录；其 revision 作为 CAS 期望值
+   * @param leaseExpiredBefore - 判定 running 记录租约已过期的时刻阈值
+   * @param signal - SQL 中止信号
+   */
   public async claimResume(
     record: SubExecutionRecord,
     leaseExpiredBefore: Date,
@@ -137,6 +181,13 @@ export class PostgresSubExecutionRepository implements SubExecutionRepository {
     )
   }
 
+  /**
+   * 以 revision CAS 整体更新记录；成功后把新 revision 写回 `record`。
+   * revision 不符时抛 REVISION_CONFLICT，防止覆盖他人的写入。
+   *
+   * @param record - 待写回的记录（含期望 revision）；成功后就地更新其 revision
+   * @param signal - SQL 中止信号
+   */
   public async update(record: SubExecutionRecord, signal: AbortSignal): Promise<void> {
     if (await this.#conditionalUpdate(record, '', [], signal)) return
     throw new SubExecutionStoreError(
@@ -145,6 +196,15 @@ export class PostgresSubExecutionRepository implements SubExecutionRepository {
     )
   }
 
+  /**
+   * 续租续跑所有权：把 updated_at 前移到 renewedAt（仅当 revision 匹配且状态仍为 running）。
+   * 未命中抛 RESUME_CONFLICT——续不上即说明所有权已不属于自己。
+   *
+   * @param executionId - 子执行 ID
+   * @param revision - 期望的当前 revision
+   * @param renewedAt - 新的租约时刻，作为 updated_at 写入
+   * @param signal - SQL 中止信号
+   */
   public async renewResumeLease(
     executionId: string,
     revision: bigint,
@@ -170,6 +230,15 @@ export class PostgresSubExecutionRepository implements SubExecutionRepository {
     )
   }
 
+  /**
+   * 以 revision CAS 追加一条恢复消息（仅 pending / running 状态）；JSONB 追加，不重写历史。
+   * 未命中抛 RESUME_CONFLICT，避免旧 owner 把消息写进已被接管的记录。
+   *
+   * @param executionId - 子执行 ID
+   * @param revision - 期望的当前 revision
+   * @param message - 待追加的会话消息，序列化后并入 recovery_messages
+   * @param signal - SQL 中止信号
+   */
   public async appendRecoveryMessage(
     executionId: string,
     revision: bigint,

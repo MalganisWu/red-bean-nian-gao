@@ -9,8 +9,13 @@ interface UiKitSectionProps {
   children: ReactNode
 }
 
-/** 一组组件的分区容器；`title` 渲染为分区标题。 */
-export function UiKitSection({ title, children }: UiKitSectionProps) {
+/**
+ * 一组组件的分区容器；`title` 渲染为分区标题。
+ *
+ * @param props - 组件属性；字段语义见 `UiKitSectionProps`。
+ */
+export function UiKitSection(props: UiKitSectionProps) {
+  const { title, children } = props
   return (
     <div className="uikit-section">
       <h3 className="uikit-section-title">{title}</h3>
@@ -25,8 +30,13 @@ interface UiKitRowProps {
   children: ReactNode
 }
 
-/** 一行组件示例；`stack` 让内容类组件纵向全宽堆叠，展开时不换行重排。 */
-export function UiKitRow({ stack, children }: UiKitRowProps) {
+/**
+ * 一行组件示例；`stack` 让内容类组件纵向全宽堆叠，展开时不换行重排。
+ *
+ * @param props - 组件属性；字段语义见 `UiKitRowProps`。
+ */
+export function UiKitRow(props: UiKitRowProps) {
+  const { stack, children } = props
   return (
     <div className={stack ? 'component-row component-row--stack' : 'component-row'}>{children}</div>
   )
@@ -39,8 +49,13 @@ interface UiKitItemProps {
   children: ReactNode
 }
 
-/** 单个组件示例；`block` 配合 row 的 stack 拉伸到整行，并使标签左对齐。 */
-export function UiKitItem({ label, block, children }: UiKitItemProps) {
+/**
+ * 单个组件示例；`block` 配合 row 的 stack 拉伸到整行，并使标签左对齐。
+ *
+ * @param props - 组件属性；字段语义见 `UiKitItemProps`。
+ */
+export function UiKitItem(props: UiKitItemProps) {
+  const { label, block, children } = props
   return (
     <div className={block ? 'component-item component-item--block' : 'component-item'}>
       {children}

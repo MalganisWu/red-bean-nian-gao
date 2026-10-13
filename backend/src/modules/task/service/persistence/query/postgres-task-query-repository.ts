@@ -33,6 +33,13 @@ export class PostgresTaskQueryRepository
     this.#database = database
   }
 
+  /**
+   * 读取单个任务定义；查不到抛 NOT_FOUND，行数据不符 Schema 时抛错而非兜底。
+   *
+   * @param taskId - 目标任务标识。
+   * @param signal - 取消信号，透传到库查询。
+   * @returns 校验通过的任务定义。
+   */
   public async getTask(taskId: string, signal: AbortSignal): Promise<AgentTaskDefinition> {
     let result
     try {
@@ -54,6 +61,14 @@ export class PostgresTaskQueryRepository
     return parseWithContext(row, mapScheduledTaskRow, '查询任务失败')
   }
 
+  /**
+   * 取一批到期且活跃的任务，按 next_run_at 升序，供调度器单轮扫描。
+   *
+   * @param now - 判定到期的当前时刻。
+   * @param limit - 本批最大条数；非正数在此即抛错。
+   * @param signal - 取消信号，透传到库查询。
+   * @returns 到期任务定义列表。
+   */
   public async getPendingTasks(
     now: Date,
     limit: number,
@@ -76,6 +91,15 @@ export class PostgresTaskQueryRepository
     }
   }
 
+  /**
+   * 按用户分页列出任务定义；分页用「多取一条」判 hasMore，游标是 `created_at` 上界。
+   *
+   * @param userId - 任务所有者，直接进 `WHERE` 谓词。
+   * @param cursor - 上一页末条的时间戳游标；空串表示取首页。
+   * @param limit - 本页最大条数；非正数在此即抛错。
+   * @param signal - 取消信号，透传到库查询。
+   * @returns 本页任务定义与下一页游标。
+   */
   public async listByUser(
     userId: string,
     cursor: string,
@@ -100,6 +124,14 @@ export class PostgresTaskQueryRepository
     }
   }
 
+  /**
+   * 列出某会话下的全部任务定义；同时按用户过滤，越权会话得到空列表。
+   *
+   * @param sessionId - 目标会话标识。
+   * @param userId - 任务所有者，用于归属过滤。
+   * @param signal - 取消信号，透传到库查询。
+   * @returns 该会话的任务定义，按创建时间倒序。
+   */
   public async listBySession(
     sessionId: string,
     userId: string,
@@ -120,6 +152,15 @@ export class PostgresTaskQueryRepository
     }
   }
 
+  /**
+   * 分页列出某任务的执行记录；整页先全量校验行再映射，坏行不会被静默跳过。
+   *
+   * @param taskId - 目标任务标识，直接进 `WHERE` 谓词。
+   * @param cursor - 上一页末条的时间戳游标；空串表示取首页。
+   * @param limit - 本页最大条数；非正数在此即抛错。
+   * @param signal - 取消信号，透传到库查询。
+   * @returns 本页执行记录与下一页游标。
+   */
   public async listExecutions(
     taskId: string,
     cursor: string,
@@ -144,6 +185,15 @@ export class PostgresTaskQueryRepository
     }
   }
 
+  /**
+   * 按任务与执行 ID 读取单条执行记录；查不到返回 `undefined` 而非抛错，
+   * 由调用方自行决定「不存在」是错误还是正常分支。
+   *
+   * @param taskId - 目标任务标识，兼作跨任务读取的隔离条件。
+   * @param executionId - 目标执行记录标识。
+   * @param signal - 取消信号，透传到库查询。
+   * @returns 目标执行记录；不存在时为 `undefined`。
+   */
   public async getExecutionById(
     taskId: string,
     executionId: string,

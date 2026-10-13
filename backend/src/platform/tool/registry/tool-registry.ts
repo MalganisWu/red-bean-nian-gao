@@ -146,6 +146,8 @@ export class ToolRegistry {
    * **未知 ID 静默跳过**而不是报错：agent 的授权列表存在数据库里，
    * 引用了某个已被移除的工具是正常的历史残留，不该让整个 agent 起不来——
    * 它只是少一个工具而已。
+   * @param ids - 期望的工具 ID 列表，通常来自 agent 的数据库授权字段；顺序即返回顺序
+   * @returns 命中工具的 schema 数组；未命中的 ID 被跳过，因此长度可能小于入参
    */
   public schemas(ids: readonly string[]): readonly ToolSchema[] {
     const schemas: ToolSchema[] = []
@@ -156,11 +158,24 @@ export class ToolRegistry {
     return schemas
   }
 
+  /**
+   * 为给定 ID 列表造一个只认识这些工具的分发器。
+   * 与 `schemas` 一致，未知 ID 被静默跳过；重复 ID 会先去重，避免同一工具被登记两次。
+   * @param ids - 授权工具 ID 列表；未授权或已不存在的工具不在分发范围内
+   * @returns 作用域限定的分发器；它只认命中的工具，其余一律按「工具不存在」失败
+   */
   public dispatcher(ids: readonly string[]): ToolDispatcher {
     return new MapToolDispatcher(this.#requestedTools(ids))
   }
 
-  /** 系统工具 + 子 Agent 委派的组合分发器；Agent Loader 用的就是它。 */
+  /**
+   * 系统工具 + 子 Agent 委派的组合分发器；Agent Loader 用的就是它。
+   * 路由规则是「先查系统工具，仅当报 `NOT_FOUND` 才回落委派」，
+   * 因此传入的系统工具一旦存在，其执行失败不会被委派层掩盖成别的错误。
+   * @param systemIds - 该系统内可用的系统工具 ID 列表，语义与 `dispatcher` 的入参一致
+   * @param delegation - 系统工具未命中时接手的委派分发器，通常来自 Runtime 的子 Agent 能力
+   * @returns 合并后的单一分发器；对模型而言两类工具共享一个命名空间
+   */
   public compositeDispatcher(
     systemIds: readonly string[],
     delegation: ToolDispatcher

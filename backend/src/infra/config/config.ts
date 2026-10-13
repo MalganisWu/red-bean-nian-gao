@@ -106,6 +106,15 @@ const DURATION_UNITS: Readonly<Record<string, number>> = Object.freeze({
   h: 3_600_000,
 })
 
+/**
+ * 读取并合并配置，是 `AppConfig` 的唯一装配入口。
+ * 只做两件事：读 `config.yaml`、把结果交给 `parseConfig` 合并环境变量。
+ * 校验责任不在本层——非法配置（缺必填、残留 `CHANGE_ME`、生产环境弱密钥）由
+ * `parseConfig` 内部的 `validateConfig` 抛错拦截，因此**本函数要么返回一份已通过
+ * 全部校验的配置，要么直接抛错**，调用方不必再自行校验，也不应吞掉这里的异常继续启动。
+ * @param options - 注入点；`directory` 覆盖配置文件所在目录，`environment` 覆盖环境变量来源
+ * @returns 已完成校验、此后不再变化的配置全集
+ */
 export async function loadConfig(options: LoadConfigOptions = {}): Promise<AppConfig> {
   const directory = options.directory ?? process.cwd()
   const environment = options.environment ?? process.env
@@ -127,6 +136,13 @@ export async function loadConfig(options: LoadConfigOptions = {}): Promise<AppCo
  *
  * 空字符串一律视为「未设置」而不是有效取值：环境文件里留空的项应当落到下一个来源，
  * 而不是把一个空串当成配置。真正的必填校验在后面的 `validate*` 里做。
+ *
+ * 校验责任集中在本函数：它在返回前调用 `validateConfig`，**非法配置一律抛错**，
+ * 不做「降级到默认值」的兜底。因此本函数的失败语义是「启动即失败」，
+ * 调用方拿到返回值就意味着所有必填项与生产环境加严项都已验过。
+ * @param raw - `config.yaml` 解析出的原始值；不是对象时直接抛错，不做隐式转换
+ * @param environment - 环境变量来源；同名变量优先于 YAML 值，空串视为未设置
+ * @returns 合并后的配置全集；已在返回前完成全部校验
  */
 export function parseConfig(raw: unknown, environment: Environment): AppConfig {
   const root = record(raw)
@@ -272,6 +288,8 @@ export function parseConfig(raw: unknown, environment: Environment): AppConfig {
  *
  * 末尾拒绝 `<= 0`：这些值最终都用作间隔或超时，0 与负数在这里没有合理语义，
  * 与其让它们在下游变成「永不触发」或「立刻超时」，不如在配置层挡住。
+ * @param value - duration 字面量，如 `5m` / `250ms`；可以是字符串以外的原始类型，但只有合法字符串才有结果
+ * @returns 解析出的毫秒数；不可能为 0 或负数——非法输入一律抛错
  */
 export function parseDurationMilliseconds(value: string): number {
   const normalized = value.trim()

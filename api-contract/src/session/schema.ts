@@ -16,7 +16,11 @@ function isSessionSummary(value: unknown): value is SessionSummaryDto {
   )
 }
 
-/** 会话列表页的守卫；逐项过内部的 `isSessionSummary`。 */
+/**
+ * 会话列表页的守卫；逐项过内部的 `isSessionSummary`。
+ * @param value - 待判定的列表响应；`sessions` 每项与 `next_cursor` 都必须合法。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isSessionList(value: unknown): value is SessionListDto {
   return (
     isRecord(value) &&
@@ -25,7 +29,11 @@ export function isSessionList(value: unknown): value is SessionListDto {
   )
 }
 
-/** 会话详情的守卫；消息逐条过 `isPersistedDisplayMessage`。 */
+/**
+ * 会话详情的守卫；消息逐条过 `isPersistedDisplayMessage`。
+ * @param value - 待判定的详情响应；`id` 必需，`messages` 每条都要合法。
+ * @returns 形状成立时为 true，否则 false（不抛错）。
+ */
 export function isSessionDetail(value: unknown): value is SessionDetailDto {
   return (
     isRecord(value) &&

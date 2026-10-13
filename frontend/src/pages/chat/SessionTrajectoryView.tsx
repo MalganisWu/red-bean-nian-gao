@@ -202,8 +202,11 @@ function applyLoadedTrajectory(
  * 会话轨迹子视图（ChatPage SessionView='trajectory'）：只读审计页。
  * 组合三个入册组件：泳道时序概览 + 轮次记录表 + 记录检查器；
  * 历史读持久化数据，流式进行中叠加 trajectory-store 的实时投影（第二投影）。
+ *
+ * @param props - 组件属性；字段语义见 `SessionTrajectoryViewProps`。
  */
-export function SessionTrajectoryView({ onBack }: SessionTrajectoryViewProps) {
+export function SessionTrajectoryView(props: SessionTrajectoryViewProps) {
+  const { onBack } = props
   const activeSessionId = useChatStore((state) => state.activeSessionId)
   const [view, setView] = useState<SessionTrajectoryView | null>(null)
   /* 以「已为哪个会话加载成功」推导加载态，避免在 effect 体内同步 setState */

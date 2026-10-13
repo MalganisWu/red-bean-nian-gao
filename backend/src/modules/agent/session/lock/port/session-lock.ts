@@ -16,6 +16,7 @@ const REGISTRY_ERROR_MESSAGES: Readonly<Record<RegistryErrorCode, string>> = Obj
 
 /** 基础设施异常；message 由内部码表统一给出，调用方只应依据 `code` 分支。 */
 export class RegistryError extends Error {
+  /** 机器判据；`message` 可能被上层重写或本地化，分支判断只应依据本字段。 */
   public readonly code: RegistryErrorCode
 
   public constructor(code: RegistryErrorCode, options?: ErrorOptions) {

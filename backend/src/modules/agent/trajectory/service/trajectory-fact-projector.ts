@@ -46,6 +46,12 @@ export interface ProjectFactsTrajectoryInput {
  * - run 终态 → 轮次 turn-end；仍在执行的 run 不产出终态（整轮保持"进行中"），
  *   只有崩溃遗留的 running 才按 interrupted 收尾；
  * - 首个 run 之前的展示消息按 G0 投影保留（升级路径回退），避免旧轮次从轨迹中消失。
+ *
+ * 降级语义：事实缺失的维度（usage、终态、时长）以 null 或缺省表达，绝不虚构数值；
+ * 首个 run 之前的历史轮次与标题统一走 G0 投影，保证与无事实日志的旧会话同形。
+ *
+ * @param input - 事实投影输入；runs 为空或首个 run 无 startedAt 时整体退化为 G0 投影。
+ * @returns 轮次化会话轨迹；compaction 为单槽（取最近一次），扩展为序列需前端配合。
  */
 export function projectFactsTrajectory(input: ProjectFactsTrajectoryInput): SessionTrajectory {
   const firstRunStartedAt = input.runs[0]?.startedAt

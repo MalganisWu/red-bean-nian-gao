@@ -77,6 +77,8 @@ export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
    * 返回一个**新的** loader，只把子运行装饰器换掉。
    * 不可变而非就地改写：同一个 loader 实例可能被并发用于多次加载，
    * 就地改 `subAgentToolFactory` 会让先启动的运行也被后来者的装饰器影响。
+   * @param decorator 子运行装饰器；由观测层注入，只作用于此后新建的 loader
+   * @returns 换用该装饰器的新 loader 实例，原实例保持不变
    */
   public withChildRuntimeDecorator(decorator: ChildRuntimeDecorator): AgentLoader {
     return new DbMainAgentLoader({
@@ -89,6 +91,10 @@ export class DbMainAgentLoader implements ChildRuntimeDecoratableAgentLoader {
    * 组装一次运行的完整配置。步骤按依赖方向串行，每一步都可能是「配置不存在」或「数据不合法」的失败点：
    * agent 行 → LLM 配置 → 凭据 → Adapter → 参数 → 子 Agent 定义 → 工具工厂 → 工具目录。
    * `is_active` 的检查放在最前：一个被禁用的 agent 不该走到读凭据那一步。
+   * @param agentId 目标 agent 主键；不存在或已禁用时抛错
+   * @param signal 各次数据库查询的中止信号
+   * @param context 加载上下文（如恢复策略入参），透传给子 Agent 工具工厂
+   * @returns 一次运行使用的自洽配置快照；运行期间不再回查数据库
    */
   public async load(
     agentId: string,

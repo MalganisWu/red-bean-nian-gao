@@ -28,6 +28,7 @@ export type SubExecutionStoreErrorCode =
 
 /** 子执行持久化的稳定冲突错误，调用方不得把 CAS 失败降级成普通覆盖写。 */
 export class SubExecutionStoreError extends Error {
+  /** 冲突码；调用方据此区分 revision CAS 冲突与 resume 所有权冲突，不得降级成普通覆盖写。 */
   public readonly code: SubExecutionStoreErrorCode
 
   public constructor(code: SubExecutionStoreErrorCode, message: string) {

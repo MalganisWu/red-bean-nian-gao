@@ -60,6 +60,13 @@ export class RedisMessageBuffer implements MessageBuffer {
     this.#ttlSeconds = ttlSeconds
   }
 
+  /**
+   * 追加一条消息到会话的恢复缓冲；写入失败包装成带会话标识的中文错误，便于定位。
+   *
+   * @param sessionId - 目标会话标识，决定缓冲键。
+   * @param message - 待缓冲的 Agent 消息，先序列化再写入，形状由序列化器保证。
+   * @param signal - 取消信号，透传到 Redis 写入，取消时中止而非落半条。
+   */
   public async append(
     sessionId: string,
     message: AgentMessage,
@@ -77,6 +84,13 @@ export class RedisMessageBuffer implements MessageBuffer {
     }
   }
 
+  /**
+   * 只读窥视缓冲内容，不清除；用于恢复前判断有没有可恢复的增量。
+   *
+   * @param sessionId - 目标会话标识，决定缓冲键。
+   * @param signal - 取消信号，透传到 Redis 读取。
+   * @returns 反序列化并逐条校验后的消息；脏数据会抛错而不是被带进上下文。
+   */
   public async peek(sessionId: string, signal: AbortSignal): Promise<readonly AgentMessage[]> {
     try {
       return decodeMessages(await this.#redis.listRange(bufferKey(sessionId), signal))
@@ -85,6 +99,13 @@ export class RedisMessageBuffer implements MessageBuffer {
     }
   }
 
+  /**
+   * 取出并清空缓冲（消费语义）；内容已随取出动作从 Redis 删除，重复调用只会拿到空数组。
+   *
+   * @param sessionId - 目标会话标识，决定缓冲键。
+   * @param signal - 取消信号，透传到 Redis 读取。
+   * @returns 本次消费掉的消息；反序列化失败时抛错，失败前不会移除键。
+   */
   public async flush(sessionId: string, signal: AbortSignal): Promise<readonly AgentMessage[]> {
     try {
       return decodeMessages(await this.#redis.consumeList(bufferKey(sessionId), signal))
@@ -93,6 +114,12 @@ export class RedisMessageBuffer implements MessageBuffer {
     }
   }
 
+  /**
+   * 丢弃整个缓冲；幂等，键不存在时同样成功。
+   *
+   * @param sessionId - 目标会话标识，决定缓冲键。
+   * @param signal - 取消信号，透传到 Redis 删除。
+   */
   public async clear(sessionId: string, signal: AbortSignal): Promise<void> {
     try {
       await this.#redis.delete(bufferKey(sessionId), signal)
@@ -108,6 +135,11 @@ export class RedisMessageBuffer implements MessageBuffer {
    * 不符就抛「session lease owner 已失效」。这道守卫的必要性在于：
    * 写缓冲的是**正持有会话锁的那次运行**，锁被接管说明这次运行已经过期，
    * 它刚刚产生的消息属于一个不会再被采纳的分支，写进去只会污染下一代的恢复内容。
+   *
+   * @param sessionId - 目标会话标识，与 generation 一起决定分代键。
+   * @param generation - 本次运行的分代（revision + 可选 writeProof）；带 writeProof 时写入受锁所有权守卫。
+   * @param message - 待缓冲的 Agent 消息，序列化后写入。
+   * @param signal - 取消信号，透传到 Redis 写入。
    */
   public async appendGeneration(
     sessionId: string,
@@ -140,6 +172,14 @@ export class RedisMessageBuffer implements MessageBuffer {
     }
   }
 
+  /**
+   * 只读窥视某一代的缓冲内容，不清除；恢复路径据此判断该代有没有未提交的增量。
+   *
+   * @param sessionId - 目标会话标识，与 generation 一起决定分代键。
+   * @param generation - 目标分代；读的是这一代专属的键，不会串到上一代。
+   * @param signal - 取消信号，透传到 Redis 读取。
+   * @returns 该代反序列化并校验后的消息；脏数据抛错而非带入上下文。
+   */
   public async peekGeneration(
     sessionId: string,
     generation: MessageBufferGeneration,
@@ -154,6 +194,16 @@ export class RedisMessageBuffer implements MessageBuffer {
     }
   }
 
+  /**
+   * 清除某一代缓冲；成功保存后才调用，键不存在时幂等成功。
+   *
+   * 带 `writeProof` 时走守卫删除：仅当 `session_lock:<id>` 的值仍是本持有者才删，
+   * 否则抛「session lease owner 已失效」——此时锁已易主，删的可能是别人的恢复内容。
+   *
+   * @param sessionId - 目标会话标识，与 generation 一起决定分代键。
+   * @param generation - 目标分代；只有它对应的键会被删除。
+   * @param signal - 取消信号，透传到 Redis 删除。
+   */
   public async clearGeneration(
     sessionId: string,
     generation: MessageBufferGeneration,

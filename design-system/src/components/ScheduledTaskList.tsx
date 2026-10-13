@@ -68,21 +68,24 @@ function matchesFilter(item: ScheduledTaskListItemData, filter: ScheduledTaskFil
 
 /**
  * 定时任务索引。任务生命周期与最近运行状态分列表达，“需要关注”始终由最近失败派生。
+ *
+ * @param props - 组件属性；字段语义见 `ScheduledTaskListProps`。
  */
-export function ScheduledTaskList({
-  items,
-  filter = 'all',
-  filterCounts,
-  onFilterChange,
-  onSelectTask,
-  onSelectExecution,
-  renderActions,
-  loading = false,
-  error,
-  onRetry,
-  sortLabel = '按下次执行',
-  onSort,
-}: ScheduledTaskListProps) {
+export function ScheduledTaskList(props: ScheduledTaskListProps) {
+  const {
+    items,
+    filter = 'all',
+    filterCounts,
+    onFilterChange,
+    onSelectTask,
+    onSelectExecution,
+    renderActions,
+    loading = false,
+    error,
+    onRetry,
+    sortLabel = '按下次执行',
+    onSort,
+  } = props
   const visibleItems = items.filter((item) => matchesFilter(item, filter))
 
   /** 渲染一行定时任务：标题、计划、最近执行、生命周期与动作槽位。 */

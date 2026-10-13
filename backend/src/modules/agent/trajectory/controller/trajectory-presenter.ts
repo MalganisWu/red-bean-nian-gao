@@ -18,6 +18,9 @@ import { optionalField } from '../../../../shared/object/optional-field.js'
 /**
  * 领域轨迹 → wire DTO 的纯映射。显式逐字段拷贝：DTO 是公开契约，
  * 领域模型的内部字段不得随结构共享泄漏到线上响应。
+ *
+ * @param view - 领域层投影出的会话轨迹，可能带内部专用字段；这里只读取契约覆盖到的部分。
+ * @returns wire DTO；`endState`/`compaction` 的 null 或缺省一律归一为 null，前端无需再判 undefined。
  */
 export function toSessionTrajectoryDto(view: SessionTrajectory): SessionTrajectoryDto {
   return {

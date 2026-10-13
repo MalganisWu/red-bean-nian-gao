@@ -59,16 +59,13 @@ function renderDelegationItem(item: ReasonItem, index: number): ReactElement | n
   return null
 }
 
-/** Process 内的紧凑子任务行；详情只增加一层缩进，不嵌套第二条 Process。 */
-export function DelegationBlock({
-  agentName,
-  status,
-  duration,
-  items,
-  output,
-  summary,
-  defaultExpanded,
-}: DelegationBlockProps) {
+/**
+ * Process 内的紧凑子任务行；详情只增加一层缩进，不嵌套第二条 Process。
+ *
+ * @param props - 组件属性；字段语义见 `DelegationBlockProps`。
+ */
+export function DelegationBlock(props: DelegationBlockProps) {
+  const { agentName, status, duration, items, output, summary, defaultExpanded } = props
   const [expanded, setExpanded] = useState(
     defaultExpanded ?? (status === 'running' || status === 'awaiting_user' || status === 'failed')
   )

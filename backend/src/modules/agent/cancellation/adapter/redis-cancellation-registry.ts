@@ -59,6 +59,9 @@ export class RedisCancelRegistry implements CancelRegistryPort {
    * 前一个请求就再也收不到取消信号了。
    * Redis 写入失败时把本地登记也一并撤掉再抛——留下一个「只有本地有效、别的实例取消不了」
    * 的残状态，比直接失败更难排查。
+   * @param parent 上游取消信号；其 abort 会级联到本请求，undefined 表示无上游
+   * @param requestId 请求唯一标识；本实例内重复登记会抛错（会覆盖前一份轮询定时器，使前一个请求失联）
+   * @returns 本次请求的取消信号，本地取消与跨实例取消都汇聚到它
    */
   public async wrap(parent: AbortSignal | undefined, requestId: string): Promise<AbortSignal> {
     if (this.#entries.has(requestId)) {
@@ -117,6 +120,8 @@ export class RedisCancelRegistry implements CancelRegistryPort {
    *
    * 返回值语义：`false` 表示这个 requestId 根本不存在（可能已经结束或被回收）；
    * 已被别人标成 cancelled 时返回 `true`——幂等，重复取消不算失败。
+   * @param requestId 待取消的请求标识
+   * @returns 是否命中：`false` 表示该 requestId 不存在（可能已结束或被回收）；已被取消返回 `true`（幂等）
    */
   public async cancel(requestId: string): Promise<boolean> {
     const entry = this.#entries.get(requestId)
@@ -157,7 +162,10 @@ export class RedisCancelRegistry implements CancelRegistryPort {
     return true
   }
 
-  /** 请求正常结束时注销：先撤本地登记（幂等保护随之失效），再删 Redis 键。 */
+  /**
+   * 请求正常结束时注销：先撤本地登记（幂等保护随之失效），再删 Redis 键。
+   * @param requestId 待注销的请求标识；本地未命中时仍尝试删除 Redis 键
+   */
   public async deregister(requestId: string): Promise<void> {
     const entry = this.#entries.get(requestId)
     if (entry !== undefined) this.#removeLocal(requestId, entry)

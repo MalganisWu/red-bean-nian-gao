@@ -37,7 +37,12 @@ export interface ParsedSSEEvent {
   readonly data: unknown
 }
 
-/** 判定字符串是否为已知事件名；未知事件名应被调用方丢弃，而不是当成解析失败。 */
+/**
+ * 判定字符串是否为已知事件名；未知事件名应被调用方丢弃，而不是当成解析失败。
+ *
+ * @param value - SSE 帧的 event 名（原始字符串）；空串或契约未声明的事件名判否。
+ * @returns 是否为契约中已声明的事件类型。
+ */
 export function isWireSSEEventType(value: string): value is SSEEventType {
   return Object.values(SSE_EVENT_TYPES).some((eventType) => eventType === value)
 }

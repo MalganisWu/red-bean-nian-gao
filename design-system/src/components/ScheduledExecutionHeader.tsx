@@ -27,19 +27,24 @@ function statusIndicatorClass(status: ScheduledTaskRunStatus): string {
   return 'bg-foreground-muted'
 }
 
-/** 单次执行页头。只描述本次运行，不重复任务配置或聊天事件外壳。 */
-export function ScheduledExecutionHeader({
-  taskTitle,
-  executionTitle,
-  status,
-  durationLabel,
-  triggerLabel,
-  plannedLabel,
-  startedLabel,
-  completedLabel,
-  backLabel,
-  onBack,
-}: ScheduledExecutionHeaderProps) {
+/**
+ * 单次执行页头。只描述本次运行，不重复任务配置或聊天事件外壳。
+ *
+ * @param props - 组件属性；字段语义见 `ScheduledExecutionHeaderProps`。
+ */
+export function ScheduledExecutionHeader(props: ScheduledExecutionHeaderProps) {
+  const {
+    taskTitle,
+    executionTitle,
+    status,
+    durationLabel,
+    triggerLabel,
+    plannedLabel,
+    startedLabel,
+    completedLabel,
+    backLabel,
+    onBack,
+  } = props
   return (
     <header>
       <button

@@ -1,6 +1,10 @@
 import type { AgentJsonObject, AgentJsonValue } from '../model/json-value.js'
 
-/** 校验并复制不可信输入，使其进入产品 JSON 值域。 */
+/**
+ * 校验并复制不可信输入，使其进入产品 JSON 值域。
+ * @param value 不可信输入；非有限数值、循环引用、非纯对象或含访问器 / 符号键时抛 `TypeError`
+ * @returns 深度复制后的产品 JSON 值（脱离原对象的引用）
+ */
 export function toAgentJsonValue(value: unknown): AgentJsonValue {
   return normalize(value, new Set<object>())
 }

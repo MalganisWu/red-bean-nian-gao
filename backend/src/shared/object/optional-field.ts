@@ -8,6 +8,9 @@
  *
  * 仅适用于"条件即空值判断、键与值同名同形"的场景；带类型转换、字段改名、多条件或可选链取值的位置
  * 需要各自的具名小助手，不得强行套用（如 `row.error === null || row.error === ''` 的空字符串语义）。
+ * @param key - 展开后的字段名。
+ * @param value - 字段值；为 `null` 或 `undefined` 时展开为空对象。
+ * @returns 值存在时为 `{ [key]: value }`，否则为空对象。
  */
 export function optionalField<TValue>(
   key: string,

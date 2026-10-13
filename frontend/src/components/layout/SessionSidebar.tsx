@@ -56,8 +56,14 @@ function groupSessionsByUpdatedAt(sessions: SessionSummary[], now = new Date()):
   return groups.filter((group) => group.sessions.length > 0)
 }
 
-/** Quiet Tool 会话侧栏：单行历史、时间分组和完整账户身份。 */
-export function SessionSidebar({ onNavigate }: SessionSidebarProps): React.ReactElement {
+/**
+ * Quiet Tool 会话侧栏：单行历史、时间分组和完整账户身份。
+ *
+ * @param props - 组件属性；字段语义见 `SessionSidebarProps`。
+ * @returns 侧栏元素。
+ */
+export function SessionSidebar(props: SessionSidebarProps): React.ReactElement {
+  const { onNavigate } = props
   const sessions = useChatStore((state) => state.sessions)
   const sessionsLoading = useChatStore((state) => state.sessionsLoading)
   const sessionsError = useChatStore((state) => state.sessionsError)

@@ -18,7 +18,18 @@ export interface IdentityModule {
   readonly profileService: IdentityProfileService
 }
 
-/** 在 Identity Module 内明确绑定认证、密码散列与用户仓储的生产实现。 */
+/**
+ * 在 Identity Module 内明确绑定认证、密码散列与用户仓储的生产实现。
+ *
+ * 是 Module 内实现选择的事实来源：跨 Module 只暴露 Port 与用例服务，具体类名不外泄。
+ * 显式 `new` 各实现，避免依赖结构化类型巧合。
+ *
+ * @param database - 共享的 SQL 执行器；用户仓储在其上运行，不持有自己的连接池
+ * @param idGenerator - 用户 ID 生成器；注入而非各服务内自造，保证 ID 策略全局一致
+ * @param jwtSecret - 令牌签名密钥，来自启动期配置；不得硬编码或落日志
+ * @param passwordHasher - 密码散列器；默认用 bcrypt，测试可注入轻量实现，生产不应替换
+ * @returns 认证服务、实际使用的散列器与两个用例服务
+ */
 export function createIdentityModule(
   database: SqlExecutor,
   idGenerator: IdGenerator,

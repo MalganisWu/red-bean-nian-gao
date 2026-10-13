@@ -43,6 +43,9 @@ const SECTION_TYPES = Object.freeze({
  *
  * G0 空值语义：步骤 tokens 为 null、requests 为空数组、主会话 totalTokens 为 null；
  * 轮次终态由"是否有回复"推导为 completed，否则缺省。
+ *
+ * @param input - 展示投影输入；messages 为持久化的展示消息，subExecutions 供子 Agent 段并入执行记录。
+ * @returns 轮次化会话轨迹；本路径无事实日志可用，compaction 恒为 null、totalTokens 恒为 null。
  */
 export function projectTrajectory(input: ProjectTrajectoryInput): SessionTrajectory {
   return new Projector(input).project()

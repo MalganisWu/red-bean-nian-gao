@@ -22,6 +22,12 @@ export class RunEventQueue<TValue> implements AsyncIterable<TValue> {
     this.#onOverflow = onOverflow
   }
 
+  /**
+   * 入队一个值并唤醒等待者。已关闭时静默丢弃；越界则整队以错误收尾，绝不丢最旧值——
+   * 流式对话里少一个 token 只会让用户看到残缺回答，宁可以明确失败结束。
+   *
+   * @param value - 待入队的值；容量上限按元素个数计，超限触发 `fail` 与 onOverflow 回调。
+   */
   public push(value: TValue): void {
     if (this.#closed) return
     if (this.#values.length >= this.#capacity) {
@@ -34,12 +40,22 @@ export class RunEventQueue<TValue> implements AsyncIterable<TValue> {
     this.#wake()
   }
 
+  /**
+   * 正常收尾：标记关闭并唤醒等待者。已入队的值仍会被消费端排空后才结束，
+   * 因此最后几个 token 不会因关闭而丢失。
+   */
   public close(): void {
     if (this.#closed) return
     this.#closed = true
     this.#wake()
   }
 
+  /**
+   * 失败收尾：记录错误并关闭。消费端排空缓冲后会把这枚错误抛给迭代方，
+   * 已关闭则不再覆盖——首个失败原因优先。
+   *
+   * @param error - 终止整队的原始错误；会原样抛给消费者，不得在此包装或吞掉。
+   */
   public fail(error: Error): void {
     if (this.#closed) return
     this.#error = error

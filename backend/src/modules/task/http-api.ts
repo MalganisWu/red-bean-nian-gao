@@ -10,7 +10,12 @@ export interface TaskRouteDependencies extends TaskControllerDependencies {
   readonly authService: AuthServicePort
 }
 
-/** 创建 Task Controller 与认证边界，再注册承载请求解包与信封输出的路由表。 */
+/**
+ * 创建 Task Controller 与认证边界，再注册承载请求解包与信封输出的路由表。
+ *
+ * @param server - 目标 Fastify 实例，任务路由注册到它上面。
+ * @param dependencies - 路由组装依赖：用例服务与认证服务 Port。
+ */
 export function registerTaskRoutes(
   server: FastifyInstance,
   dependencies: TaskRouteDependencies

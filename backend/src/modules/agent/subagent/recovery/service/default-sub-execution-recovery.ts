@@ -18,6 +18,13 @@ export class SubExecutionRecovery implements AgentRunPreparation {
     this.#runtimeState = runtimeState
   }
 
+  /**
+   * 收束会话内滞留的 pending 子执行：逐个认领并改写为中断 / 等待用户态。
+   * 每轮开头先 `throwIfAborted` 让取消即时生效，单项失败也不阻断其余子执行的恢复。
+   *
+   * @param sessionId - 目标会话；空串直接跳过（无匹配范围）
+   * @param signal - 中止信号；已中止或单项失败后均会复检
+   */
   public async prepare(sessionId: string, signal: AbortSignal): Promise<void> {
     signal.throwIfAborted()
     if (sessionId === '') return

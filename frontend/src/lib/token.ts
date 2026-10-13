@@ -1,4 +1,9 @@
-/** JWT payload 解码（客户端不做验证，仅读取 claims） */
+/**
+ * JWT payload 解码（客户端不做验证，仅读取 claims）
+ *
+ * @param token - 待解码的 JWT；只读取第二段载荷，不校验签名（前端不持有密钥，验签交给后端）。
+ * @returns 含 user_id / username / exp / iat 的 claims；段缺失、base64 非法或字段不符时返回 null，绝不抛出。
+ */
 export function decodeJwtPayload(token: string): {
   user_id: string
   username: string
@@ -41,7 +46,13 @@ export function decodeJwtPayload(token: string): {
   }
 }
 
-/** 检查 token 是否即将过期（默认 5 分钟阈值） */
+/**
+ * 检查 token 是否即将过期（默认 5 分钟阈值）
+ *
+ * @param token - 待检查的 JWT；无法解码时按「即将过期」处理，促使调用方刷新。
+ * @param thresholdMinutes - 提前量阈值（分钟），缺省 5；剩余寿命不足该值即视为即将过期。
+ * @returns 需要刷新时 true；token 不可解析时同样返回 true。
+ */
 export function isTokenExpiringSoon(token: string, thresholdMinutes = 5): boolean {
   const payload = decodeJwtPayload(token)
   if (!payload) return true
@@ -50,7 +61,12 @@ export function isTokenExpiringSoon(token: string, thresholdMinutes = 5): boolea
   return Date.now() > expiresAt - threshold
 }
 
-/** 检查 token 是否已过期 */
+/**
+ * 检查 token 是否已过期
+ *
+ * @param token - 待检查的 JWT；无法解码时按「已过期」处理（fail-safe）。
+ * @returns 已过期或不可解析时 true，否则 false。
+ */
 export function isTokenExpired(token: string): boolean {
   const payload = decodeJwtPayload(token)
   if (!payload) return true

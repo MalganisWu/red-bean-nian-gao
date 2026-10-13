@@ -5,7 +5,11 @@ import { useAuth } from '@/hooks/useAuth'
 import { ROUTES } from '@/lib/constants'
 import { useAuthStore } from '@/stores/auth-store'
 
-/** 保护路由并在刷新后恢复当前用户，避免各页面分别处理账户占位。 */
+/**
+ * 保护路由并在刷新后恢复当前用户，避免各页面分别处理账户占位。
+ *
+ * @returns 已认证且已有用户信息时渲染子路由；未认证重定向登录；信息加载中或加载失败时渲染对应的占位界面。
+ */
 export function RequireAuth(): React.ReactElement {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const user = useAuthStore((state) => state.user)

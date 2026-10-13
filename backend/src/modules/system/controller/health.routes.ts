@@ -9,6 +9,9 @@ import type { HealthController } from './health.controller.js'
  * 路由层将部署探针结果投影为 HTTP 响应并决定状态码，不持有健康检查实现；
  * 探针响应为裸 body（非业务信封），与全局 setErrorHandler 的错误信封互不干扰。
  * 端点执行链路：onRequest(全局) → handler → 裸响应（无认证、无限流）。
+ *
+ * @param server - 目标 Fastify 实例，三条探针路由就地注册到它上面。
+ * @param controller - 探针控制器；本函数只接线，不持有其生命周期。
  */
 export function registerHealthRoutes(server: FastifyInstance, controller: HealthController): void {
   // GET /health → HealthController.health（裸响应）

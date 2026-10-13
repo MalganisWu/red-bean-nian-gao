@@ -125,19 +125,22 @@ function AnsweredQuestion({
 /**
  * Process 内的确认节点。它使用独立边框与状态提示；
  * 确认后原地压缩为问题与回答，不生成新的过程或消息。
+ *
+ * @param props - 组件属性；字段语义见 `QuestionCardProps`。
  */
-export function QuestionCard({
-  questions,
-  status,
-  answers,
-  submitting = false,
-  disabled = false,
-  error,
-  allowCustomAnswer = false,
-  confirmLabel,
-  onConfirm,
-  onRefuse,
-}: QuestionCardProps) {
+export function QuestionCard(props: QuestionCardProps) {
+  const {
+    questions,
+    status,
+    answers,
+    submitting = false,
+    disabled = false,
+    error,
+    allowCustomAnswer = false,
+    confirmLabel,
+    onConfirm,
+    onRefuse,
+  } = props
   const groupId = useId()
   const [innerStatus, setInnerStatus] = useState<'pending' | 'answered' | 'refused'>('pending')
   const [draftAnswers, setDraftAnswers] = useState<Record<string, QuestionCardAnswer>>(() =>

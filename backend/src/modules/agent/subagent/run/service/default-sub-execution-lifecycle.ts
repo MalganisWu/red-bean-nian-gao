@@ -72,6 +72,11 @@ export class SubExecutionLifecycle implements ChildExecutionLifecycle {
    *
    * 注意「不存在」与「不属于当前会话」用的是**同一句错误文案**：
    * 区分开会让人用 executionId 探测别人的子执行是否存在。
+   *
+   * @param identity - 子执行身份；executionId / sessionId / userId 用于归属校验，parentCallId 决定是否保留父关联
+   * @param resume - 是否续跑：false 表示新建，true 触发一串恢复校验（归属→有状态→interrupt 匹配→状态允许）
+   * @param signal - 中止信号，透传给仓储调用
+   * @returns 恢复上下文：新建时仅含 recoveryMessages 与 persistenceRevision；恢复时另含 state 与租约，调用方保存前须检查租约是否失效
    */
   public async load(
     identity: ChildExecutionIdentity,
@@ -150,6 +155,14 @@ export class SubExecutionLifecycle implements ChildExecutionLifecycle {
    * 两道门槛在写入之前：**租约仍然有效**（失效说明别的实例已接管，写进去就是覆盖别人的结果）
    * 与 **revision 未变**（CAS）。
    * 租约的 `release()` 放在 `finally`，且失败路径也走它——否则一次写失败会让心跳定时器一直活着。
+   *
+   * @param identity - 子执行身份；executionId 为空串时视为无需持久化，直接返回
+   * @param outcome - Runtime 执行结果；undefined 表示未拿到结果，按失败处理
+   * @param displaySections - 累积的展示 section；缺失或无 parentCallId 时不发布展示
+   * @param executionError - 执行期错误；用于映射 errorMessage 与兜底状态
+   * @param persistenceRevision - 加载时的 revision，作为 CAS 期望值；不符即冲突
+   * @param lease - resume 租约；保存前检查是否失效，写完后在 finally 释放
+   * @param signal - 中止信号；进入即先 throwIfAborted
    */
   public async save(
     identity: ChildExecutionIdentity,

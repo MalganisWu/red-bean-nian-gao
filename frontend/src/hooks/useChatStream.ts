@@ -52,7 +52,12 @@ export interface ChatStreamControls {
   canRetry: () => boolean
 }
 
-/** 消费一次对话流；同一批 SSE 事件分别喂给 chat-store（主展示）与 trajectory-store（轨迹投影）。 */
+/**
+ * 消费一次对话流；同一批 SSE 事件分别喂给 chat-store（主展示）与 trajectory-store（轨迹投影）。
+ *
+ * @param agentId - 本轮请求携带的 Agent 标识，缺省为 DEFAULT_AGENT_ID；send 与 answer 都据此选择后端 Agent。
+ * @returns 实时流状态与 send / cancel / answer / retry / canRetry 动作；重试仅对未收到 START 的连接级失败开放。
+ */
 export function useChatStream(agentId = DEFAULT_AGENT_ID): ChatStreamControls {
   // 具名 selector 订阅流式相关状态：避免订阅整个 store，
   // 使 sessions 等无关状态变化（如 loadSessions）不触发本 hook 重渲染。

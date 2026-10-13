@@ -65,22 +65,23 @@ export interface IButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   render?: React.ComponentProps<typeof BaseButton>['render']
 }
 
-/** 按钮组件；`children` 为内容，其余属性原样透传，`className` 追加在内置变体之后。 */
-export function Button({
-  children,
-  size = 'md',
-  className = '',
-  variant = 'default',
-  render,
-  ref,
-  ...props
-}: IButtonProps & { ref?: React.Ref<HTMLButtonElement> }): React.ReactElement {
+/**
+ * 按钮组件；`children` 为内容，其余属性原样透传，`className` 追加在内置变体之后。
+ *
+ * @param props - 组件属性；`variant` / `size` 走内置变体表，`render` 交给 base-ui 的渲染槽，
+ *   其余未知属性原样落到 `button` 上。
+ * @returns 一个宿主可继续追加属性与 children 的按钮元素。
+ */
+export function Button(
+  props: IButtonProps & { ref?: React.Ref<HTMLButtonElement> }
+): React.ReactElement {
+  const { children, size = 'md', className = '', variant = 'default', render, ref, ...rest } = props
   return (
     <BaseButton
       ref={ref}
       className={cn(buttonVariants({ variant, size }), className)}
       render={render}
-      {...props}
+      {...rest}
     >
       {children}
     </BaseButton>

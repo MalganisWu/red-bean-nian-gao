@@ -10,8 +10,13 @@ export interface SpecPageHeaderProps {
   note: string
 }
 
-/** 规范页头部：展示站组件页的标题区。 */
-export function SpecPageHeader({ title, description, note }: SpecPageHeaderProps) {
+/**
+ * 规范页头部：展示站组件页的标题区。
+ *
+ * @param props - 组件属性；字段语义见 `SpecPageHeaderProps`。
+ */
+export function SpecPageHeader(props: SpecPageHeaderProps) {
+  const { title, description, note } = props
   return (
     <header className="spec-page__header">
       <h2>{title}</h2>

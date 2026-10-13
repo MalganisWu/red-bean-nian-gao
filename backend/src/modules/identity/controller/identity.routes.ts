@@ -34,6 +34,9 @@ export interface IdentityRouteBindings {
  * 端点执行链路（Fastify 生命周期，自左向右）：onRequest(全局 Abort+CORS+trace)
  * → preHandler auth → preHandler 限流 → handler zod 校验 → Controller 业务 → 成功信封；
  * 错误由全局 setErrorHandler 统一输出。各端点差异见下方链路指纹注释。
+ *
+ * @param server - 承载路由的 Fastify 实例；路径一律取自 `API_ROUTES`，本函数不手写路径字面量
+ * @param bindings - 由组装层注入的 Controller 与前置处理器；认证策略在此按端点绑定，不做运行时挑选
  */
 export function registerUserRoutes(server: FastifyInstance, bindings: IdentityRouteBindings): void {
   // POST /api/register → IdentityController.register → IdentityRegistrationService.register

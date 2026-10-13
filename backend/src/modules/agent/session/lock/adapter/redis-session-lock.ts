@@ -63,6 +63,11 @@ export class RedisSessionLockRegistry implements SessionLockRegistry {
    * `owner` 由 `requestId:fencingToken:nonce` 拼成。nonce 是关键：同一个 requestId 重试时
    * owner 必须不同，否则新持有者会与旧持有者的 `compareAndDelete` 撞上同一个值，
    * 把别人的锁当成自己的删掉。
+   *
+   * @param sessionId - 目标会话标识，决定锁键 `session_lock:<id>`，同一会话的并发运行在此互斥。
+   * @param requestId - 本次运行标识，参与拼装 owner，用于区分同一会话的不同请求。
+   * @param parent - 调用方取消信号，可选；缺省时用永不中止的内部信号，因为抢锁本身不该被半途放弃。
+   * @returns 已持有的租约，持有者必须负责 `release()`。
    */
   public async tryAcquire(
     sessionId: string,
@@ -127,9 +132,11 @@ interface RedisSessionLockOptions {
  *   这是为了不把「调用方取消了」误报成「租约丢了」。
  */
 export class RedisSessionLock implements SessionLease {
+  /** 单调递增的围栏序号；回写到仓储后，旧序号实例的写入会被判为陈旧而拒绝。 */
   public readonly fencingToken: bigint
   /** 写证明：Store 用它核对「这次写入确实来自当前锁持有者」。 */
   public readonly writeProof: string
+  /** 丢失信号；只 resolve 一次的 Promise，续租发现锁已易主时兑现，持有者据此停止写入。 */
   public readonly lost: Promise<Error>
   readonly #redis: RedisStore
   readonly #key: string
