@@ -106,13 +106,24 @@ export interface TrajectoryLiveState {
   readonly turnBase: number
   /** 进行中记录的客户端计时起点（recordId → startMs）；定稿时换算 durationMs 后清除。 */
   readonly recordStartTimes: Readonly<Record<string, number>>
-  /** 并入一条 SSE 事件；类型未知或缺少归属轮次时原样返回、不产生更新。 */
+  /**
+   * 并入一条 SSE 事件；类型未知或缺少归属轮次时原样返回、不产生更新。
+   *
+   * @param event - 单条已解析的 SSE 事件；按 eventType 分派到对应分支。
+   */
   readonly applyEvent: (event: ParsedSSEEvent) => void
-  /** 新一轮用户输入开始时调用（发送即开轮，不等 START）。 */
+  /**
+   * 新一轮用户输入开始时调用（发送即开轮，不等 START）。
+   *
+   * @param content - 用户输入原文；直接作为本轮第一条 user 记录的摘要。
+   * @param sessionId - 会话 id；新会话此时可能还没拿到（START 事件才带回），允许 null/undefined。
+   */
   readonly beginUserTurn: (content: string, sessionId?: string | null) => void
   /**
    * 用已加载的历史轨迹对齐轮次号：设定基准，并把流式途中已建立的实时轮次按基准重编号
    * （视图在流式进行中打开时会先有临时轮次号，随后才拿到历史）。
+   *
+   * @param base - 对齐基准；取其 turnBase 作为实时轮次的起始序号。
    */
   readonly alignToHistory: (base: TrajectoryHistoryBase) => void
   /** 丢弃实时轮次（持久化轮次已经接管展示时调用）。 */

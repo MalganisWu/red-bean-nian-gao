@@ -52,7 +52,10 @@ export type AgentStreamEvent = AgentRuntimeEvent | SubAgentRuntimeEvent
 
 /** Agent 加载期间使用的事件出口。 */
 export interface AgentLoadContext {
-  /** 加载期事件出口；子 Agent 事件经它流向宿主，缺省表示不订阅。 */
+  /**
+   * 加载期事件出口；子 Agent 事件经它流向宿主，缺省表示不订阅。
+   * @param event - 加载期产生的运行时或子 Agent 信封事件；缺省时不订阅。
+   */
   readonly eventSink?: ((event: AgentStreamEvent) => void) | undefined
 }
 
@@ -109,12 +112,24 @@ export interface AgentLoader {
 
 /** 子 Agent Runtime 观测装饰器，由组装层注入 Loader。 */
 export interface ChildRuntimeDecorator {
-  /** 装饰子 Agent 的 LLM 适配器；缺省表示不改写。 */
+  /**
+   * 装饰子 Agent 的 LLM 适配器；缺省表示不改写。
+   * @param adapter - 被装饰的模型适配器；返回值替换原适配器向下游传递。
+   * @returns 装饰后的适配器；缺省实现应返回原对象。
+   */
   readonly wrapLlm?: ((adapter: AgentModelAdapter) => AgentModelAdapter) | undefined
-  /** 装饰子 Agent 的工具分派器；缺省表示不改写。 */
+  /**
+   * 装饰子 Agent 的工具分派器；缺省表示不改写。
+   * @param dispatcher - 被装饰的工具分派器；返回值替换原实例向下游传递。
+   * @returns 装饰后的分派器；缺省实现应返回原对象。
+   */
   readonly wrapToolDispatcher?:
     ((dispatcher: AgentToolDispatcher) => AgentToolDispatcher) | undefined
-  /** 装饰子 Agent 的运行器；缺省表示不改写。 */
+  /**
+   * 装饰子 Agent 的运行器；缺省表示不改写。
+   * @param runner - 被装饰的子运行器；返回值替换原实例向下游传递。
+   * @returns 装饰后的运行器；缺省实现应返回原对象。
+   */
   readonly wrapChildRunner?: ((runner: AgentChildRunner) => AgentChildRunner) | undefined
 }
 

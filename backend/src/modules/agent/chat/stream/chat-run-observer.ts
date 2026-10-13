@@ -34,9 +34,15 @@ export class ChatRunObserver implements AgentExecutionEventSink, AgentExecutionM
   readonly #queue: { push(event: ProductStreamEvent): void }
   /** 恢复缓冲；增量写入尽力而为，最终提交点在 Session 保存。 */
   readonly #messageBuffer: MessageBuffer
-  /** 已提交消息的附加观察者（如事实日志写入器）；先于展示投影调用。 */
+  /**
+   * 已提交消息的附加观察者（如事实日志写入器）；先于展示投影调用。
+   * @param message - 刚被提交的领域消息；观察者须同步消费，不得抛错打断主流程。
+   */
   readonly #onMessage: ((message: AgentMessage) => void) | undefined
-  /** Runtime 事件的附加观察者（如事实日志写入器）；先于 SSE 投影调用。 */
+  /**
+   * Runtime 事件的附加观察者（如事实日志写入器）；先于 SSE 投影调用。
+   * @param event - Runtime 上报的原始事件；在展示投影改写前交给观察者，且不得抛错。
+   */
   readonly #onEvent: ((event: AgentRuntimeEvent) => void) | undefined
 
   public constructor(options: {

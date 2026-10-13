@@ -100,43 +100,96 @@ interface ChatState {
 
 /** 对话主投影对外暴露的动作集合：流式写入、卡片提交、错误处理与会话侧栏加载，供组件回调调用。 */
 interface ChatActions {
-  /** 追加一条本地用户消息，id 与时间戳在本地生成。 */
+  /**
+   * 追加一条本地用户消息，id 与时间戳在本地生成。
+   * @param content - 用户输入的消息正文，原样写入新消息的 content 字段。
+   */
   addUserMessage: (content: string) => void
   /** 记录前端发出本轮请求的时刻，作为流式总耗时的真实起点。 */
   markSent: () => void
-  /** 开始一轮流式：记录请求/会话 id 与起点时刻，清空上一轮状态与错误。 */
+  /**
+   * 开始一轮流式：记录请求/会话 id 与起点时刻，清空上一轮状态与错误。
+   * @param requestId - 本轮请求 id，写入状态供取消与竞态比对使用。
+   * @param sessionId - 目标会话 id，同时用于高亮当前会话；为空串时沿用已有高亮会话。
+   */
   startStreaming: (requestId: string, sessionId: string) => void
-  /** 追加一段回答 token 到在途 section 的 content 段（末段）。 */
+  /**
+   * 追加一段回答 token 到在途 section 的 content 段（末段）。
+   * @param content - 本次增量回答文本，追加到在途 section 末段的 content。
+   */
   appendToken: (content: string) => void
-  /** 把在途 section 定稿为一条消息（续跑则合并进卡片消息），并清空 pendingSections。 */
+  /**
+   * 把在途 section 定稿为一条消息（续跑则合并进卡片消息），并清空 pendingSections。
+   * @param terminalStatus - 终态标记，为 'cancelled' 时把定稿消息标注为已取消；省略则不带终态。
+   */
   finalizeStreamingText: (terminalStatus?: 'cancelled') => void
-  /** 设置或清除服务端状态提示文案（null 表示无提示）。 */
+  /**
+   * 设置或清除服务端状态提示文案（null 表示无提示）。
+   * @param content - 要展示的状态提示文案；传 null 表示清除提示。
+   */
   setStatus: (content: string | null) => void
-  /** 记录流式错误并结束本轮请求生命周期（停止流式、清空起点）。 */
+  /**
+   * 记录流式错误并结束本轮请求生命周期（停止流式、清空起点）。
+   * @param error - 最近一次流式错误事件，写入 error 并驱动界面的可重试错误态。
+   */
   setError: (error: ErrorEvent) => void
   /** 清除错误态，不影响进行中的流式。 */
   clearError: () => void
   /** 确保在途 section 里已有一个思考块，没有则新建空思考块。 */
   ensureThinkingBlock: () => void
-  /** 追加一步思考内容（序号 + 文本）到在途的 reason 段。 */
+  /**
+   * 追加一步思考内容（序号 + 文本）到在途的 reason 段。
+   * @param step - 思考步骤序号，用于在 reason 段内排序。
+   * @param content - 该步思考的文本内容。
+   */
   appendReasonStep: (step: number, content: string) => void
-  /** 工具开始：追加一条 running 的 tool section（带参数时一并记录）。 */
+  /**
+   * 工具开始：追加一条 running 的 tool section（带参数时一并记录）。
+   * @param callId - 工具调用 id，用于后续结果或失败落定时定位该 section。
+   * @param toolName - 工具名称，展示在 tool section 上。
+   * @param params - 工具调用入参；未提供时该 section 不记录参数。
+   */
   startToolCall: (callId: string, toolName: string, params?: Record<string, unknown>) => void
-  /** 工具成功落定，并把同 callId 的委派 section 收尾（剥掉续跑协议标记）。 */
+  /**
+   * 工具成功落定，并把同 callId 的委派 section 收尾（剥掉续跑协议标记）。
+   * @param callId - 成功落定的工具调用 id，用于定位对应的 tool section。
+   * @param result - 工具返回文本，写入 section 作为结果展示。
+   */
   completeToolCall: (callId: string, result: string) => void
-  /** 工具失败落定，并把同 callId 的委派 section 收尾为失败。 */
+  /**
+   * 工具失败落定，并把同 callId 的委派 section 收尾为失败。
+   * @param callId - 失败的工具调用 id，用于定位对应的 tool section。
+   * @param error - 失败原因文本，写入 section 作为失败结果展示。
+   */
   failToolCall: (callId: string, error: string) => void
-  /** 追加一张待回答卡片 section。 */
+  /**
+   * 追加一张待回答卡片 section。
+   * @param card - 待回答的卡片数据，作为 type="card" section 追加到在途消息。
+   */
   setPendingCard: (card: CardSectionData) => void
-  /** 并入一条子 Agent 信封事件：按 parent_call_id 建或找 sub_agent section。 */
+  /**
+   * 并入一条子 Agent 信封事件：按 parent_call_id 建或找 sub_agent section。
+   * @param env - 子 Agent 信封载荷，携带 agent/execution 标识与内层事件。
+   */
   appendSubAgentEvent: (env: SubAgentEnvelopePayload) => void
   /** 把仍处于 running 的工具 section 收尾为中断态（用于流异常结束）。 */
   settleIncompleteTools: () => void
-  /** 把卡片标记为已回答，并写入用户提交的答案。 */
+  /**
+   * 把卡片标记为已回答，并写入用户提交的答案。
+   * @param interactionId - 卡片交互 id，用于定位要标记的卡片 section。
+   * @param answers - 用户提交的答案，按问题 id 索引写入卡片。
+   */
   markCardAnswered: (interactionId: string, answers: Record<string, QuestionCardAnswer>) => void
-  /** 把卡片标记为已拒绝（answers 置空）。 */
+  /**
+   * 把卡片标记为已拒绝（answers 置空）。
+   * @param interactionId - 卡片交互 id，用于定位要标记为已拒绝的卡片 section。
+   */
   markCardRefused: (interactionId: string) => void
-  /** 进入卡片提交态（submitting），记录本次提交的答案与拒绝标记。 */
+  /**
+   * 进入卡片提交态（submitting），记录本次提交的答案与拒绝标记。
+   * @param interactionId - 本次提交对应的卡片交互 id。
+   * @param payload - 提交内容，含可选答案与拒绝标记。
+   */
   beginCardSubmission: (
     interactionId: string,
     payload: {
@@ -148,9 +201,15 @@ interface ChatActions {
   acceptCardSubmission: () => void
   /** 提交收尾：按拒绝与否落定卡片，并清空提交态。 */
   completeCardSubmission: () => void
-  /** 提交失败：卡片转错误态，同时结束本轮流式与请求生命周期。 */
+  /**
+   * 提交失败：卡片转错误态，同时结束本轮流式与请求生命周期。
+   * @param error - 提交失败原因文本，写入卡片提交态供界面提示。
+   */
   failCardSubmission: (error: string) => void
-  /** 停止流式：先定稿在途文本，再清空流式状态。 */
+  /**
+   * 停止流式：先定稿在途文本，再清空流式状态。
+   * @param terminalStatus - 终态标记，为 'cancelled' 时把定稿消息标注为已取消；省略则不带终态。
+   */
   stopStreaming: (terminalStatus?: 'cancelled') => void
   /** 复位会话级状态到初始基线，并递增导航代次以作废旧连接。 */
   reset: () => void
@@ -160,7 +219,10 @@ interface ChatActions {
   loadSessions: () => Promise<void>
   /** 以当前游标追加下一页会话列表；无游标或正在加载时跳过。 */
   loadMoreSessions: () => Promise<void>
-  /** 切换会话：先清空并递增导航代次，再拉取目标会话（仅仍停留在目标时才落地）。 */
+  /**
+   * 切换会话：先清空并递增导航代次，再拉取目标会话（仅仍停留在目标时才落地）。
+   * @param sessionId - 目标会话 id，用于拉取历史消息并作为高亮会话。
+   */
   switchSession: (sessionId: string) => Promise<void>
   /** 开启新会话：按基线清空会话级状态。 */
   newSession: () => void

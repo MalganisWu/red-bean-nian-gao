@@ -68,7 +68,10 @@ export interface RuntimeChildRunnerOptions {
   readonly onMessage?: ChildMessageSink | undefined
   /** 子执行生命周期；缺省表示不做持久化加载与保存。 */
   readonly lifecycle?: ChildExecutionLifecycle | undefined
-  /** 展示收集器工厂；缺省表示不收集展示 section。 */
+  /**
+   * 展示收集器工厂；缺省表示不收集展示 section。
+   * @returns 本次子执行新建的展示收集器；每次运行独立，避免上一次的 section 泄漏。
+   */
   readonly createSectionCollector?: (() => ChildSectionCollector) | undefined
   /** 子运行事件出口工厂；缺省表示不向父流转发子执行进展。 */
   readonly stream?: ChildStreamFactory | undefined

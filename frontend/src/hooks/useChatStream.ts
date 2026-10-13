@@ -57,15 +57,29 @@ export interface ChatStreamControls {
   pendingSections: MessageSection[]
   /** 当前卡片的提交进行态；null 表示无待提交卡片。 */
   cardSubmission: CardSubmissionState | null
-  /** 发送一轮用户消息：乐观追加用户气泡后发起 SSE 流。 */
+  /**
+   * 发送一轮用户消息：乐观追加用户气泡后发起 SSE 流。
+   * @param messages - 本轮消息列表；取最后一条 user 消息作为发送单元，避免历史被重复追加。
+   * @param sessionId - 目标会话 id；缺省时回落到 store 中的当前会话。
+   */
   send: (messages: ChatMessage[], sessionId?: string) => void
   /** 取消当前流：先失效连接回调再 abort，随后通知服务端取消。 */
   cancel: () => Promise<void>
-  /** 提交询问卡片答案/拒绝，随后续跑 SSE。 */
+  /**
+   * 提交询问卡片答案/拒绝，随后续跑 SSE。
+   * @param interactionId - 被作答卡片的交互 id；后端据此定位待答询问。
+   * @param payload - 作答载荷；提交答案映射或声明拒绝作答，二者择一。
+   */
   answer: (interactionId: string, payload: AnswerPayload) => void
-  /** 原样重发最近一次请求；已收到 START 的流不允许重放，此时返回 false。 */
+  /**
+   * 原样重发最近一次请求；已收到 START 的流不允许重放，此时返回 false。
+   * @returns 是否成功发起重发；没有可重发请求或已收到 START 时返回 false。
+   */
   retry: () => boolean
-  /** 当前是否允许重试；仅对尚未收到 START 的连接级失败为 true。 */
+  /**
+   * 当前是否允许重试；仅对尚未收到 START 的连接级失败为 true。
+   * @returns 是否允许重试；存在可重发请求且尚未收到 START 时为 true。
+   */
   canRetry: () => boolean
 }
 

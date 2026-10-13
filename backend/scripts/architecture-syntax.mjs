@@ -255,8 +255,7 @@ function collectClassMember(member, sourceFile, source, records, usedPaths, clas
     pushRecord(records, usedPaths, {
       ...base,
       symbolPath: `${className}.${name}`,
-      kind: 'property',
-      returnTypeText: typeTextOf(member.type, sourceFile),
+      ...functionTypedMemberFields(member, sourceFile),
     })
   }
 }
@@ -321,10 +320,58 @@ function collectInterfaceMember(
     pushRecord(records, usedPaths, {
       ...base,
       symbolPath: `${interfaceName}.${name}`,
-      kind: 'property',
-      returnTypeText: typeTextOf(member.type, sourceFile),
+      ...functionTypedMemberFields(member, sourceFile),
     })
   }
+}
+
+/**
+ * 属性成员的 `kind` / 参数 / 返回类型。
+ *
+ * 属性声明的类型是**函数类型**时按**方法**处理：`readonly send: (a: string) => void` 与
+ * `send(a: string): void` 是同一个契约，只差写法；不认前者会造成「同一个接口里两种写法的
+ * 要求不同」（一个只要描述正文，一个要逐个 `@param`）。否则是普通属性，只要描述正文。
+ */
+function functionTypedMemberFields(member, sourceFile) {
+  const signature = functionTypeOf(member.type)
+  if (signature === undefined) {
+    return {
+      kind: 'property',
+      params: [],
+      hasDestructuredParam: false,
+      returnTypeText: typeTextOf(member.type, sourceFile),
+    }
+  }
+  return {
+    kind: 'method',
+    params: simpleParameterNames(signature.parameters),
+    hasDestructuredParam: signature.parameters.some(isDestructuredParameter),
+    returnTypeText: typeTextOf(signature.type, sourceFile),
+  }
+}
+
+/**
+ * 属性声明上的函数类型签名；不是函数类型时返回 `undefined`。
+ *
+ * 解包括号，并剥掉 `| undefined` / `| null` 这类可选包装 —— 它们只是可空标注，
+ * 不改变那个函数签名的形状。
+ */
+function functionTypeOf(typeNode) {
+  if (typeNode === undefined) return undefined
+  if (ts.isFunctionTypeNode(typeNode)) return typeNode
+  if (ts.isParenthesizedTypeNode(typeNode)) return functionTypeOf(typeNode.type)
+  if (!ts.isUnionTypeNode(typeNode)) return undefined
+  const functions = typeNode.types.filter((t) => functionTypeOf(t) !== undefined)
+  if (functions.length !== 1) return undefined
+  const optionalOnly = typeNode.types
+    .filter((t) => functionTypeOf(t) === undefined)
+    .every(
+      (t) =>
+        t.kind === ts.SyntaxKind.UndefinedKeyword ||
+        t.kind === ts.SyntaxKind.NullKeyword ||
+        (ts.isLiteralTypeNode(t) && ts.isNullLiteral(t.literal))
+    )
+  return optionalOnly ? functionTypeOf(functions[0]) : undefined
 }
 
 function memberNameOf(member) {

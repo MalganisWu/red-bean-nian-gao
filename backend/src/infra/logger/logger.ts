@@ -23,7 +23,10 @@ export interface LoggerOptions {
   readonly level: string
   /** 输出目标；缺省写 stdout，注入后测试即可捕获写出的行。 */
   readonly destination?: LogDestination
-  /** 时钟；缺省用系统时间，注入后测试可得到稳定时间戳。 */
+  /**
+   * 时钟；缺省用系统时间，注入后测试可得到稳定时间戳。
+   * @returns 当前时刻
+   */
   readonly now?: () => Date
 }
 
@@ -93,7 +96,10 @@ class StructuredLogger implements Logger {
   readonly #minimumLevel: LogLevel
   /** 实际输出目标；未注入时为 stdout。 */
   readonly #destination: LogDestination
-  /** 时间源；每写完一条记录取一次当前时间。 */
+  /**
+   * 时间源；每写完一条记录取一次当前时间。
+   * @returns 当前时刻
+   */
   readonly #now: () => Date
   /** 本实例绑定的结构化字段；`child` 派生的实例在此基础上叠加。 */
   readonly #fields: LogFields

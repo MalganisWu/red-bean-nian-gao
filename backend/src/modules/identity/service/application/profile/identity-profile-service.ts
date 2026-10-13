@@ -21,7 +21,10 @@ export interface UpdateSelfCommand {
 export interface IdentityProfileServiceOptions {
   /** 用户仓储；读写都经它，本服务不持有连接池。 */
   readonly users: UserRepository
-  /** 产生 `updatedAt` 的时钟；缺省用系统时钟，测试注入固定值以获得确定性。 */
+  /**
+   * 产生 `updatedAt` 的时钟；缺省用系统时钟，测试注入固定值以获得确定性。
+   * @returns 当前时刻
+   */
   readonly now?: (() => Date) | undefined
 }
 
@@ -32,7 +35,10 @@ export interface IdentityProfileServiceOptions {
 export class IdentityProfileService {
   /** 用户仓储，构造时注入，读写都经它并透传取消信号。 */
   readonly #users: UserRepository
-  /** 产生时间戳的时钟，构造时确定；默认取系统时钟，测试可注入固定实现。 */
+  /**
+   * 产生时间戳的时钟，构造时确定；默认取系统时钟，测试可注入固定实现。
+   * @returns 当前时刻
+   */
   readonly #now: () => Date
 
   public constructor(options: IdentityProfileServiceOptions) {

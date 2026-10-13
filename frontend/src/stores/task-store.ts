@@ -60,29 +60,76 @@ interface TaskState {
  * 拉取类用自增序号丢弃过期响应，变更类做乐观更新并在失败时回滚。
  */
 interface TaskActions {
-  /** 拉取某个会话下的任务列表（覆盖式）。 */
+  /**
+   * 拉取某个会话下的任务列表（覆盖式）。
+   *
+   * @param sessionId - 目标会话主键；用于定位并覆盖该会话下的任务列表。
+   */
   loadSessionTasks: (sessionId: string) => Promise<void>
-  /** 拉取任务列表：带游标时追加，否则整体替换；正在加载时跳过。 */
+  /**
+   * 拉取任务列表：带游标时追加，否则整体替换；正在加载时跳过。
+   *
+   * @param cursor - 上一页返回的翻页游标；缺省表示拉取首页并整体替换列表。
+   */
   loadTasks: (cursor?: string) => Promise<void>
-  /** 拉取任务详情；响应回来时若已有更新的请求，则整条结果丢弃。 */
+  /**
+   * 拉取任务详情；响应回来时若已有更新的请求，则整条结果丢弃。
+   *
+   * @param taskId - 目标任务主键；用于定位并把结果写入当前任务详情。
+   */
   loadTaskDetail: (taskId: string) => Promise<void>
-  /** 拉取某任务的执行列表；首屏先清空旧列表，响应回来时丢弃过期请求。 */
+  /**
+   * 拉取某任务的执行列表；首屏先清空旧列表，响应回来时丢弃过期请求。
+   *
+   * @param taskId - 所属任务主键；用于定位任务下的执行集合并限定请求范围。
+   * @param cursor - 上一页返回的翻页游标；缺省表示拉取首页并清空旧列表。
+   */
   loadExecutions: (taskId: string, cursor?: string) => Promise<void>
-  /** 拉取执行详情；响应回来时若已有更新的请求，则整条结果丢弃。 */
+  /**
+   * 拉取执行详情；响应回来时若已有更新的请求，则整条结果丢弃。
+   *
+   * @param taskId - 所属任务主键；用于限定执行归属并构造请求路径。
+   * @param executionId - 目标执行主键；用于定位并把结果写入当前执行详情。
+   */
   loadExecutionDetail: (taskId: string, executionId: string) => Promise<void>
-  /** 批量补拉执行视图状态（未加载或加载失败的），失败重试两次后退化为默认态。 */
+  /**
+   * 批量补拉执行视图状态（未加载或加载失败的），失败重试两次后退化为默认态。
+   *
+   * @param executionIds - 待补拉的执行主键集合；内部去重并跳过已加载或在途的条目。
+   */
   loadExecutionViewStates: (executionIds: string[]) => Promise<void>
-  /** 标记执行已读；已读过则直接返回成功，否则写服务端并以回执落状态。 */
+  /**
+   * 标记执行已读；已读过则直接返回成功，否则写服务端并以回执落状态。
+   *
+   * @param taskId - 所属任务主键；用于限定执行归属并构造请求路径。
+   * @param executionId - 目标执行主键；用于定位待标记的视图状态。
+   * @returns 是否已成功置为已读；已读过或写入成功返回 true，写入失败返回 false。
+   */
   markExecutionSeen: (taskId: string, executionId: string) => Promise<boolean>
-  /** 设置执行折叠态：先乐观写入，服务端回执或失败后各自回填。 */
+  /**
+   * 设置执行折叠态：先乐观写入，服务端回执或失败后各自回填。
+   *
+   * @param taskId - 所属任务主键；用于限定执行归属并构造请求路径。
+   * @param executionId - 目标执行主键；用于定位待折叠的视图状态。
+   * @param collapsed - 目标折叠状态；true 收起、false 展开。
+   * @returns 服务端写入是否成功；失败时已回滚本地乐观更新并返回 false。
+   */
   setExecutionCollapsed: (
     taskId: string,
     executionId: string,
     collapsed: boolean
   ) => Promise<boolean>
-  /** 切换任务启用态，并把新状态同步到详情与各列表项。 */
+  /**
+   * 切换任务启用态，并把新状态同步到详情与各列表项。
+   *
+   * @param taskId - 目标任务主键；无当前任务详情时直接跳过。
+   */
   toggleTaskActive: (taskId: string) => Promise<void>
-  /** 删除任务，并从会话任务列表与全局任务列表中一并移除。 */
+  /**
+   * 删除任务，并从会话任务列表与全局任务列表中一并移除。
+   *
+   * @param taskId - 目标任务主键；用于删除服务端记录并清理各列表项。
+   */
   deleteTask: (taskId: string) => Promise<void>
   /** 复位任务 store 到初始状态。 */
   reset: () => void

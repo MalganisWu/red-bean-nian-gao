@@ -27,10 +27,17 @@ interface MessageCardProps {
   isStreaming?: boolean | undefined
   /** 回合元信息（run_started_at 用于历史回合总耗时重算） */
   meta?: DisplayMessageMeta | undefined
-  /** pending 卡片确认/拒绝回调（answer 调用由上层注入） */
+  /**
+   * pending 卡片确认/拒绝回调（answer 调用由上层注入）
+   * @param interactionId - 被确认卡片的交互 id；用于把答案路由回对应的询问。
+   * @param answers - 用户提交的答案，按题目 id 索引；上层据此续跑对话流。
+   */
   onCardConfirm?:
     ((interactionId: string, answers: Record<string, QuestionCardAnswer>) => void) | undefined
-  /** pending 卡片拒绝回调；用户拒绝作答时触发。 */
+  /**
+   * pending 卡片拒绝回调；用户拒绝作答时触发。
+   * @param interactionId - 被拒绝卡片的交互 id；后端据此按拒绝处理该询问。
+   */
   onCardRefuse?: ((interactionId: string) => void) | undefined
   /** 当前卡片的提交态；非空时卡片按 submitting/error 等状态渲染。 */
   cardSubmission?: CardSubmissionState | null | undefined

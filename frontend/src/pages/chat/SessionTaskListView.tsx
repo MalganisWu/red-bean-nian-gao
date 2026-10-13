@@ -14,9 +14,16 @@ import { useTaskStore } from '@/stores/task-store'
 interface SessionTaskListViewProps {
   /** 点击返回时触发。 */
   onBack: () => void
-  /** 选中某个任务时触发，携带任务 id。 */
+  /**
+   * 选中某个任务时触发，携带任务 id。
+   * @param taskId - 被选中的任务 id；调用方据此进入任务详情。
+   */
   onSelectTask: (taskId: string) => void
-  /** 选中某次执行时触发，携带任务 id 与执行 id。 */
+  /**
+   * 选中某次执行时触发，携带任务 id 与执行 id。
+   * @param taskId - 该次执行所属的任务 id。
+   * @param executionId - 被选中的执行 id；调用方据此打开该次执行详情。
+   */
   onSelectExecution: (taskId: string, executionId: string) => void
 }
 

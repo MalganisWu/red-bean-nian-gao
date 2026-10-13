@@ -243,6 +243,9 @@ return runWithMiddleware(info, middleware, runRequest, signal);
   `undefined` 及其 `Promise<>` 包装，以及由它们组成的联合（`Promise<void> | void` 算 void 类）；
   没有写返回类型时**不要求**（fail-open，避免门禁变成「先补返回类型标注」的连锁改造）；
 - `@param` / `@returns` 与当前签名一一对应：参数改名或删除后 tag 未同步即失败；
+- **函数类型的属性按方法判**：`readonly send: (a: string) => void` 与 `send(a: string): void`
+  是同一个契约、只差写法，因此前者同样要逐参数 `@param`（非 void 返回再加 `@returns`）。
+  只对**属性类型本身是函数类型**的情况如此；`onClick?: () => void` 这类可空包装会先剥掉再判。
 - 解构参数会失败 —— 参数必须是简单标识符。React 组件因此把参数写成具名 `props`、解构放在
   函数体首行；函数体内仍不使用 `props.xxx`；
 - **语言**：描述正文与 `@param` / `@returns` 的说明必须含中文字符。判据是**中文是主要工作语言**：

@@ -11,7 +11,10 @@ export interface PresentationClock {
 export interface DisplayMessageCollectorOptions {
   /** 时间戳来源；缺省用 `Date.now`，注入后测试可产出确定的时间。 */
   readonly now?: PresentationClock | undefined
-  /** 构造当次运行 section 的方法；缺省则 assistant 消息只带正文分节。 */
+  /**
+   * 构造当次运行 section 的方法；缺省则 assistant 消息只带正文分节。
+   * @returns 当次运行的 section 值；收集器挂到 assistant 消息上，非数组或空则退回正文分节。
+   */
   readonly buildSections?: (() => AgentJsonValue) | undefined
 }
 
@@ -36,7 +39,10 @@ export interface PresentationContext {
 export class DisplayMessageCollector {
   /** 时间戳来源；可注入，测试据此产出确定的时间。 */
   readonly #now: PresentationClock
-  /** 构造当次运行 section 的方法；缺省则只产出正文分节。 */
+  /**
+   * 构造当次运行 section 的方法；缺省则只产出正文分节。
+   * @returns 当次运行的 section 值；非数组或空时退回正文分节。
+   */
   readonly #buildSections: (() => AgentJsonValue) | undefined
   /** 已收集的展示消息；对外经 `messages` getter 深拷贝返回。 */
   readonly #messages: DisplayMessage[] = []

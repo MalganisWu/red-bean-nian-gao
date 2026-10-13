@@ -23,7 +23,10 @@ export interface ObservabilityProviderOptions {
 
 /** 构造依赖；两处均可注入，测试因此不建真实 exporter、也不去抓 stdout。 */
 export interface ObservabilityProviderDependencies {
-  /** span 导出器工厂；注入后测试无需建真实 exporter，缺省用默认 OTLP 导出器。 */
+  /**
+   * span 导出器工厂；注入后测试无需建真实 exporter，缺省用默认 OTLP 导出器。
+   * @returns 新建的 span 导出器实例，由 SDK provider 持有并负责批量上报与关闭
+   */
   readonly exporterFactory?: (() => tracing.SpanExporter) | undefined
   /** 结构化日志去向；注入后测试无需捕获 stdout，缺省由 sink 自行决定。 */
   readonly logSink?: StructuredLogSink | undefined

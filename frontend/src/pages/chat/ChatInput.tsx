@@ -4,7 +4,10 @@ import { ArrowRight, Square } from 'lucide-react'
 interface ChatInputProps {
   /** 输入框的受控文本值。 */
   value: string
-  /** 文本变更时回调，由调用方更新受控值。 */
+  /**
+   * 文本变更时回调，由调用方更新受控值。
+   * @param value - 输入框的最新文本；调用方据此更新受控值。
+   */
   onChange: (value: string) => void
   /** 提交发送；回车（非 IME 组合中）与发送按钮都触发。 */
   onSend: () => void

@@ -22,7 +22,10 @@ export interface FollowTailOptions {
 export interface FollowTail {
   /** 绑定到滚动容器的 ref。 */
   readonly containerRef: RefObject<HTMLDivElement | null>
-  /** 绑定到滚动容器 onScroll：判定用户上滚暂停 / 回底恢复。 */
+  /**
+   * 绑定到滚动容器 onScroll：判定用户上滚暂停 / 回底恢复。
+   * @param event - 滚动事件；据 currentTarget 距底距离判定暂停或恢复跟随。
+   */
   readonly onScroll: (event: UIEvent<HTMLDivElement>) => void
 }
 

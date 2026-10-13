@@ -33,7 +33,10 @@ export interface IdentityRegistrationServiceOptions {
   readonly passwordHasher: PasswordHasher
   /** 用户 ID 生成器；注入而非本地自造，保证 ID 策略全局一致。 */
   readonly idGenerator: IdGenerator
-  /** 产生创建/更新时间戳的时钟；缺省用系统时钟，测试注入固定值以获得确定性。 */
+  /**
+   * 产生创建/更新时间戳的时钟；缺省用系统时钟，测试注入固定值以获得确定性。
+   * @returns 当前时刻
+   */
   readonly now?: (() => Date) | undefined
 }
 
@@ -48,7 +51,10 @@ export class IdentityRegistrationService {
   readonly #passwordHasher: PasswordHasher
   /** 用户 ID 生成器，构造时注入；只用于生成新用户的 id。 */
   readonly #idGenerator: IdGenerator
-  /** 产生创建/更新时间戳的时钟，构造时确定；默认取系统时钟，测试可注入固定实现。 */
+  /**
+   * 产生创建/更新时间戳的时钟，构造时确定；默认取系统时钟，测试可注入固定实现。
+   * @returns 当前时刻
+   */
   readonly #now: () => Date
 
   public constructor(options: IdentityRegistrationServiceOptions) {

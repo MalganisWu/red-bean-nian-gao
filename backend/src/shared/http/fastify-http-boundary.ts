@@ -67,7 +67,10 @@ export interface HttpServerOptions {
   readonly logger?: FastifyServerOptions['logger'] | undefined
   /** 观测实现；缺省用 `NoopTracer`，业务代码因此不必判空。 */
   readonly tracer?: TracerPort | undefined
-  /** trace ID 生成函数；缺省用随机 16 字节 hex。 */
+  /**
+   * trace ID 生成函数；缺省用随机 16 字节 hex。
+   * @returns 新的 trace ID 字符串；随后回写到 x-trace-id 响应头
+   */
   readonly traceIdGenerator?: (() => string) | undefined
   /** 外部 trace header 解析器；缺省不从 header 继承 trace 上下文。 */
   readonly traceContextExtractor?: TraceContextExtractorPort | undefined
@@ -87,7 +90,10 @@ export interface FixedWindowRateLimiterOptions {
   readonly limit: number
   /** 窗口长度，毫秒。 */
   readonly windowMilliseconds: number
-  /** 当前时刻来源；可注入，测试因此不必真的等满一个窗口。 */
+  /**
+   * 当前时刻来源；可注入，测试因此不必真的等满一个窗口。
+   * @returns 当前时刻，epoch 毫秒
+   */
   readonly now?: (() => number) | undefined
 }
 
@@ -103,7 +109,10 @@ interface RateLimitDecision {
 interface TraceHookDependencies {
   /** 外部 trace 上下文解析器；缺省表示不继承上游 trace 上下文。 */
   readonly extractor: TraceContextExtractorPort | undefined
-  /** 生成新 trace ID 的函数；header 里没有可用 trace ID 时使用。 */
+  /**
+   * 生成新 trace ID 的函数；header 里没有可用 trace ID 时使用。
+   * @returns 新的 trace ID 字符串；上游未提供时用作本次请求的链路标识
+   */
   readonly generateTraceId: () => string
   /** 观测实现；恒有实例，业务代码不必判空。 */
   readonly tracer: TracerPort
@@ -406,7 +415,10 @@ export class FixedWindowRateLimiter {
   readonly #limit: number
   /** 窗口长度，毫秒。 */
   readonly #windowMilliseconds: number
-  /** 当前时刻来源；可注入以便测试不必真的等满窗口。 */
+  /**
+   * 当前时刻来源；可注入以便测试不必真的等满窗口。
+   * @returns 当前时刻，epoch 毫秒
+   */
   readonly #now: () => number
   /** 上次惰性清理的时刻，epoch 毫秒。 */
   #lastCleanup: number

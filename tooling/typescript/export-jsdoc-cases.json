@@ -308,5 +308,31 @@
       "hasDestructuredParam": false,
       "returnTypeText": "Promise<void> | void"
     }
+  },
+  {
+    "name": "函数类型的属性按方法判：要有逐参数 @param",
+    "valid": false,
+    "record": {
+      "symbolPath": "ChatRunObserver.onMessage",
+      "kind": "method",
+      "exported": true,
+      "jsdocText": "/** 已提交消息的通知回调。 */",
+      "params": ["message"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "void"
+    }
+  },
+  {
+    "name": "非函数类型的属性只要描述正文",
+    "valid": true,
+    "record": {
+      "symbolPath": "ChatRunObserver.bufferSize",
+      "kind": "property",
+      "exported": true,
+      "jsdocText": "/** 缓冲上限，超过后丢弃最旧事件。 */",
+      "params": [],
+      "hasDestructuredParam": false,
+      "returnTypeText": "number"
+    }
   }
 ]

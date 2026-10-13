@@ -7,7 +7,10 @@ type Theme = 'light' | 'dark'
 interface ThemeContextValue {
   /** 当前生效的主题。 */
   theme: Theme
-  /** 显式设置主题；会同步到 documentElement 与 localStorage。 */
+  /**
+   * 显式设置主题；会同步到 documentElement 与 localStorage。
+   * @param theme - 要设置的主题；仅 light / dark 两态，会同步写入 DOM 与存储。
+   */
   setTheme: (theme: Theme) => void
   /** 在 light / dark 之间切换，即 setTheme 的反向操作。 */
   toggleTheme: () => void

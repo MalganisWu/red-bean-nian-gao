@@ -54,7 +54,10 @@ export class ManagedChatRunHandle implements ChatRunHandle {
   readonly #queue: RunEventQueue<ProductStreamEvent>
   /** 内部中止控制器；与父信号合并成运行取消信号。 */
   readonly #controller = new AbortController()
-  /** 结算 `completion` 的回调；由生产者收尾时调用。 */
+  /**
+   * 结算 `completion` 的回调；由生产者收尾时调用。
+   * @param result - 本次运行的最终结局；调用后 `completion` 以它兑现，且不可再次结算。
+   */
   readonly #resolveCompletion: (result: ChatRunResult) => void
   /** 是否已结算；置真后 publish/complete/fail/close 都变为安全空操作。 */
   #settled = false

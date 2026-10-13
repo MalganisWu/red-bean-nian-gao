@@ -25,7 +25,10 @@ export interface ScheduledTaskHeaderProps {
   backLabel: string
   /** 点击返回按钮时触发。 */
   onBack: () => void
-  /** 切换页签时触发，回传目标页签。 */
+  /**
+   * 切换页签时触发，回传目标页签。
+   * @param tab - 被点击的目标页签，调用方据此更新受控的 `activeTab`。
+   */
   onTabChange: (tab: ScheduledTaskDetailTab) => void
   /** 主操作槽位，由调用方注入现成按钮；缺省且无 `moreAction` 时不渲染操作区。 */
   primaryAction?: ReactNode | undefined

@@ -25,7 +25,10 @@ export interface TrajectoryInspectorProps {
   initialTab?: string | undefined
   /** 定位/布局类名由调用方给（覆盖式：`absolute inset-y-0 right-0 z-20`）。 */
   className?: string | undefined
-  /** 步骤概览里点击某次 LLM 请求时回调（用于跳转到请求详情）。 */
+  /**
+   * 步骤概览里点击某次 LLM 请求时回调（用于跳转到请求详情）。
+   * @param id - 被点击尝试记录的 id，调用方据此定位并在表中选中该请求。
+   */
   onSelectRecord?: ((id: string) => void) | undefined
   /** 点右上角关闭按钮时回调；面板的挂载/卸载由消费方决定，这里只上报意图。 */
   onClose: () => void

@@ -51,7 +51,10 @@ export interface QuestionCardProps {
   allowCustomAnswer?: boolean | undefined
   /** 业务明确知道动作时可给出更直接的确认文案；函数形态可随当前选择变化。 */
   confirmLabel?: string | ((answer: QuestionCardAnswer | undefined) => string) | undefined
-  /** 确认回调；入参是按问题 id 索引的完整作答。 */
+  /**
+   * 确认回调；入参是按问题 id 索引的完整作答。
+   * @param answers - 用户提交的完整作答，按问题 id 索引，含被跳过与未作答的问题。
+   */
   onConfirm?: ((answers: Record<string, QuestionCardAnswer>) => void) | undefined
   /** 拒绝回调；不传则整张卡片不渲染拒绝入口。 */
   onRefuse?: (() => void) | undefined

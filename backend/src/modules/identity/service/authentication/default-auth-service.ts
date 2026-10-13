@@ -41,7 +41,10 @@ export interface JwtAuthServiceOptions {
   readonly tokenDurationMilliseconds?: number | undefined
   /** 续签可接受的旧令牌最大年龄（毫秒）；缺省或非正整数时回退到 7 天。 */
   readonly refreshMaxAgeMilliseconds?: number | undefined
-  /** 产生校验与签发的当前时间；可注入，测试据此推进令牌有效期。 */
+  /**
+   * 产生校验与签发的当前时间；可注入，测试据此推进令牌有效期。
+   * @returns 当前时刻
+   */
   readonly now?: (() => Date) | undefined
 }
 
@@ -121,7 +124,10 @@ export class JwtAuthService implements AuthServicePort {
   readonly #tokenDurationMilliseconds: number
   /** 生效的续签最大年龄（毫秒），构造时按选项或默认值归一。 */
   readonly #refreshMaxAgeMilliseconds: number
-  /** 提供当前时间的时钟，构造时确定；默认取系统时钟，测试可注入固定实现。 */
+  /**
+   * 提供当前时间的时钟，构造时确定；默认取系统时钟，测试可注入固定实现。
+   * @returns 当前时刻
+   */
   readonly #now: () => Date
 
   public constructor(options: JwtAuthServiceOptions) {

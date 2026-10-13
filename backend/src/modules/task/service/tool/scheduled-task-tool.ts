@@ -100,7 +100,10 @@ export class ScheduledTaskManageTool implements AgentTool {
   readonly #idGenerator: IdGenerator
   /** 解释 run_at 与 cron 所用时区；构造时已校验合法。 */
   readonly #timezone: string
-  /** 时钟注入点；用于「run_at 是否为过去」判定与算下次触发，测试可注入固定时刻。 */
+  /**
+   * 时钟注入点；用于「run_at 是否为过去」判定与算下次触发，测试可注入固定时刻。
+   * @returns 当前时刻
+   */
   readonly #now: () => Date
 
   public constructor(

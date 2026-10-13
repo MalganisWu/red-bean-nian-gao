@@ -156,7 +156,10 @@ export class MemorySessionStore implements FencedSessionRepository {
   readonly #updated = new Map<string, Date>()
   /** 更新顺序（最早 → 最新）；读取时反转即为列表顺序。 */
   #order: string[] = []
-  /** 取当前时间的函数；默认用真实时钟，测试可注入固定值以消除时间抖动。 */
+  /**
+   * 取当前时间的函数；默认用真实时钟，测试可注入固定值以消除时间抖动。
+   * @returns 当前时刻；写入各会话的更新时间戳，列表排序间接依赖它。
+   */
   readonly #now: () => Date
 
   public constructor(now: () => Date = (): Date => new Date()) {

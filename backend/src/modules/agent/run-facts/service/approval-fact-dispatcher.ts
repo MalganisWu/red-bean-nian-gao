@@ -27,7 +27,10 @@ export class ApprovalFactToolDispatcher implements AgentToolDispatcher {
   readonly #next: AgentToolDispatcher
   /** 本次运行的事实写入器；只写挂起事实，不参与其余采集。 */
   readonly #recorder: RunFactRecorder
-  /** 可替换时钟；测试注入固定时刻。 */
+  /**
+   * 可替换时钟；测试注入固定时刻。
+   * @returns 当前时刻的 epoch 毫秒；用于给挂起事实打时间戳。
+   */
   readonly #now: () => number
 
   /**

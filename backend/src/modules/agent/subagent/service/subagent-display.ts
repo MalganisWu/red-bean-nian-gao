@@ -51,7 +51,10 @@ export type ProductPipelineEvent = AgentRuntimeEvent | SubAgentEnvelope
 export interface ProductPipelineContext {
   /** 节点间共享的元数据；注册表等跨节点状态放在这里，按 key 读写。 */
   readonly metadata: Map<string, unknown>
-  /** 事件出口；节点会接管它再往下传，undefined 表示尚无下游 sink。 */
+  /**
+   * 事件出口；节点会接管它再往下传，undefined 表示尚无下游 sink。
+   * @param event - pipeline 中流动的事件；节点接管出口后先消费内部事件，其余再转发给它。
+   */
   eventSink: ((event: ProductPipelineEvent) => void) | undefined
 }
 

@@ -14,7 +14,10 @@ export const DISPLAY_MESSAGES_METADATA_KEY = 'display_messages'
 export interface PresentationInterruptAssemblerOptions {
   /** 时间戳来源；缺省用 `Date.now`，注入后测试可产出确定的时间。 */
   readonly now?: PresentationClock | undefined
-  /** 构造当前 section 列表的方法；缺省则从空数组起拼投影。 */
+  /**
+   * 构造当前 section 列表的方法；缺省则从空数组起拼投影。
+   * @returns 当前 section 列表；中断卡片会被追加到它之后，非数组时从空数组起拼。
+   */
   readonly buildSections?: (() => AgentJsonValue) | undefined
 }
 
@@ -32,7 +35,10 @@ export class PresentationInterruptAssembler {
   readonly #display: DisplayMessageCollector
   /** 时间戳来源；可注入，测试据此产出确定的时间。 */
   readonly #now: PresentationClock
-  /** 构造当前 section 列表的方法；缺省则从空数组起拼投影。 */
+  /**
+   * 构造当前 section 列表的方法；缺省则从空数组起拼投影。
+   * @returns 当前 section 列表；非数组时从空数组起拼投影。
+   */
   readonly #buildSections: (() => AgentJsonValue) | undefined
 
   public constructor(

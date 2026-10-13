@@ -15,7 +15,10 @@ export class RunEventQueue<TValue> implements AsyncIterable<TValue> {
   readonly #waiters: Array<() => void> = []
   /** 队列容量上限；越界视为故障信号而非丢弃策略。 */
   readonly #capacity: number
-  /** 溢出时的回调；用于把故障信号通知给生产者（如中止整次运行）。 */
+  /**
+   * 溢出时的回调；用于把故障信号通知给生产者（如中止整次运行）。
+   * @param error - 触发收尾的越界错误；与抛给消费者的是同一枚，回调只做通知、不得吞掉。
+   */
   readonly #onOverflow: ((error: Error) => void) | undefined
   /** 是否已收尾（正常关闭或失败）；置真后 push 静默丢弃。 */
   #closed = false

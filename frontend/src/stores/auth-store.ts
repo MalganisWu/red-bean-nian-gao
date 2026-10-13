@@ -15,13 +15,23 @@ interface AuthState {
 
 /** 认证状态的可写动作：登录写入、退出清空，以及只更新 token 或 user 的局部动作。 */
 interface AuthActions {
-  /** 登录成功后写入 token 与用户，并把 token 持久化到 localStorage，标记为已认证。 */
+  /**
+   * 登录成功后写入 token 与用户，并把 token 持久化到 localStorage，标记为已认证。
+   * @param token - 服务端签发的访问令牌，会写入 localStorage。
+   * @param user - 当前登录用户信息，仅存内存不持久化。
+   */
   setAuth: (token: string, user: User) => void
   /** 退出登录：清除持久化的 token 与内存中的用户和认证状态。 */
   clearAuth: () => void
-  /** 只更新 token（如刷新后回填），同步持久化并标记为已认证，不改动 user。 */
+  /**
+   * 只更新 token（如刷新后回填），同步持久化并标记为已认证，不改动 user。
+   * @param token - 待回填的访问令牌，同步写入 localStorage 并置为已认证。
+   */
   setToken: (token: string) => void
-  /** 只更新内存中的用户信息，不改动 token 与持久化状态。 */
+  /**
+   * 只更新内存中的用户信息，不改动 token 与持久化状态。
+   * @param user - 待写入的当前登录用户信息，仅存内存不持久化。
+   */
   setUser: (user: User) => void
 }
 

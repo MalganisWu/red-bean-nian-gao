@@ -44,7 +44,10 @@ export class DeliveryQueue implements TaskResultDeliveryPort {
   readonly #writer: ExternalSessionTurnWriterPort
   /** 会话锁注册表；保证同一会话的投递同一时刻只有一个执行者。 */
   readonly #locks: DeliveryLockRegistry
-  /** 时钟注入点；合成占位消息的时间戳取它，便于测试定时语义。 */
+  /**
+   * 时钟注入点；合成占位消息的时间戳取它，便于测试定时语义。
+   * @returns 当前时刻
+   */
   readonly #now: () => Date
 
   public constructor(

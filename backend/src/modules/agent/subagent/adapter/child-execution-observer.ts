@@ -31,7 +31,10 @@ export class ChildExecutionObserver
   readonly #persistenceRevision: bigint
   /** 子执行自己的展示收集器；缺省表示不收集展示 section。 */
   readonly #sections: ChildSectionCollector | undefined
-  /** 父流的事件出口；缺省表示不把子执行进展转发给父运行。 */
+  /**
+   * 父流的事件出口；缺省表示不把子执行进展转发给父运行。
+   * @param event - 子运行的中性事件；转发给父流供 SSE 折叠展示，缺省出口时被丢弃。
+   */
   readonly #eventSink: ((event: AgentRuntimeEvent) => void) | undefined
   /** 增量消息落库回调；缺省表示不持久化中间消息，观察器退化为纯转发。 */
   readonly #messageSink: ChildMessageSink | undefined

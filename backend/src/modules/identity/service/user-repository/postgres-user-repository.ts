@@ -60,7 +60,10 @@ const USER_COLUMNS = `
 export class PostgresUserRepository implements UserRepository {
   /** SQL 执行器，构造时注入；本仓储不持有连接池，事务与连接所有权仍归执行器。 */
   readonly #database: SqlExecutor
-  /** 写入 `updated_at` 的时钟，构造时确定；默认取系统时钟，测试可注入固定实现。 */
+  /**
+   * 写入 `updated_at` 的时钟，构造时确定；默认取系统时钟，测试可注入固定实现。
+   * @returns 当前时刻
+   */
   readonly #now: () => Date
 
   public constructor(database: SqlExecutor, now: () => Date = (): Date => new Date()) {

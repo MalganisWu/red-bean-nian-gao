@@ -25,7 +25,10 @@ export class PostgresTaskCommandRepository
 {
   /** 支持事务的 SQL 执行器；写操作与 fencing 更新都经它落地。 */
   readonly #database: TransactionalSqlExecutor
-  /** 时钟注入点；租约与更新时间的取值统一走它，便于测试定时语义。 */
+  /**
+   * 时钟注入点；租约与更新时间的取值统一走它，便于测试定时语义。
+   * @returns 当前时刻
+   */
   readonly #now: () => Date
 
   public constructor(database: TransactionalSqlExecutor, now: () => Date = (): Date => new Date()) {

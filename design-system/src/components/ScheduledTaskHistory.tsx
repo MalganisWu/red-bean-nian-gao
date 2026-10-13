@@ -8,7 +8,10 @@ import { scheduledTaskRunLabel, type ScheduledTaskRunSummary } from './scheduled
 export interface ScheduledTaskHistoryProps {
   /** 已加载的执行记录，按调用方给定的顺序（默认最近优先）排列。 */
   records: ScheduledTaskRunSummary[]
-  /** 选中一条执行记录时触发，回传该记录以跳转详情。 */
+  /**
+   * 选中一条执行记录时触发，回传该记录以跳转详情。
+   * @param record - 被点击的执行记录摘要，含其主键、时刻与状态字段。
+   */
   onSelect: (record: ScheduledTaskRunSummary) => void
   /** 是否加载中；默认 false。记录为空时展示整块加载态，已有数据时展示底部加载提示。 */
   loading?: boolean | undefined

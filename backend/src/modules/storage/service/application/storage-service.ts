@@ -50,7 +50,10 @@ const MAX_PRESIGN_SECONDS = 60 * 60
 export class StorageService {
   /** 对象存储适配器，构造时注入；对象读写与预签名都由它执行。 */
   readonly #storage: ObjectStorage
-  /** 生成对象 key 中时间戳的时钟，构造时确定；默认取系统时钟，测试可注入固定实现。 */
+  /**
+   * 生成对象 key 中时间戳的时钟，构造时确定；默认取系统时钟，测试可注入固定实现。
+   * @returns 当前时刻
+   */
   readonly #now: () => Date
 
   public constructor(storage: ObjectStorage, now: () => Date = (): Date => new Date()) {

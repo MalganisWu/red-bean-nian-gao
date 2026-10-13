@@ -8,9 +8,15 @@ import type { LoginRequest, RegisterRequest, User } from '@/types/api'
 
 /** useAuth 的返回契约：登录、注册、登出、拉取当前用户四个动作，以及当前认证态快照。 */
 interface AuthControls {
-  /** 登录：成功后写入令牌与用户，失败向上抛出由调用方提示。 */
+  /**
+   * 登录：成功后写入令牌与用户，失败向上抛出由调用方提示。
+   * @param request - 登录请求；携带用户名与密码，成功后写入令牌与用户。
+   */
   login: (request: LoginRequest) => Promise<void>
-  /** 注册并自动登录：注册接口不返回令牌，故随后用同一凭据再登录一次。 */
+  /**
+   * 注册并自动登录：注册接口不返回令牌，故随后用同一凭据再登录一次。
+   * @param request - 注册请求；携带用户名与密码，注册成功后自动登录并写入令牌。
+   */
   register: (request: RegisterRequest) => Promise<void>
   /** 登出并按 finally 语义清空本地状态，服务端登出失败也不影响本地重置。 */
   logout: () => Promise<void>

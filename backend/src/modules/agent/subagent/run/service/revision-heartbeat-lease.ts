@@ -24,7 +24,10 @@ export class RevisionHeartbeatLease implements ChildExecutionLease {
   readonly #leaseMilliseconds: number
   /** 心跳间隔毫秒数；必须小于租期，否则永远来不及续上。 */
   readonly #heartbeatMilliseconds: number
-  /** 取当前时间的函数；续租时写入记录，测试可注入固定值。 */
+  /**
+   * 取当前时间的函数；续租时写入记录，测试可注入固定值。
+   * @returns 当前时刻；作为续租写入的 updated_at，测试可注入固定值消除时间抖动。
+   */
   readonly #now: () => Date
   /** 失租时被 abort 的控制器；调用方看 `signal.aborted` 判断是否还能写。 */
   readonly #controller = new AbortController()

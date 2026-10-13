@@ -11,10 +11,17 @@ interface ChatMessageItemProps {
   message: DisplayMessage
   /** 本条消息是否仍在流式接收；决定进行中计时与折叠态。 */
   isStreaming?: boolean | undefined
-  /** pending 卡片确认回调；用户提交答案时触发。 */
+  /**
+   * pending 卡片确认回调；用户提交答案时触发。
+   * @param interactionId - 被确认卡片的交互 id；用于把答案路由回对应的询问。
+   * @param answers - 用户提交的答案，按题目 id 索引；上层据此续跑对话流。
+   */
   onCardConfirm?:
     ((interactionId: string, answers: Record<string, QuestionCardAnswer>) => void) | undefined
-  /** pending 卡片拒绝回调；用户拒绝作答时触发。 */
+  /**
+   * pending 卡片拒绝回调；用户拒绝作答时触发。
+   * @param interactionId - 被拒绝卡片的交互 id；后端据此按拒绝处理该询问。
+   */
   onCardRefuse?: ((interactionId: string) => void) | undefined
   /** 当前卡片的提交态；非空时卡片按 submitting/error 等状态渲染。 */
   cardSubmission?: CardSubmissionState | null | undefined

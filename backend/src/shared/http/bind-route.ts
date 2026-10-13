@@ -15,7 +15,11 @@ export interface BindRouteOptions {
   readonly auth?: preHandlerAsyncHookHandler
   /** 其余前置钩子（限流等），按声明顺序在 auth 之后执行。 */
   readonly preHandler?: readonly preHandlerAsyncHookHandler[]
-  /** 路由处理函数；在 auth 与其余 preHandler 全部通过后才执行。 */
+  /**
+   * 路由处理函数；在 auth 与其余 preHandler 全部通过后才执行。
+   * @param request - 目标 Fastify 请求对象。
+   * @param reply - 用于写回响应的 Fastify 回复对象。
+   */
   readonly handler: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
 }
 

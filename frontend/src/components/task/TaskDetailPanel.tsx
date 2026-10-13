@@ -27,11 +27,17 @@ interface TaskDetailPanelProps {
   backLabel: string
   /** 点击返回时触发。 */
   onBack: () => void
-  /** 切换页签时触发，由调用方更新并透传 activeTab。 */
+  /**
+   * 切换页签时触发，由调用方更新并透传 activeTab。
+   * @param tab - 目标页签（详情 / 执行历史）；调用方据此更新并透传回 activeTab。
+   */
   onTabChange: (tab: ScheduledTaskDetailTab) => void
   /** 任务删除成功后触发，供调用方做返回等收尾。 */
   onDeleted: () => void
-  /** 查看某次执行详情时触发，携带执行 id。 */
+  /**
+   * 查看某次执行详情时触发，携带执行 id。
+   * @param executionId - 目标执行的 id；调用方据此加载对应的执行详情。
+   */
   onViewExecution: (executionId: string) => void
 }
 

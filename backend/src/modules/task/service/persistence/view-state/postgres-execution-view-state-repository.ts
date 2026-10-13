@@ -9,7 +9,10 @@ import { notAuthorizedError } from './../task-sql.js'
 export class PostgresExecutionViewStateRepository implements ExecutionViewStateRepository {
   /** 支持事务的 SQL 执行器；读与 upsert 都经它查询。 */
   readonly #database: TransactionalSqlExecutor
-  /** 时钟注入点；已读时间与更新时间统一取它，保证同一 upsert 内时间一致。 */
+  /**
+   * 时钟注入点；已读时间与更新时间统一取它，保证同一 upsert 内时间一致。
+   * @returns 当前时刻
+   */
   readonly #now: () => Date
 
   public constructor(database: TransactionalSqlExecutor, now: () => Date = (): Date => new Date()) {

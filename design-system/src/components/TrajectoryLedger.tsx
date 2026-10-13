@@ -68,11 +68,16 @@ export interface TrajectoryLedgerProps {
   /**
    * 搜索框内容变化的回调。给了就在表头之上渲染工具栏（折叠全部 / 展开全部 + 搜索）；
    * 不给则只渲染折叠按钮、不渲染搜索框（消费方自己放搜索）。
+   * @param text - 搜索框当前文本，调用方据此过滤记录表并高亮命中行。
    */
   onFilterChange?: ((text: string) => void) | undefined
   /** 当前选中记录 id。 */
   selectedId?: string | undefined
-  /** 点击记录行 / 压缩卡片时回调。 */
+  /**
+   * 点击记录行 / 压缩卡片时回调。
+   * @param id - 被点击记录（或压缩事件）的 id，调用方据此定位检查器内容。
+   * @param tab - 期望打开的详情页签；缺省时由检查器自行选择首个可用页签。
+   */
   onSelect?: ((id: string, tab?: string) => void) | undefined
   /**
    * 区域聚焦集合（通常来自 TrajectoryTimeline 的 onRangeFocus）：

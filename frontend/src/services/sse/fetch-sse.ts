@@ -11,9 +11,15 @@ export interface SSEConnectionOptions {
   url?: string | undefined
   /** 请求体；对话走 ChatRequest，卡片作答走 AnswerRequest。 */
   request: ChatRequest | AnswerRequest
-  /** 每收到一个合法事件时回调；心跳与未知事件名不会触发。 */
+  /**
+   * 每收到一个合法事件时回调；心跳与未知事件名不会触发。
+   * @param event - 已解析的 SSE 事件；携带事件类型与原始 data，供上层按类型投影。
+   */
   onEvent: (event: ParsedSSEEvent) => void
-  /** 连接失败或首事件超时时回调；携带已可直接展示的错误。 */
+  /**
+   * 连接失败或首事件超时时回调；携带已可直接展示的错误。
+   * @param error - 连接错误；消息为可直接展示的中文文案，供 UI 呈现重试入口。
+   */
   onError: (error: Error) => void
   /** 连接正常关闭时回调（流结束）；不区分成功与中断。 */
   onClose: () => void

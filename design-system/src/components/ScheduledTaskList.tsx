@@ -22,13 +22,26 @@ export interface ScheduledTaskListProps {
   filter?: ScheduledTaskFilter | undefined
   /** 各档位的任务条数；用于在档位标签后显示数字，缺省或某档缺省则不显示数字。 */
   filterCounts?: Partial<Record<ScheduledTaskFilter, number>> | undefined
-  /** 切换筛选档位的回调；缺省时档位不可交互，点击不生效。 */
+  /**
+   * 切换筛选档位的回调；缺省时档位不可交互，点击不生效。
+   * @param filter - 被点击的目标筛选档位，调用方据此更新受控的 `filter`。
+   */
   onFilterChange?: ((filter: ScheduledTaskFilter) => void) | undefined
-  /** 选中任务主体的回调，点击标题区域时触发。 */
+  /**
+   * 选中任务主体的回调，点击标题区域时触发。
+   * @param item - 被点击的任务列表项数据，含主键、标题与最近执行摘要。
+   */
   onSelectTask: (item: ScheduledTaskListItemData) => void
-  /** 选中最近一次执行的回调；缺省时最近执行区域按钮处于禁用态，无跳转。 */
+  /**
+   * 选中最近一次执行的回调；缺省时最近执行区域按钮处于禁用态，无跳转。
+   * @param item - 被点击的任务列表项数据，调用方据其最近执行记录跳转详情。
+   */
   onSelectExecution?: ((item: ScheduledTaskListItemData) => void) | undefined
-  /** 行尾动作槽位的渲染函数；缺省时渲染一个箭头提示可进入。 */
+  /**
+   * 行尾动作槽位的渲染函数；缺省时渲染一个箭头提示可进入。
+   * @param item - 当前行对应的任务列表项数据，供渲染该行专属的动作。
+   * @returns 该行的动作槽位节点，渲染在行尾的「状态」列之后。
+   */
   renderActions?: ((item: ScheduledTaskListItemData) => ReactNode) | undefined
   /** 是否加载中；默认 false。列表为空时展示整块加载态，已有数据时展示底部加载提示。 */
   loading?: boolean | undefined

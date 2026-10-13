@@ -56,7 +56,10 @@ export interface SubExecutionLifecycleOptions {
   readonly modelName?: string | undefined
   /** 子 Agent 系统提示词；空串或缺省表示不写该字段。 */
   readonly systemPrompt?: string | undefined
-  /** 取当前时间的函数；缺省用真实时钟，测试可注入固定值以免真等满租期。 */
+  /**
+   * 取当前时间的函数；缺省用真实时钟，测试可注入固定值以免真等满租期。
+   * @returns 当前时刻；写入记录的创建 / 更新时间，并作为 resume 租期的起点。
+   */
   readonly now?: (() => Date) | undefined
   /** resume 租期毫秒数；缺省用 `RESUME_LEASE_MILLISECONDS`。 */
   readonly resumeLeaseMilliseconds?: number | undefined
@@ -75,7 +78,10 @@ export class SubExecutionLifecycle implements ChildExecutionLifecycle {
   readonly #repository: SubExecutionRepository
   /** 组装时固定的选项；含 Agent 元信息与可注入的租期/时钟。 */
   readonly #options: SubExecutionLifecycleOptions
-  /** 取当前时间的函数；已按选项兜底为真实时钟。 */
+  /**
+   * 取当前时间的函数；已按选项兜底为真实时钟。
+   * @returns 当前时刻；用于记录创建 / 更新时间与租期起点。
+   */
   readonly #now: () => Date
 
   public constructor(repository: SubExecutionRepository, options: SubExecutionLifecycleOptions) {

@@ -123,7 +123,10 @@ export interface AgentToolCallContext {
   readonly checkpointRevision: bigint
   /** fencing token：lease 被抢占后，旧持有者的写入会因 token 过期而被拒。 */
   readonly fencingToken: bigint
-  /** 运行事件出口；工具产生的事件经它回流到 Runtime 事件流，缺省表示不订阅。 */
+  /**
+   * 运行事件出口；工具产生的事件经它回流到 Runtime 事件流，缺省表示不订阅。
+   * @param event - 工具产生的中性运行事件；由工具在副作用发生后调用，缺省时不回流。
+   */
   readonly eventSink?: ((event: AgentRuntimeEvent) => void) | undefined
 }
 
@@ -345,7 +348,10 @@ export interface AgentChildRunRequest {
   readonly expectedFormat: string
   /** 续跑信息；非空表示从先前的挂起处继续，而非新建。 */
   readonly resume?: { readonly interruptId: string; readonly response: string } | undefined
-  /** 子运行事件出口；缺省表示父运行不订阅子运行事件。 */
+  /**
+   * 子运行事件出口；缺省表示父运行不订阅子运行事件。
+   * @param event - 子运行上报的中性运行事件；每次子运行事件都会调用它，缺省时不订阅。
+   */
   readonly eventSink?: ((event: AgentRuntimeEvent) => void) | undefined
 }
 

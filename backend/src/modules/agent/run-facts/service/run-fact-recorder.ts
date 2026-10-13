@@ -27,9 +27,15 @@ export interface RunFactRecorderOptions {
   readonly signal: AbortSignal
   /** 事实日志仓储；所有写入经串行队列落到它。 */
   readonly repository: RunFactRepository
-  /** 可替换时钟（epoch 毫秒）；缺省为 Date.now。 */
+  /**
+   * 可替换时钟（epoch 毫秒）；缺省为 Date.now。
+   * @returns 当前时刻的 epoch 毫秒；用于给各类事实打时间戳。
+   */
   readonly now?: (() => number) | undefined
-  /** 事实写入失败只影响审计日志，不影响会话主流程；首次失败经此回调上报诊断。 */
+  /**
+   * 事实写入失败只影响审计日志，不影响会话主流程；首次失败经此回调上报诊断。
+   * @param error - 归一化后的写入失败错误；回调只做上报，不得改变停写语义。
+   */
   readonly onError?: ((error: Error) => void) | undefined
 }
 
@@ -70,9 +76,15 @@ export class RunFactRecorder implements AgentExecutionEventSink {
   readonly #run: StartSessionRunCommand
   /** append 阶段的中止信号；由构造参数传入。 */
   readonly #signal: AbortSignal
-  /** 可替换时钟（epoch 毫秒）；缺省为 Date.now。 */
+  /**
+   * 可替换时钟（epoch 毫秒）；缺省为 Date.now。
+   * @returns 当前时刻的 epoch 毫秒；用于给各类事实打时间戳。
+   */
   readonly #now: () => number
-  /** 写入失败诊断回调；未注入时静默降级。 */
+  /**
+   * 写入失败诊断回调；未注入时静默降级。
+   * @param error - 归一化后的写入失败错误；回调只做上报，不得改变停写语义。
+   */
   readonly #onError: ((error: Error) => void) | undefined
   /** 串行化所有仓储写入：保证 facts JSONB 的追加顺序与事件到达顺序一致。 */
   #queue: Promise<void> = Promise.resolve()

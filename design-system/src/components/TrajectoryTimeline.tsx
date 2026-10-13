@@ -31,11 +31,15 @@ export interface TrajectoryTimelineProps {
   compaction?: TrajectoryCompaction | undefined
   /** 当前选中记录 id；选中段带品牌色描边。 */
   selectedId?: string | undefined
-  /** 点击段/压缩标记时回调记录 id（压缩为 compaction.id）。 */
+  /**
+   * 点击段/压缩标记时回调记录 id（压缩为 compaction.id）。
+   * @param id - 被点击段对应的记录 id（压缩段为 `compaction.id`），供记录表联动选中。
+   */
   onSelect?: ((id: string) => void) | undefined
   /**
    * 区域选择回调：拖选时间区间时回调区间内活动记录的 id 集合（供记录表聚焦/淡隐），
    * 清除选择（右键 / Esc / 清除按钮）时回调 null。
+   * @param idsInRange - 选区命中的活动记录 id 集合；清除选择时为 null，表示取消聚焦。
    */
   onRangeFocus?: ((idsInRange: ReadonlySet<string> | null) => void) | undefined
 }

@@ -32,11 +32,20 @@ export interface RedisSessionLockRegistryOptions {
   readonly ttlMilliseconds?: number
   /** 续租间隔毫秒数；缺省按 TTL 的三分之一派生，决定丢失多久后能被发现。 */
   readonly renewIntervalMilliseconds?: number
-  /** 围栏序号来源；缺省用进程内自增兜底，多实例部署应注入数据库序列之类的全局源。 */
+  /**
+   * 围栏序号来源；缺省用进程内自增兜底，多实例部署应注入数据库序列之类的全局源。
+   * @returns 下一个围栏序号；必须大于零，且跨实例严格递增才能保证 fencing 判别有效。
+   */
   readonly nextFencingToken?: () => Promise<bigint>
-  /** owner 随机串来源；缺省用随机字节，测试可注入固定值以产出确定的 owner。 */
+  /**
+   * owner 随机串来源；缺省用随机字节，测试可注入固定值以产出确定的 owner。
+   * @returns 本次抢锁使用的随机串；同一 requestId 重试时也必须不同，否则会误删他人锁。
+   */
   readonly nonce?: () => string
-  /** 后台续租出错时的回调；缺省静默，宿主可借此上报监控而不影响主流程。 */
+  /**
+   * 后台续租出错时的回调；缺省静默，宿主可借此上报监控而不影响主流程。
+   * @param error - 触发续租失败的错误；回调应记录或上报，不应再抛出以免打断续租。
+   */
   readonly onRenewalError?: (error: Error) => void
 }
 
@@ -48,11 +57,20 @@ export class RedisSessionLockRegistry implements SessionLockRegistry {
   readonly #ttlMilliseconds: number
   /** 续租间隔（毫秒），构造时经校验固定。 */
   readonly #renewIntervalMilliseconds: number
-  /** 围栏序号来源；抢锁前先取值，失败也不复用已消耗的序号。 */
+  /**
+   * 围栏序号来源；抢锁前先取值，失败也不复用已消耗的序号。
+   * @returns 下一个围栏序号；必须大于零，生成失败即中止本次抢锁。
+   */
   readonly #nextFencingToken: () => Promise<bigint>
-  /** owner 随机串来源；保证同一 requestId 重试时 owner 仍不同。 */
+  /**
+   * owner 随机串来源；保证同一 requestId 重试时 owner 仍不同。
+   * @returns 拼入 owner 的随机串；每次调用都应产出不同值。
+   */
   readonly #nonce: () => string
-  /** 后台续租错误回调；默认空实现，见 `RedisSessionLockRegistryOptions`。 */
+  /**
+   * 后台续租错误回调；默认空实现，见 `RedisSessionLockRegistryOptions`。
+   * @param error - 触发续租失败的错误；默认实现忽略它，注入方负责记录或上报。
+   */
   readonly #onRenewalError: (error: Error) => void
 
   public constructor(redis: RedisStore, options: RedisSessionLockRegistryOptions = {}) {
@@ -146,7 +164,10 @@ interface RedisSessionLockOptions {
   readonly renewIntervalMilliseconds: number
   /** 调用方取消信号；缺省表示抢锁时没传，行为上不监听父中止。 */
   readonly parent: AbortSignal | undefined
-  /** 后台续租错误回调；缺省为空实现。 */
+  /**
+   * 后台续租错误回调；缺省为空实现。
+   * @param error - 触发续租失败的错误；由回调记录或上报，不应向外抛出。
+   */
   readonly onRenewalError: (error: Error) => void
 }
 
@@ -179,9 +200,15 @@ export class RedisSessionLock implements SessionLease {
   readonly #ttlMilliseconds: number
   /** 调用方取消信号；缺省表示未传，此时不注册父中止监听。 */
   readonly #parent: AbortSignal | undefined
-  /** 后台续租错误回调。 */
+  /**
+   * 后台续租错误回调。
+   * @param error - 触发续租失败的错误；由回调负责记录或上报。
+   */
   readonly #onRenewalError: (error: Error) => void
-  /** `lost` 的兑现句柄；只调用一次，兑现后 `lost` 从挂起转为 resolved。 */
+  /**
+   * `lost` 的兑现句柄；只调用一次，兑现后 `lost` 从挂起转为 resolved。
+   * @param error - 兑现给 `lost` 的丢失原因；只应传入一次，重复调用不再生效。
+   */
   readonly #resolveLost: (error: Error) => void
   /** 父信号中止时的监听器；缺省表示无父信号，无需注册。 */
   readonly #onParentAbort: (() => void) | undefined
@@ -277,7 +304,10 @@ export class RedisSessionLock implements SessionLease {
 interface DeferredError {
   /** 由外部持有的挂起句柄；在丢失事件发生前一直不兑现。 */
   readonly promise: Promise<Error>
-  /** 兑现 `promise` 的句柄；调用方在需要时手动调用，只应调用一次。 */
+  /**
+   * 兑现 `promise` 的句柄；调用方在需要时手动调用，只应调用一次。
+   * @param error - 兑现给 `promise` 的错误；只应调用一次，重复调用不产生额外效果。
+   */
   readonly resolve: (error: Error) => void
 }
 

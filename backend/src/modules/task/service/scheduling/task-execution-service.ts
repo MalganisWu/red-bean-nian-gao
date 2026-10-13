@@ -67,9 +67,15 @@ export interface TaskExecutionServiceOptions {
   readonly policy: ScheduledTaskPolicy
   /** 链路追踪器；run 的 span 由它开启与结束。 */
   readonly tracer: Tracer
-  /** traceId 工厂；每次执行据此生成链路标识，便于测试注入固定值。 */
+  /**
+   * traceId 工厂；每次执行据此生成链路标识，便于测试注入固定值。
+   * @returns 新生成的追踪 ID
+   */
   readonly traceIdFactory: () => string
-  /** 时钟注入点；缺省用系统时间，测试可注入固定时刻。 */
+  /**
+   * 时钟注入点；缺省用系统时间，测试可注入固定时刻。
+   * @returns 当前时刻
+   */
   readonly now?: (() => Date) | undefined
 }
 
@@ -121,9 +127,15 @@ export class TaskExecutionService {
   readonly #policy: ScheduledTaskPolicy
   /** 链路追踪器；负责 run 的 span。 */
   readonly #tracer: Tracer
-  /** traceId 工厂。 */
+  /**
+   * traceId 工厂。
+   * @returns 新生成的追踪 ID
+   */
   readonly #traceIdFactory: () => string
-  /** 时钟注入点；缺省为系统时间。 */
+  /**
+   * 时钟注入点；缺省为系统时间。
+   * @returns 当前时刻
+   */
   readonly #now: () => Date
 
   public constructor(options: TaskExecutionServiceOptions) {

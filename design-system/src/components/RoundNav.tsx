@@ -22,7 +22,10 @@ export interface RoundNavProps {
   entries: RoundNavEntry[]
   /** 当前轮 id（豆沙红伸长态） */
   currentId?: string | undefined
-  /** 选中某一轮的回调；滚动定位由调用方实现，本组件不碰滚动容器。 */
+  /**
+   * 选中某一轮的回调；滚动定位由调用方实现，本组件不碰滚动容器。
+   * @param id - 被点击或键盘聚焦的轮次标识，调用方据此滚动到该轮。
+   */
   onSelect?: ((id: string) => void) | undefined
 }
 

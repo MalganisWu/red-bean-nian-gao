@@ -33,11 +33,20 @@ export interface StructuredLogSink {
 export interface StructuredLogTracerOptions {
   /** 日志落点；缺省写 stdout 一行 JSON，交给容器日志采集器索引。 */
   readonly sink?: StructuredLogSink | undefined
-  /** trace ID 生成器；缺省用密码学随机源，注入后测试可断言固定链路。 */
+  /**
+   * trace ID 生成器；缺省用密码学随机源，注入后测试可断言固定链路。
+   * @returns 新链路的 trace ID；须为非零的 32 位十六进制串
+   */
   readonly traceIdGenerator?: (() => string) | undefined
-  /** span ID 生成器；缺省同样用随机源，注入理由与 trace ID 一致。 */
+  /**
+   * span ID 生成器；缺省同样用随机源，注入理由与 trace ID 一致。
+   * @returns 新 span 的 ID；须为非零的 16 位十六进制串
+   */
   readonly spanIdGenerator?: (() => string) | undefined
-  /** 结束时刻的取值来源；缺省为 `Date.now`，注入后测试可断言确定的耗时字段。 */
+  /**
+   * 结束时刻的取值来源；缺省为 `Date.now`，注入后测试可断言确定的耗时字段。
+   * @returns 当前时刻，epoch 毫秒
+   */
   readonly now?: (() => number) | undefined
 }
 
@@ -67,11 +76,20 @@ export class StructuredLogTracer implements TracerPort {
   readonly #active = new AsyncLocalStorage<ActiveStructuredLogSpan>()
   /** 记录落点；构造时注入，缺省退回 stdout 实现。 */
   readonly #sink: StructuredLogSink
-  /** 新链路的 trace ID 来源；缺省用随机源。 */
+  /**
+   * 新链路的 trace ID 来源；缺省用随机源。
+   * @returns 新链路的 trace ID；须符合 W3C 非零格式
+   */
   readonly #traceIdGenerator: () => string
-  /** 新 span 的 ID 来源；缺省用随机源。 */
+  /**
+   * 新 span 的 ID 来源；缺省用随机源。
+   * @returns 新 span 的 ID；须符合 W3C 非零格式
+   */
   readonly #spanIdGenerator: () => string
-  /** 耗时计算用的时钟；缺省为 `Date.now`。 */
+  /**
+   * 耗时计算用的时钟；缺省为 `Date.now`。
+   * @returns 当前时刻，epoch 毫秒
+   */
   readonly #now: () => number
 
   public constructor(options: StructuredLogTracerOptions = {}) {
@@ -130,7 +148,10 @@ interface StructuredLogSpanOptions {
   readonly active: AsyncLocalStorage<ActiveStructuredLogSpan>
   /** span 起始时刻（毫秒）；结束事件据它算出耗时。 */
   readonly startedAt: number
-  /** 结束时刻的取值来源；与起始时刻同一时钟，避免跨时钟漂移。 */
+  /**
+   * 结束时刻的取值来源；与起始时刻同一时钟，避免跨时钟漂移。
+   * @returns 当前时刻，epoch 毫秒
+   */
   readonly now: () => number
 }
 
@@ -152,7 +173,10 @@ class StructuredLogSpan implements TraceSpan {
   readonly #active: AsyncLocalStorage<ActiveStructuredLogSpan>
   /** span 起始时刻（毫秒）。 */
   readonly #startedAt: number
-  /** 结束时刻的取值来源；与起始时刻同一时钟。 */
+  /**
+   * 结束时刻的取值来源；与起始时刻同一时钟。
+   * @returns 当前时刻，epoch 毫秒
+   */
   readonly #now: () => number
   /** 属性表；初始属性来自 start，`setAttributes` 可就地补充或覆盖。 */
   readonly #attributes: Map<string, string>
