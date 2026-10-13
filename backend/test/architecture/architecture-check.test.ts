@@ -285,18 +285,10 @@ void test('拒绝 DTO 文件包含运行时函数或值', () => {
   })
 })
 
-void test('拒绝 Port 和生产实现缺少中文职责 JSDoc', () => {
+void test('拒绝 Port 的 JSDoc 未说明默认实现', () => {
   withFixture((root) => {
     write(root, 'modules/order/port/order.port.ts', 'export interface OrderServicePort {}\n')
-    assertCheckerFails(root, 'chinese-boundary-documentation')
-  })
-  withFixture((root) => {
-    write(
-      root,
-      'modules/order/service/default-order-service.ts',
-      'export class DefaultOrderService implements Disposable { [Symbol.dispose](): void {} }\n'
-    )
-    assertCheckerFails(root, 'chinese-boundary-documentation')
+    assertCheckerFails(root, 'port-default-binding-documentation')
   })
 })
 

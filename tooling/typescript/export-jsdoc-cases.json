@@ -230,5 +230,57 @@
       "hasDestructuredParam": false,
       "returnTypeText": "LlmError"
     }
+  },
+  {
+    "name": "纯英文描述必须失败：注释读者只读中文",
+    "valid": false,
+    "record": {
+      "symbolPath": "loadConfig",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * Load application config from file and process environment.\n * @param environment - Process environment variables.\n * @returns Validated application config.\n */",
+      "params": ["environment"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "Promise<AppConfig>"
+    }
+  },
+  {
+    "name": "中文描述但 @param 说明是英文，必须失败",
+    "valid": false,
+    "record": {
+      "symbolPath": "connectRedis",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * 建立 Redis 连接。\n * @param redisUrl - The connection string.\n */",
+      "params": ["redisUrl"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "Promise<RedisConnection>"
+    }
+  },
+  {
+    "name": "@param 只写名字不给说明，必须失败",
+    "valid": false,
+    "record": {
+      "symbolPath": "connectRedis",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * 建立 Redis 连接。\n * @param redisUrl\n */",
+      "params": ["redisUrl"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "Promise<RedisConnection>"
+    }
+  },
+  {
+    "name": "混排不违规：说明含中文即可，不要求纯中文",
+    "valid": true,
+    "record": {
+      "symbolPath": "openAiRequestPayload",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * 把中性请求投影成 OpenAI wire 形状。\n * @param modelName - 模型名，直接进 `model` 字段，不做别名解析。\n * @returns 可直接序列化的请求体。\n */",
+      "params": ["modelName"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "JsonObject"
+    }
   }
 ]

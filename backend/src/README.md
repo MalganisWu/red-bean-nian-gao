@@ -154,7 +154,7 @@ rg -n "describe\(" backend/test
 - `public-api.ts` 导出 Controller/Routes，或 `*.routes.ts` 自行构造 Controller。
 - `public-api.ts` 直接或经 Module 返回类型间接暴露 Repository、ObjectStorage、Adapter 或 serializer。
 - Wire DTO 出现函数、Schema、类或其他运行时值。
-- Port 与生产 Service/Adapter 缺少中文职责说明。
+- Port 的 JSDoc 未说明默认实现，或缺少流/资源所有权、取消与失败语义。
 
 Routes、Controller、主 Service 与 Adapter 超过建议行数时只输出人工审查提示，不因行数单独阻断构建。
 

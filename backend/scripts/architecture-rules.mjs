@@ -145,7 +145,7 @@ export function analyzeArchitecture(sourceRoot, options = {}) {
     ...checkImplementationTypeReExports(files, modulesRoot),
     ...checkRouteConstruction(files, modulesRoot),
     ...checkDtoPurity(absoluteRoot, options.contractRoot),
-    ...checkChineseBoundaryDocumentation(files, modulesRoot),
+    ...checkPortContractDocumentation(files, modulesRoot),
     ...checkTaskRuntimeImports(files, modulesRoot),
     ...checkRuntimeSdkImportWhitelist(sourceFiles, absoluteRoot),
     ...checkPublicApiRuntimeLeaks(files, imports, modulesRoot),
@@ -385,7 +385,15 @@ function isPureTypeDeclaration(statement) {
   )
 }
 
-function checkChineseBoundaryDocumentation(files, modulesRoot) {
+/**
+ * Port 契约文档门禁。
+ *
+ * 这里**不检查注释语言**：语言由跨仓的导出 JSDoc 门禁（`make ts-export-jsdoc-check`）对所有
+ * 命名声明统一检查 —— 历史上本函数同时查中文，于是「谁该有注释、要不要中文」出现了两套判据
+ * （本函数按路径角色，那道门禁按导出性），拿到一个文件无法预测它受什么约束。
+ * 本函数只保留 Port 特有的语义要求：默认实现、流/资源所有权、取消与失败语义。
+ */
+function checkPortContractDocumentation(files, modulesRoot) {
   return files.flatMap((file) => {
     const relativeFile = normalizePath(relative(modulesRoot, file))
     const pathSegments = segments(relative(modulesRoot, file))
@@ -393,25 +401,13 @@ function checkChineseBoundaryDocumentation(files, modulesRoot) {
     const parsed = parseSourceFile(file, source)
     return parsed.statements.flatMap((statement) => {
       if (statement.kind !== STATEMENT_KINDS.DECLARATION || !statement.exported) return []
-      const isProductionClass =
-        statement.declarationKind === DECLARATION_KINDS.CLASS &&
-        (pathSegments.includes('service') || pathSegments.includes('adapter'))
       const isPortRole =
         statement.declarationKind === DECLARATION_KINDS.INTERFACE &&
         pathSegments.includes('port') &&
         /(Port|Repository|Registry|Store|Storage|Factory|Loader|Lifecycle)$/u.test(statement.name)
-      if (!isProductionClass && !isPortRole) return []
+      if (!isPortRole) return []
       const comment = statement.jsdoc
-      if (!/[\u3400-\u9fff]/u.test(comment)) {
-        return [
-          {
-            rule: 'chinese-boundary-documentation',
-            file: relativeFile,
-            message: `公开${isProductionClass ? '生产实现' : ' Port'} ${statement.name ?? ''} 缺少中文职责 JSDoc。`,
-          },
-        ]
-      }
-      if (isPortRole && !/(默认实现|实现为)/u.test(comment)) {
+      if (!/(默认实现|实现为)/u.test(comment)) {
         return [
           {
             rule: 'port-default-binding-documentation',
