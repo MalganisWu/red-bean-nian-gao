@@ -1,0 +1,234 @@
+[
+  {
+    "name": "完整函数：描述 + 逐参数 @param + @returns 通过",
+    "valid": true,
+    "record": {
+      "symbolPath": "loadConfig",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * 从配置文件与进程环境装配应用配置。\n * @param environment - 进程环境变量表。\n * @returns 已完成校验的应用配置。\n */",
+      "params": ["environment"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "Promise<AppConfig>"
+    }
+  },
+  {
+    "name": "整块 JSDoc 缺失必须失败",
+    "valid": false,
+    "record": {
+      "symbolPath": "loadConfig",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "",
+      "params": ["environment"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "Promise<AppConfig>"
+    }
+  },
+  {
+    "name": "只有 tag 没有描述正文必须失败",
+    "valid": false,
+    "record": {
+      "symbolPath": "loadConfig",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * @param environment - 进程环境变量表。\n * @returns 已完成校验的应用配置。\n */",
+      "params": ["environment"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "Promise<AppConfig>"
+    }
+  },
+  {
+    "name": "缺少某个参数的 @param 必须失败",
+    "valid": false,
+    "record": {
+      "symbolPath": "connectRedis",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * 建立 Redis 连接。\n * @param redisUrl - 连接串。\n */",
+      "params": ["redisUrl", "factory", "signal"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "Promise<RedisConnection>"
+    }
+  },
+  {
+    "name": "非 void 返回缺少 @returns 必须失败",
+    "valid": false,
+    "record": {
+      "symbolPath": "estimateTokens",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * 估算消息列表占用的 token 数。\n * @param messages - 待估算的消息。\n */",
+      "params": ["messages"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "number"
+    }
+  },
+  {
+    "name": "void 返回不要求 @returns",
+    "valid": true,
+    "record": {
+      "symbolPath": "runOnce",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * 执行一次并等待结束。\n * @param signal - 取消信号。\n */",
+      "params": ["signal"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "Promise<void>"
+    }
+  },
+  {
+    "name": "解构参数必须失败：门禁要求简单标识符",
+    "valid": false,
+    "record": {
+      "symbolPath": "MessageCard",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * Quiet Tool 消息：一轮回合收束为单一 Process 与最终回答。\n */",
+      "params": [],
+      "hasDestructuredParam": true,
+      "returnTypeText": "React.ReactElement"
+    }
+  },
+  {
+    "name": "陈旧 @param（签名里没有该参数）必须失败",
+    "valid": false,
+    "record": {
+      "symbolPath": "serializeModelParams",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * 将中性模型参数转换为稳定 JSON 字段。\n * @param config - 旧签名留下的参数名。\n * @returns 字段序稳定的 JSON 对象。\n */",
+      "params": ["params"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "JsonObject"
+    }
+  },
+  {
+    "name": "构造函数整体豁免：既不要描述也不要 tag",
+    "valid": true,
+    "record": {
+      "symbolPath": "RedisConnection.constructor",
+      "kind": "ctor",
+      "exported": true,
+      "jsdocText": "",
+      "params": ["driver"],
+      "hasDestructuredParam": false
+    }
+  },
+  {
+    "name": "公开属性只要描述正文，不要求 tag",
+    "valid": true,
+    "record": {
+      "symbolPath": "RuntimeContext.sessionId",
+      "kind": "property",
+      "exported": true,
+      "jsdocText": "/** 会话标识；同一次会话的多次运行共用，用于串行化同线程执行。 */",
+      "params": [],
+      "hasDestructuredParam": false,
+      "returnTypeText": "string"
+    }
+  },
+  {
+    "name": "公开属性缺少描述必须失败",
+    "valid": false,
+    "record": {
+      "symbolPath": "RuntimeContext.sessionId",
+      "kind": "property",
+      "exported": true,
+      "jsdocText": "",
+      "params": [],
+      "hasDestructuredParam": false,
+      "returnTypeText": "string"
+    }
+  },
+  {
+    "name": "@internal 显式豁免",
+    "valid": true,
+    "record": {
+      "symbolPath": "unsafeReset",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * 仅供本包测试使用的复位入口。\n * @internal\n */",
+      "params": ["scope"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "void"
+    }
+  },
+  {
+    "name": "未导出符号不参与门禁",
+    "valid": true,
+    "record": {
+      "symbolPath": "normalizeError",
+      "kind": "function",
+      "exported": false,
+      "jsdocText": "",
+      "params": ["value"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "Error"
+    }
+  },
+  {
+    "name": "setter 要有 @param 且不要 @returns",
+    "valid": true,
+    "record": {
+      "symbolPath": "TaskStore.collapsed#set",
+      "kind": "accessor",
+      "exported": true,
+      "jsdocText": "/**\n * 设置折叠态。\n * @param collapsed - 是否折叠。\n */",
+      "params": ["collapsed"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "void"
+    }
+  },
+  {
+    "name": "getter 要有描述与 @returns",
+    "valid": true,
+    "record": {
+      "symbolPath": "TaskStore.messages#get",
+      "kind": "accessor",
+      "exported": true,
+      "jsdocText": "/**\n * 当前展示的消息快照。\n * @returns 只读消息列表。\n */",
+      "params": [],
+      "hasDestructuredParam": false,
+      "returnTypeText": "readonly RawMessage[]"
+    }
+  },
+  {
+    "name": "getter 缺少 @returns 必须失败",
+    "valid": false,
+    "record": {
+      "symbolPath": "TaskStore.messages#get",
+      "kind": "accessor",
+      "exported": true,
+      "jsdocText": "/**\n * 当前展示的消息快照。\n */",
+      "params": [],
+      "hasDestructuredParam": false,
+      "returnTypeText": "readonly RawMessage[]"
+    }
+  },
+  {
+    "name": "未标注返回类型时不要求 @returns（fail-open）",
+    "valid": true,
+    "record": {
+      "symbolPath": "RequireAuth",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * 未登录时重定向到登录页。\n */",
+      "params": [],
+      "hasDestructuredParam": false
+    }
+  },
+  {
+    "name": "JSDoc 可选参数写法 [name] 可识别",
+    "valid": true,
+    "record": {
+      "symbolPath": "openAiProtocolError",
+      "kind": "function",
+      "exported": true,
+      "jsdocText": "/**\n * 协议层错误一律是永久的。\n * @param message - 错误文案。\n * @param [cause] - 原始抛出物。\n * @returns 归一后的错误对象。\n */",
+      "params": ["message", "cause"],
+      "hasDestructuredParam": false,
+      "returnTypeText": "LlmError"
+    }
+  }
+]

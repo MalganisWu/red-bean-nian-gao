@@ -68,8 +68,11 @@ interface ChatInputProps {
   placeholder?: string
 }
 
-// 3. 组件定义
-export function ChatInput({ onSubmit, disabled = false, placeholder = '输入消息...' }: ChatInputProps) {
+// 3. 组件定义（参数具名 props，解构放函数体首行 —— 导出组件的 JSDoc 门禁要求参数是
+//    简单标识符才能写 @param；函数体内仍不使用 props.xxx）
+export function ChatInput(props: ChatInputProps) {
+  const { onSubmit, disabled = false, placeholder = '输入消息...' } = props
+
   // 4. hooks
   const [value, setValue] = useState('')
 
@@ -105,7 +108,7 @@ export function ChatInput({ onSubmit, disabled = false, placeholder = '输入消
 |------|------|
 | Props 用 `interface` | 放组件上方，不内联 |
 | 函数组件 | 不用 class 组件 |
-| 解构 Props | `{ prop1, prop2 }: Props`，不用 `props.prop1` |
+| Props 具名参数 | 参数写 `props: XxxProps`，解构放函数体首行；函数体内不用 `props.xxx` |
 | 默认值用解构默认值 | `disabled = false` |
 | 不用 `React.FC` | 直接用函数类型 |
 | 禁止 `<div onClick>` | 可交互元素用 `<button>`（支持键盘聚焦） |

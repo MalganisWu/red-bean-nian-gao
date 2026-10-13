@@ -221,6 +221,11 @@ return runWithMiddleware(info, middleware, runRequest, signal);
 - 公开入口、DTO、接口、默认实现、复杂状态机、并发与一致性、安全限制和反直觉分支必须解释设计
   意图、所有权或失败语义。
 - 注释说明「为什么」和边界，不逐行复述显而易见的代码；实现变化时同步更新或删除失真注释。
+  `@param` / `@returns` **不受本条约束**：它们是形式锚点，作用是可判定地证明「这个参数被想过」，
+  不承担解释业务的责任，解释仍写在描述正文里。
+- **门禁只管可机械判定的那一半**：导出符号与公开成员有没有 JSDoc、tag 与签名是否一一对应，
+  由 `make ts-export-jsdoc-check` 强制。「是否解释了复杂业务」「是否在复述显而易见的代码」
+  不可机械判定，**没有门禁**，只能靠评审 —— 门禁过了不等于注释合格。
 - **唯一红线是注释与代码不一致**：失真注释比没有注释更有害，评审时必查。
 - 测试名称与第三方协议原文可保留英文；非显然的测试准备、故障注入和断言原因优先写中文注释。
 
@@ -237,7 +242,8 @@ return runWithMiddleware(info, middleware, runRequest, signal);
 
 ## 跨仓一致性
 
-本文件在两仓各存一份，内容必须逐字相同。由 `scripts/check-common-conventions.sh` 比对：
+本文件在两仓各存一份，内容必须逐字相同。它本身就在 `scripts/check-shared-files.mjs` 的逐字
+比对清单里（该脚本同样两仓各一份，且把自身也列入清单）：
 
 - 产品仓可直接比对 sibling SDK 工作区（CI 会把它按 `runtime.lock` 的 SHA checkout 成
   `../red-bean-qing-tuan`），因此「产品仓锁哪个 SDK 版本，就跟着那个版本的通用规范走」。

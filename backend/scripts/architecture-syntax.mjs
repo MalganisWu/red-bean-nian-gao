@@ -47,13 +47,256 @@ export function parseSourceFile(fileName, source = readFileSync(fileName, 'utf8'
     source,
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TS
+    scriptKindOf(fileName)
   )
   const statements = sourceFile.statements.map((statement) =>
     classifyStatement(statement, sourceFile, source)
   )
   const newExpressions = collectNewExpressions(sourceFile, source)
   return { statements, newExpressions }
+}
+
+/**
+ * 按扩展名选 `ScriptKind`。
+ *
+ * 拿 `TS` 去解析 `.tsx` 会产出语法错误 AST，而"读坏了 AST"在门禁里的表现是
+ * **零成员、零违规**的静默放行 —— 比报错更危险，所以这里必须按扩展名分流。
+ * 产品仓的注释门禁要覆盖 frontend 与 design-system，这条是它的前提。
+ */
+function scriptKindOf(fileName) {
+  if (fileName.endsWith('.tsx')) return ts.ScriptKind.TSX
+  if (fileName.endsWith('.jsx')) return ts.ScriptKind.JSX
+  return ts.ScriptKind.TS
+}
+
+/**
+ * 文档事实收集：把源码里所有**可文档化**的符号摊平成与编译器节点无关的记录。
+ *
+ * 与 `parseSourceFile` 的分工：后者给架构规则看"顶层语句骨架"，本函数给注释门禁看
+ * "每个符号的注释事实"。记录只承载事实 —— 有没有 JSDoc、参数名是什么、返回类型写了
+ * 什么；**"该不该有 tag" 属于纯规则模块 `tooling/typescript/export-jsdoc-rules.mjs`
+ * 的策略，不在本文件判定**，这样两个仓的语法层只需产出一致的事实，不必各自复刻规则。
+ *
+ * `symbolPath` 在单文件内保证唯一（重载实现、声明合并会追加 `#2`、`#3`）：
+ * 棘轮基线按 `{file, symbolPath}` 建键，唯一性是它的前提。
+ */
+export function collectDocumentables(fileName, source = readFileSync(fileName, 'utf8')) {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKindOf(fileName)
+  )
+  const records = []
+  const usedPaths = new Set()
+  for (const statement of sourceFile.statements) {
+    collectStatement(statement, sourceFile, source, records, usedPaths)
+  }
+  return records
+}
+
+function collectStatement(statement, sourceFile, source, records, usedPaths) {
+  if (ts.isFunctionDeclaration(statement)) {
+    // 有无函数体区分实现与重载签名；签名由实现承载文档。
+    if (statement.body === undefined) return
+    pushRecord(records, usedPaths, {
+      symbolPath: statement.name?.text ?? 'default',
+      kind: 'function',
+      exported: hasExportModifier(statement),
+      jsdocText: leadingJsDoc(source, statement, sourceFile),
+      line: lineOf(statement, sourceFile),
+      params: simpleParameterNames(statement.parameters),
+      hasDestructuredParam: statement.parameters.some(isDestructuredParameter),
+      returnTypeText: typeTextOf(statement.type, sourceFile),
+    })
+    return
+  }
+  if (ts.isClassDeclaration(statement)) {
+    const className = statement.name?.text ?? 'default'
+    const exported = hasExportModifier(statement)
+    pushRecord(records, usedPaths, {
+      symbolPath: className,
+      kind: 'class',
+      exported,
+      jsdocText: leadingJsDoc(source, statement, sourceFile),
+      line: lineOf(statement, sourceFile),
+      params: [],
+      hasDestructuredParam: false,
+      returnTypeText: undefined,
+    })
+    for (const member of statement.members) {
+      collectClassMember(member, sourceFile, source, records, usedPaths, className, exported)
+    }
+    return
+  }
+  if (ts.isVariableStatement(statement)) {
+    const exported = hasExportModifier(statement)
+    const jsdocText = leadingJsDoc(source, statement, sourceFile)
+    for (const declaration of statement.declarationList.declarations) {
+      // 解构绑定的名字不是符号路径，跳过而不是编造一个。
+      if (!ts.isIdentifier(declaration.name)) continue
+      const callable = callableOf(declaration.initializer)
+      pushRecord(records, usedPaths, {
+        symbolPath: declaration.name.text,
+        kind: callable === undefined ? 'variable' : 'function',
+        exported,
+        jsdocText,
+        line: lineOf(declaration, sourceFile),
+        params: callable?.parameters ?? [],
+        hasDestructuredParam: callable?.hasDestructuredParam ?? false,
+        returnTypeText: callable?.returnTypeText ?? typeTextOf(declaration.type, sourceFile),
+      })
+    }
+    return
+  }
+  const simpleKind = simpleDeclarationKindOf(statement)
+  if (simpleKind !== undefined) {
+    pushRecord(records, usedPaths, {
+      symbolPath: declarationNameOf(statement) ?? 'default',
+      kind: simpleKind,
+      exported: hasExportModifier(statement),
+      jsdocText: leadingJsDoc(source, statement, sourceFile),
+      line: lineOf(statement, sourceFile),
+      params: [],
+      hasDestructuredParam: false,
+      returnTypeText: undefined,
+    })
+  }
+}
+
+/** 只需描述正文、不需要 tag 的声明种类。 */
+function simpleDeclarationKindOf(statement) {
+  if (ts.isInterfaceDeclaration(statement)) return 'interface'
+  if (ts.isTypeAliasDeclaration(statement)) return 'typeAlias'
+  if (ts.isEnumDeclaration(statement)) return 'enum'
+  if (ts.isModuleDeclaration(statement)) return 'module'
+  return undefined
+}
+
+function collectClassMember(member, sourceFile, source, records, usedPaths, className, exported) {
+  if (isPrivateMember(member)) return
+  const base = {
+    exported,
+    jsdocText: leadingJsDoc(source, member, sourceFile),
+    line: lineOf(member, sourceFile),
+    params: [],
+    hasDestructuredParam: false,
+    returnTypeText: undefined,
+  }
+  if (ts.isConstructorDeclaration(member)) {
+    pushRecord(records, usedPaths, {
+      ...base,
+      symbolPath: `${className}.constructor`,
+      kind: 'ctor',
+      params: simpleParameterNames(member.parameters),
+      hasDestructuredParam: member.parameters.some(isDestructuredParameter),
+    })
+    return
+  }
+  const name = memberNameOf(member)
+  if (name === undefined) return
+  if (ts.isMethodDeclaration(member)) {
+    if (member.body === undefined) return
+    pushRecord(records, usedPaths, {
+      ...base,
+      symbolPath: `${className}.${name}`,
+      kind: 'method',
+      params: simpleParameterNames(member.parameters),
+      hasDestructuredParam: member.parameters.some(isDestructuredParameter),
+      returnTypeText: typeTextOf(member.type, sourceFile),
+    })
+    return
+  }
+  if (ts.isGetAccessorDeclaration(member)) {
+    pushRecord(records, usedPaths, {
+      ...base,
+      symbolPath: `${className}.${name}#get`,
+      kind: 'accessor',
+      returnTypeText: typeTextOf(member.type, sourceFile),
+    })
+    return
+  }
+  if (ts.isSetAccessorDeclaration(member)) {
+    pushRecord(records, usedPaths, {
+      ...base,
+      symbolPath: `${className}.${name}#set`,
+      kind: 'accessor',
+      params: simpleParameterNames(member.parameters),
+      hasDestructuredParam: member.parameters.some(isDestructuredParameter),
+    })
+    return
+  }
+  if (ts.isPropertyDeclaration(member)) {
+    pushRecord(records, usedPaths, {
+      ...base,
+      symbolPath: `${className}.${name}`,
+      kind: 'property',
+      returnTypeText: typeTextOf(member.type, sourceFile),
+    })
+  }
+}
+
+/** 只跳过 `private` 与 `#` 成员；`protected` 属于继承契约，仍纳入。 */
+function isPrivateMember(member) {
+  if (member.name !== undefined && ts.isPrivateIdentifier(member.name)) return true
+  return (ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Private) !== 0
+}
+
+function memberNameOf(member) {
+  const name = member.name
+  if (name === undefined) return undefined
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text
+  if (ts.isPrivateIdentifier(name)) return name.text
+  return undefined
+}
+
+/**
+ * 变量声明初始值是箭头函数或函数表达式时，按函数对待。
+ *
+ * 不这样做就等于留了一个绕道：把函数写成 `export const f = () => {}` 即可绕开
+ * `@param` 要求。返回 `undefined` 表示它不是可调用体（如 zod schema、常量对象）。
+ */
+function callableOf(initializer) {
+  if (initializer === undefined) return undefined
+  if (!ts.isArrowFunction(initializer) && !ts.isFunctionExpression(initializer)) return undefined
+  return {
+    parameters: simpleParameterNames(initializer.parameters),
+    hasDestructuredParam: initializer.parameters.some(isDestructuredParameter),
+    returnTypeText: typeTextOf(initializer.type, initializer.getSourceFile()),
+  }
+}
+
+function simpleParameterNames(parameters) {
+  const names = []
+  for (const parameter of parameters) {
+    if (ts.isIdentifier(parameter.name)) names.push(parameter.name.text)
+  }
+  return names
+}
+
+function isDestructuredParameter(parameter) {
+  return !ts.isIdentifier(parameter.name)
+}
+
+function typeTextOf(node, sourceFile) {
+  return node === undefined ? undefined : node.getText(sourceFile)
+}
+
+function lineOf(node, sourceFile) {
+  return sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1
+}
+
+/** 同名符号追加序号，保证 `symbolPath` 在单文件内唯一。 */
+function pushRecord(records, usedPaths, record) {
+  let symbolPath = record.symbolPath
+  let ordinal = 2
+  while (usedPaths.has(symbolPath)) {
+    symbolPath = `${record.symbolPath}#${ordinal}`
+    ordinal += 1
+  }
+  usedPaths.add(symbolPath)
+  records.push({ ...record, symbolPath })
 }
 
 function classifyStatement(statement, sourceFile, source) {

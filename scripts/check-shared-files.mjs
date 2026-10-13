@@ -22,6 +22,8 @@ const candidates = ["red-bean-qing-tuan", "red-bean-nian-gao"];
 const byteIdenticalFiles = [
   "docs/standards/typescript-common-conventions.md",
   "tooling/typescript/tsconfig.base.json",
+  "tooling/typescript/export-jsdoc-rules.mjs",
+  "tooling/typescript/export-jsdoc-cases.json",
   "scripts/check-shared-files.mjs",
 ];
 

@@ -23,7 +23,7 @@ PNPM_CONTRACT := pnpm --filter @red-bean/api-contract
 .PHONY: help setup init bootstrap require-install doctor check-tools hooks-install hooks-uninstall hooks-status fmt fmt-check diff-check secrets-check compose-check lint test \
 		test-integration build run dev clean infra-up infra-down infra-logs db-migrate db-status db-rollback \
 		ci verify verify-quick verify-full backend-verify frontend-verify sdk-revision-check sdk-verify docs-check shared-files-check audit audit-js \
-		typecheck ts-lint ts-policy-check be-architecture-check be-build be-format be-format-check be-lint be-typecheck be-test be-test-integration be-install backend-ts-verify \
+		typecheck ts-lint ts-policy-check ts-export-jsdoc-check be-architecture-check be-build be-format be-format-check be-lint be-typecheck be-test be-test-integration be-install backend-ts-verify \
 		fe-dev fe-build fe-format fe-format-check fe-lint fe-typecheck fe-test fe-test-watch fe-install \
 		ds-dev ds-build ds-check ds-format ds-format-check ds-lint ds-typecheck ds-install ds-test contract fe-contract full-dev \
 		contract-install contract-build contract-format contract-format-check contract-lint contract-test contract-typecheck contract-verify
@@ -135,6 +135,9 @@ ts-lint: be-lint fe-lint ds-lint ## 对全部 TypeScript package 执行类型感
 ts-policy-check: ## 检查严格 TS 配置、ESLint 政策、package scripts 与 Make 入口
 	node ./scripts/check-typescript-policy.mjs
 
+ts-export-jsdoc-check: ## 检查四个 package 导出符号与公开成员的 JSDoc（棘轮基线，纯语法解析，不依赖构建产物）
+	node ./scripts/check-export-jsdoc.mjs
+
 secrets-check: ## 检查环境文件忽略策略与高置信度密钥
 	bash ./scripts/check-secrets.sh
 
@@ -226,9 +229,9 @@ sdk-verify: sdk-revision-check ## 验证锁定版本的同级 Runtime SDK（SDK_
 		exit 1; }
 	$(MAKE) -C $(SDK_DIR) verify
 
-verify: require-install doctor diff-check docs-check shared-files-check secrets-check compose-check ts-policy-check backend-verify frontend-verify ds-check sdk-verify ## 本地统一门禁（不改 Git 跟踪文件、不要求外部服务）
+verify: require-install doctor diff-check docs-check shared-files-check secrets-check compose-check ts-policy-check ts-export-jsdoc-check backend-verify frontend-verify ds-check sdk-verify ## 本地统一门禁（不改 Git 跟踪文件、不要求外部服务）
 
-verify-quick: require-install doctor diff-check docs-check shared-files-check secrets-check compose-check ts-policy-check be-architecture-check fmt-check ## commit 前快速门禁（不改 Git 跟踪文件）
+verify-quick: require-install doctor diff-check docs-check shared-files-check secrets-check compose-check ts-policy-check ts-export-jsdoc-check be-architecture-check fmt-check ## commit 前快速门禁（不改 Git 跟踪文件）
 
 verify-full: verify test-integration audit ## 发布级门禁（额外要求基础设施、网络和安全审计工具）
 

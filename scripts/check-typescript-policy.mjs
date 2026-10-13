@@ -101,6 +101,7 @@ for (const target of [
   'typecheck:',
   'ts-lint:',
   'ts-policy-check:',
+  'ts-export-jsdoc-check:',
   'be-typecheck:',
   'be-lint:',
   'backend-ts-verify:',
