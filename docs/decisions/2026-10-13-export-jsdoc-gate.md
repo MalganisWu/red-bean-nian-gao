@@ -54,3 +54,18 @@
   这是有意的取舍——静默放行比报错危险得多。
 
 后果：基线在烧到 0 之后删除，连同 `--update-baseline` 与 `--seed-baseline` 分支一起。
+
+结果（同日完成）：棘轮烧到 0，基线文件与两条分支已删除，门禁转为**零容忍**。实际补齐的条目
+与实测量有出入，原因是实测量的 glob 写成 `src/**/*.ts`，**不匹配 `.tsx`** —— 所以全部 React
+组件与 design-system 都不在其统计内。真实存量是 SDK 481、产品仓 1183（含构造函数豁免后的数字）。
+
+执行中发现并修掉的两处工具缺陷：
+
+1. `architecture-syntax.mjs` 两仓都硬编码 `ScriptKind.TS`，拿它解析 `.tsx` 会产出语法错误 AST，
+   而「读坏了 AST」在门禁里的表现是**零成员零违规**的静默放行。改为按扩展名分流。
+2. `leadingJsDoc` 原先要求 JSDoc 必须是声明前的**最后一段**注释，与 ESLint 的
+   `// eslint-disable-next-line`（必须紧贴目标行）在同一声明上互斥。改为取前导里最后一段 JSDoc。
+
+已知遗留（未处理，留待决策）：门禁采集**类的**公开成员，但**接口的成员一律不采集** ——
+`ManagedChatRunHandle.runId` 写在类里被要求注释、同义的 `ChatRunHandle.runId` 写在接口里就豁免。
+参考实现（deepseek-harness）的措辞同样只覆盖 class members，故本次按原样保留。

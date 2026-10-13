@@ -499,12 +499,6 @@ export function groupRequests(records: readonly TrajectoryRecord[]): TurnItem[] 
 }
 
 /**
- * 请求头行：一次模型网关调用。承载这次请求的模型、尝试序、**入/出 token** 与耗时。
- *
- * 输出 token **不拆到各块产出上**（Provider 只返回整次响应的总量，不返回分块），
- * 所以「出」挂在这里，思考/正文/工具调用共享它，不虚构分块数字。
- */
-/**
  * 「工具调用」行的文本：模型写出的调用意图 = 工具名 + 参数。
  * 与紧随其后的「工具执行」行（系统阶段，带结果与耗时）是两件事。
  */
@@ -555,6 +549,12 @@ function removeFromSet<T>(source: ReadonlySet<T>, value: T): ReadonlySet<T> {
   return next
 }
 
+/**
+ * 请求头行：一次模型网关调用。承载这次请求的模型、尝试序、**入/出 token** 与耗时。
+ *
+ * 输出 token **不拆到各块产出上**（Provider 只返回整次响应的总量，不返回分块），
+ * 所以「出」挂在这里，思考/正文/工具调用共享它，不虚构分块数字。
+ */
 function RequestHeaderRow({
   index,
   call,
