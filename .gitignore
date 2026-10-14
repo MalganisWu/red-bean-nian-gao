@@ -35,8 +35,51 @@ tmp/
 # 草稿本身不留档，git 历史里也没有价值可追溯的内容。
 design-system/previews/
 
-# Claude Code worktrees（保留 .claude/CLAUDE.md 被跟踪）
-.claude/worktrees/
+# ── AI 编码助手的本地配置 ──────────────────────────────────────────────
+# 仓库不绑定任何 harness：规则的源是 `skills/` 与 `AGENTS.md`，至于各工具怎么发现
+# 它们，由开发者本地决定（需要就在本地建符号链接或写配置，不进库）。
+.claude/
+.claude.json
+.claude_settings
+.claudeignore
+.mcp.json
+.cursor/
+.cursorrules
+.cursorignore
+.cursorindexingignore
+.codex/
+.opencode/
+opencode.json
+opencode.jsonc
+.agents/
+.windsurf/
+.windsurfrules
+.codeiumignore
+.aider*
+.continue/
+.continueignore
+.clinerules
+.clinerules/
+.cline/
+.roo/
+.rooignore
+.roorules
+.roomodes
+.gemini/
+.geminiignore
+.aiexclude
+.amazonq/
+.kilocode/
+.kilocodeignore
+.kiroignore
+.qodo/
+.supermaven/
+.devin/
+.tabnine/
+.tabnineignore
+.augment/
+.augmentignore
+.gooseignore
 
 # AI 协作讨论稿/运行时状态（brainstorm 会话产物，不入库）
 .superpowers/

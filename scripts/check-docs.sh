@@ -78,29 +78,6 @@ check_skill_format() {
 	fi
 }
 
-check_skill_link() {
-	local client="$1"
-	local name="$2"
-	local canonical="$3"
-	local entry="$root/$client/skills/$name"
-	local resolved_canonical
-	local resolved_entry
-
-	if [[ ! -L "$entry" ]]; then
-		report_error "$client/skills/$name 必须是指向权威 Skill 的符号链接"
-		return
-	fi
-	if [[ ! -f "$entry/SKILL.md" ]]; then
-		report_error "$client/skills/$name 无法解析到 SKILL.md"
-		return
-	fi
-	resolved_canonical="$(cd "$canonical" && pwd -P)"
-	resolved_entry="$(cd "$entry" && pwd -P)"
-	if [[ "$resolved_entry" != "$resolved_canonical" ]]; then
-		report_error "$client/skills/$name 未指向 skills/$name 权威目录"
-	fi
-}
-
 for skill_dir in "$root"/skills/*; do
 	[[ -d "$skill_dir" ]] || continue
 	name="$(basename "$skill_dir")"
@@ -112,22 +89,6 @@ for skill_dir in "$root"/skills/*; do
 		continue
 	fi
 	check_skill_format "$skill_dir"
-	check_skill_link ".agents" "$name" "$skill_dir"
-	check_skill_link ".claude" "$name" "$skill_dir"
-done
-
-for client in .agents .claude; do
-	for entry in "$root/$client/skills"/*; do
-		[[ -e "$entry" || -L "$entry" ]] || continue
-		name="$(basename "$entry")"
-		if [[ ! -L "$entry" ]]; then
-			report_error "$client/skills/$name 不是符号链接，可能形成规范副本"
-		elif [[ ! -f "$entry/SKILL.md" ]]; then
-			report_error "$client/skills/$name 是失效链接"
-		elif [[ ! -d "$root/skills/$name" ]]; then
-			report_error "$client/skills/$name 没有对应的 skills/$name 权威目录"
-		fi
-	done
 done
 
 check_living_doc_index() {
