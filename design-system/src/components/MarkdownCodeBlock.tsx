@@ -1,6 +1,6 @@
 /**
  * 内部件：由 MarkdownRenderer 为 fenced code block 提供语言标签与复制动作，
- * 不单独对前端承诺 API。见 design-system/AGENTS.md「组件入册规则」。
+ * 不单独对前端承诺 API。见 `skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`。
  */
 'use client'
 

@@ -35,16 +35,16 @@
 | 组件层（交互行为） | Testing Library 渲染 + 模拟操作 | 先定义验收状态；可自动化行为先写失败测试再实现，结构/样式骨架可先搭建 |
 | 视觉层（样式、动画） | Showcase + Dev server 目视确认 | 先定义视觉验收条件，覆盖 Light/Dark 与必要视口，不强写像素单测 |
 
-**组件规范与状态管理**：见 [`coding-conventions.md`](coding-conventions.md) §2（组件结构）、
-§3（样式与 token）、§4（状态管理）。
+**组件规范与状态管理**（组件结构、样式与 token、状态管理）：见前端编码规范 Skill
+[`../../../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`](../../../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md)。
 
 **设计系统同步**：见 [`../../../design-system/AGENTS.md`](../../../design-system/AGENTS.md)「同步机制」
 （alias 映射、漂移检查、token 同步）；前端侧只需验证 `pnpm typecheck && pnpm build` 仍通过。
 
 ### 4 验证
 
-**硬性门禁（全部必须通过）**：逐项清单见
-[`../../../docs/standards/typescript-coding-conventions.md`](../../../docs/standards/typescript-coding-conventions.md)「门禁」。
+**硬性门禁（全部必须通过）**：逐项清单见根
+[`AGENTS.md`](../../../AGENTS.md)「门禁」。
 前端侧即 `pnpm format:check` + `pnpm typecheck` + `pnpm lint` + `pnpm test` + `pnpm build`。
 
 **目视确认**（`pnpm dev` → http://localhost:5173），检查清单：

@@ -22,7 +22,7 @@ description: 在 red-bean-nian-gao 中开发、修复、重构、评审、测试
 | 后端 | [`backend/docs/standards/development-workflow.md`](../../backend/docs/standards/development-workflow.md) |
 | 前端 | [`frontend/docs/standards/development-workflow.md`](../../frontend/docs/standards/development-workflow.md) |
 | Design System | [`design-system/AGENTS.md`](../../design-system/AGENTS.md)「开发流程（硬性红线）」 |
-| api-contract | 随前后端一起改；契约测试见根 [`AGENTS.md`](../../AGENTS.md)「API 契约（硬性红线）」 |
+| api-contract | 随前后端一起改；契约测试见根 [`AGENTS.md`](../../AGENTS.md)「前后端共用契约包（硬性红线）」 |
 
 - **plan 的落点**：跨 workspace 落仓库根 `docs/plans/<date>-<feature>.md`；仅影响单个 workspace 时
   落 `backend/docs/plans/` 或 `frontend/docs/plans/`。

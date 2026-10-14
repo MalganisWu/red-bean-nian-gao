@@ -8,7 +8,7 @@ embedded anywhere.
 
 [![CI](https://github.com/MalganisWu/red-bean-nian-gao/actions/workflows/ci.yml/badge.svg)](https://github.com/MalganisWu/red-bean-nian-gao/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D24.9.0%20%3C26-brightgreen)](package.json)
+![Node.js](https://img.shields.io/badge/node-%3E%3D24.9.0%20%3C26-brightgreen)
 
 **English** · [简体中文](README.md)
 

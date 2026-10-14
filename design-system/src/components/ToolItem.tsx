@@ -1,6 +1,6 @@
 /**
  * 内部件：被 ProcessFold / ReasoningBlock / DelegationBlock 内部使用，
- * 不单独出 showcase 页。见 design-system/AGENTS.md「组件入册规则」。
+ * 不单独出 showcase 页。见 `skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`。
  */
 'use client'
 

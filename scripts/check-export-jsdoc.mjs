@@ -12,8 +12,8 @@ import { documentableViolations } from '../tooling/typescript/export-jsdoc-rules
  * 没有 `package.json`，解析不到编译器 API，所以语法层从 `backend/scripts/architecture-syntax.mjs`
  * 借：bare specifier 按**导入方文件位置**解析，那里的 `typescript` 是可解析的。
  *
- * **零容忍**：棘轮基线已删除（存量补齐后不再需要长期豁免清单）。规则、豁免条件与「要放宽先改
- * 规范」的要求写在 `docs/standards/typescript-common-conventions.md`「注释 › 机械门禁」，
+ * **零容忍**：棘轮基线已删除（存量补齐后不再需要长期豁免清单）。规则与豁免条件由通用 TypeScript
+ * 规范规定，见 `docs/standards/typescript-common-conventions.md`（它指向跨仓共享的那份实体）；
  * 本文件只实现它，不自行放宽。
  */
 

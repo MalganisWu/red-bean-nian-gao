@@ -95,7 +95,7 @@ class MyTool implements Tool {
 配置引用不存在的系统工具不会进入 schema 或 system dispatcher；若同名委派也不存在，调用会返回稳定的
 `tool_not_found` 错误。
 
-> `Description` 不是占位符：adapter 把工具定义**原样透传**给 LLM，`function.description` 是模型决定「是否调用」的信号，须写全「做什么 / 何时用 / 返回什么 / 何时不用（与相似工具的区分）」。制作系统工具的专项工作流见 Skill [`make-agent-system-tools`](../../../skills/make-agent-system-tools/SKILL.md)，并通过 `.claude/skills/` 与 `.agents/skills/` 暴露给不同客户端。
+> `Description` 不是占位符：adapter 把工具定义**原样透传**给 LLM，`function.description` 是模型决定「是否调用」的信号，须写全「做什么 / 何时用 / 返回什么 / 何时不用（与相似工具的区分）」。制作系统工具的专项工作流见 Skill [`make-agent-system-tools`](../../../skills/make-agent-system-tools/SKILL.md)。
 
 ---
 

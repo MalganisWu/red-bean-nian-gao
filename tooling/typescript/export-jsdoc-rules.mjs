@@ -6,7 +6,8 @@
  * 一致 —— 语法层（碰编译器、每仓一份）产出中性记录，本文件只消费记录、产出违规。
  * 新增语法形态只需改语法层；改判据只需改本文件。
  *
- * 判据的唯一事实来源是 `docs/standards/typescript-common-conventions.md`「注释」章节。
+ * 判据的唯一事实来源是**跨仓共享的通用 TypeScript 规范**——入口是
+ * `docs/standards/typescript-common-conventions.md`（短指针，实体在 `skills/` 下的编码规范 Skill）。
  * 门禁只负责**可机械判定**的部分：有没有注释、tag 与签名是否对应、说明是否中文。
  * 「注释是否解释了复杂业务」不可机械判定，不在这里，也不假装在这里。
  */

@@ -31,8 +31,8 @@
 
 ### 4 验证
 
-一条 `make verify`；逐项清单见
-[`../../../docs/standards/typescript-coding-conventions.md`](../../../docs/standards/typescript-coding-conventions.md)「门禁」。
+一条 `make verify`；逐项清单见根
+[`AGENTS.md`](../../../AGENTS.md)「门禁」。
 
 **测试要求**：覆盖核心 happy path 与主要 error path，外部输入至少覆盖非法形状；纯领域测试优先用
 内存 fake，SQL / Redis 原子语义 / MinIO / 完整 HTTP 生命周期必须有真实基础设施证据；多 case 场景
