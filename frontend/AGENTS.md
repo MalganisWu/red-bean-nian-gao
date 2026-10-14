@@ -76,9 +76,8 @@ alias 映射表、漂移检查与 token 同步机制见
 
 | 范围 | 唯一事实来源 |
 |------|-------------|
-| 通用 TypeScript（类型边界、`unknown`、可读性、判空、命名、注释） | [`../docs/standards/typescript-common-conventions.md`](../docs/standards/typescript-common-conventions.md) |
-| 产品仓特有约束 | [`../docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md) |
-| React / UI（组件结构、样式、状态、导入顺序、文件命名） | [`docs/standards/coding-conventions.md`](docs/standards/coding-conventions.md) |
+| 通用 TypeScript（类型边界、`unknown`、可读性、判空、命名、注释） | [`../skills/red-bean-nian-gao-frontend-coding-conventions/references/common.md`](../skills/red-bean-nian-gao-frontend-coding-conventions/references/common.md) |
+| React / UI 与 Design System（组件结构、样式、状态、导入顺序、API 调用、注释、门禁） | [`../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`](../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md) |
 
 冲突时以通用件为准。
 
@@ -90,11 +89,13 @@ alias 映射表、漂移检查与 token 同步机制见
 
 前端特有的差异：
 
-- **阶段 2 额外步骤：UI 组件盘点 + design-system 先行**
-  1. 盘点需要的 UI 组件（哪些已有的、哪些要新建、哪些要改）
-  2. 在 design-system 完成组件设计 + showcase 页
-  3. 人工目视确认（启动 design-system dev server）
-  4. 确认后才进入阶段 3
+- **阶段 1 与阶段 2 之间额外步骤：mock → 方向确认 → UI 组件盘点 + design-system 先行**
+  1. 产出 mock，落 `design-system/previews/`（本地、不入库），由开发者目视确认方向
+  2. 确认后才写 plan；plan 只写已确认的方向
+  3. 盘点需要的 UI 组件（哪些已有的、哪些要新建、哪些要改）
+  4. 在 design-system 完成组件设计 + showcase 页
+  5. 人工目视确认（启动 design-system dev server）
+  6. 确认后才进入阶段 3
 - 阶段 3 **测试分层**：逻辑层严格 TDD；组件先定义验收状态，可自动化的交互行为测试先行；纯视觉层使用 Showcase + 目视验证
 - 阶段 4 **硬性门禁**：format:check + typecheck + lint + test + build，外加 dev server 目视确认
 - 阶段 5 涉及 design-system 变更的，验证两端 `typecheck + build` 均通过
@@ -118,7 +119,7 @@ alias 映射表、漂移检查与 token 同步机制见
 ## 运行命令
 
 日常几条；**完整门禁清单见
-[`../docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md)「门禁」**，
+[`../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`](../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md)「门禁」**，
 本节不重列。
 
 ```bash

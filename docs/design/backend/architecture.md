@@ -43,10 +43,9 @@ backend/
 ### 依赖方向
 
 - `src/modules/*/**/controller` 是与 Fastify 解耦的 HTTP 用例控制器：方法签名即"入参 + 返回"（入参
-  DTO/标量与 `AbortSignal`），负责 wire DTO 投影和 HTTP 应用错误映射，但不导入 Fastify 类型、不自行连接
-  基础设施。`*.routes.ts` 承载请求解包
+  DTO/标量与 `AbortSignal`），负责 wire DTO 投影和 HTTP 应用错误映射；`*.routes.ts` 承载请求解包
   （parser、Principal/Bearer 提取、AbortSignal）、成功信封（`shared/http/response.ts` 的 `sendOk`）
-  与 SSE/下载流的传输投影，同样不连接数据库、Redis 或 MinIO。
+  与 SSE/下载流的传输投影。这条边界的**书写约束**见后端编码规范 Skill「HTTP 边界与 Controller」。
 - `src/modules` 持有领域模型、Port、Adapter 和产品编排；业务跨 Module 只依赖 `public-api.ts`。
   `app/http-routes.ts` 可通过各 Module 的 `http-api.ts` 组装 Controller 与路由，这是唯一 transport 例外。
 - `src/platform` 持有启动期封闭的 LLM / Tool Registry 与 Provider，不包含产品用例；产品工具实例由各
@@ -55,7 +54,8 @@ backend/
 - `src/shared` 只定义中性机制与窄 Port，不依赖业务 Module；业务 Module 也不得反向依赖 `src/app`。
 - `src/app` 是唯一完整组装层，可以依赖具体实现；`src/entrypoint` 只保留进程入口。
 - 跨模块只依赖 `public-api.ts` 暴露的业务自有模型和窄接口。SDK 中性类型停留在 Agent Runtime Adapter、
-  Loader 与平台接入边界，不通过产品 Model/Port 扩散；Fastify、`pg`、Redis、MinIO 或 OTel 具体类型同理。
+  Loader 与平台接入边界；Fastify、`pg`、Redis、MinIO 或 OTel 具体类型同理。「哪些类型不得扩散到业务
+  模块」的约束见后端编码规范 Skill「架构与依赖方向」。
 - TypeScript 的边界由 import、类型检查、构造接线测试、架构机械门禁和人工架构审查共同保护。
 
 直接导入 `red-bean-qing-tuan` 的生产白名单固定为 `modules/agent/execution/adapter/`、
@@ -80,13 +80,9 @@ backend/
 执行一次并聚合所有错误。这是静态、显式的依赖组装，不提供运行期服务查找，也不把应用容器传入业务模块。
 
 全局 composition root 是跨 Module 第二层接线的唯一事实来源，各 `*.module.ts` 是 Module 内第一层实现
-选择的唯一事实来源。Controller 和 Application Service 持有 Port 或内部 1:1 实现类：调用处不会重复 `new`
-具体实现。人工审查时从依赖字段跳到 Port（或直接看实现类），搜索实现类的显式 `implements`（无 Port 的
-1:1 实现类登记在 `backend/scripts/architecture-rules.mjs` 的 `NON_PORT_IMPLEMENTATION_CLASSES`），
-再到对应 `*.module.ts` 查看 `new ConcreteClass(...)`；涉及跨 Module 依赖时继续回到
-`src/app/composition-root.ts`。禁止仅依赖 TypeScript 结构化类型让一个类“碰巧”满足接口；Port 注释还应
-指出默认实现和组装位置。接口只服务于真实的多实现/外部边界/跨模块共享，内部 1:1 业务 Service 不建 Port，
-Controller 直接依赖实现类，保证完整流程能在单个公开方法内读完。
+选择的唯一事实来源。Controller 和 Application Service 持有 Port 或内部 1:1 实现类：调用处不会重复
+`new` 具体实现。**依赖的人工审查路径、`implements` 义务、Port 注释要求，以及「哪些接口该建」的判据**，
+见后端编码规范 Skill「组装与实现绑定」与共享通用件「依赖、接口与实现」。
 
 Identity Module 的注册与资料查询是内部 1:1 实现类（`application/{registration,profile}/service/`），
 Controller 直接依赖；认证委托已并入共享真边界 `AuthServicePort`，不再有模块内窄 Port。
@@ -159,15 +155,23 @@ Adapter / Runtime SDK
 
 - HTTP 方法、路径、信封、错误码和 SSE wire 结构以 `../../../api-contract/src/` 的可执行共享契约为准；
   [`../../contracts/api.md`](../../contracts/api.md) 是人类可读说明。
-- 共享 `api-contract/src/<module>/dto.ts` 只声明 wire 数据结构；共享 Schema 位于同域文件，后端输入解析与
-  领域到 wire 的映射分别位于 Module 的 `controller/*-request-parser.ts` 和 `*-presenter.ts`。Controller 是
-  与 Fastify 解耦的 HTTP 用例控制器（方法签名即入参与返回），负责 DTO 投影和 `AppError` 映射；
-  `*.routes.ts` 完成请求解包与成功信封输出，领域 Service/SDK 不依赖 Fastify 或 HTTP DTO。
+- 共享契约与 HTTP 边界的**书写约束**——`dto.ts` 只声明 wire 数据结构、输入解析与 presenter 的落点、
+  Controller 与 `*.routes.ts` 的分工——见后端编码规范 Skill「HTTP 边界与 Controller」与「契约与公开边界」。
 - 未捕获错误只向客户端返回安全文案，完整上下文进入服务端日志。
 - Runtime Event 是中性事件；`src/modules/agent/chat/controller/chat-event-presenter.ts` 负责映射为 SSE payload 和本地化状态文案。
 - 完整的逐接口审查顺序和功能矩阵见 [`../../../backend/src/README.md`](../../../backend/src/README.md)。
 - Request ID、Run ID 与 Trace ID 相互独立；具体层级与字段见
   [`observability.md`](observability.md)。
+
+### 已知现状：route 文件超出职责审查触发线
+
+`modules/**/controller/*.routes.ts` 在端点 handler 按「函数与流程可读性」具名化后普遍超出行数触发线
+（`task.routes.ts` 271 行、`identity.routes.ts` 219 行、`storage.routes.ts` 188 行；具名化前分别为
+204 / 163 / 149 行）。
+
+**这些文件不拆分。** 它们的固有规模来自端点数量本身；handler 抽到同文件模块级之后，注册处退化成
+一张端点清单、链路指纹注释与 handler 同处一文件，再拆到 `*-route-handlers.ts` 反而让「注册 → 链路
+→ 实现」多一次跨文件跳转。端点继续增长时按业务面拆成独立 route 文件，而不是把 handler 抽走。
 
 ## Agent 组装
 
@@ -220,10 +224,10 @@ AgentLoader.load
 | 插件与观测                         | 静态 Plugin、Tracer、LLM/Tool/ChildRunner wrapper | 启动期依赖组装、HTTP/Pipeline/Scheduler span、结构化日志/OTLP Provider、W3C 传播            |
 | 核心进程更新                       | 无                                                | 构建并部署新的产品实例；应用提供版本与探针并优雅退出                                  |
 
-禁止把产品 presentation、Session、Redis key 或 PostgreSQL row model 移入 Runtime。产品不复制 Runtime
-的 ReAct 行为；但 Session、恢复消息、展示 JSON 和跨 Module Port 必须使用业务自有模型，避免把 SDK DTO
-变成数据库与模块契约。`RuntimeAgentExecutor` 的 mapper/codec 负责与 SDK Message、Event、Checkpoint
-转换，工具与模型 Adapter 等执行依赖仍通过 SDK 公开接口复用。
+产品不复制 Runtime 的 ReAct 行为，但 Session、恢复消息、展示 JSON 和跨 Module Port 使用业务自有模型，
+SDK DTO 不进入数据库与模块契约。`RuntimeAgentExecutor` 的 mapper/codec 负责与 SDK
+Message、Event、Checkpoint 转换，工具与模型 Adapter 等执行依赖仍通过 SDK 公开接口复用。「哪些东西属于
+宿主、不得移回 Runtime」的约束见后端编码规范 Skill「架构与依赖方向」。
 
 产品提交通过 `runtime.lock` 锁定已验证的 Runtime commit。跨仓变更需要先完成 Runtime 提交，再更新
 产品 lock 并在两仓验证。
@@ -292,43 +296,15 @@ iterator 和心跳，客户端提前断开时关闭句柄；后台 Session final
 - Redis key、TTL 和连接生命周期由宿主管理；Runtime 不读取这些配置。
 - migration 由 `src/entrypoint/migrate.main.ts` 或开发环境显式自动迁移执行；生产实例只校验 schema。
 
-## 扩展检查
-
-| 改动                                | 必须同步检查                                                                                             |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 新 HTTP/SSE 行为                    | API 契约、后端 contract、前端 contract                                                                   |
-| 新业务模块                          | Module 内 port/service/adapter、`*.module.ts`、`public-api.ts`、全局 composition root、AGENTS 与设计文档 |
-| 新产品工具或 Tool Provider          | 工具设计、Provider/Registry、默认授权和专项 Skill                                                        |
-| Session/lease/fence                 | 会话恢复、生产就绪、并发测试                                                                             |
-| Runtime 接口                        | Runtime contract/guide、`runtime.lock`、两仓门禁                                                         |
-| LLM Provider                        | Provider Registry 测试、启动组装、技术栈与凭据边界                                                       |
-| Trace 或日志                        | 可观测性设计、API/SSE 契约、生产就绪清单                                                                 |
-| 启动期 Registry、模型切换或部署更新 | 架构设计、API 契约、生产就绪清单                                                                         |
-| UI 投影字段                         | presentation core、API/SSE 契约、前端类型与 Design System                                                |
-
 ## 架构机械门禁
 
-`backend/scripts/check-architecture.mjs` 是快速、只读的边界检查，覆盖：
-
-1. Controller 不得直接依赖 Repository 或 Adapter，只依赖 Application Service Port。
-2. 跨 Module import 必须经过目标模块 `public-api.ts`。
-3. Module 组装使用的生产默认实现必须显式 `implements` 对应 Port。
-4. `adapter/` 中导出的生产类必须显式 `implements` 对应 Port。
-5. `public-api.ts` 不得通过公开 Model/Port 转发 Runtime SDK 类型。
-6. 白名单外的生产源码不得直接导入 Runtime SDK。
-7. 已退役的 `src/api|engine|cli` 与 `test/api|engine|cli` 目录不得恢复。
-8. Module 依赖图不得形成循环。
-9. Service、Adapter 和 Model 不得转发权威 Port 类型；`public-api.ts` 不得直接导出内部
-   Repository、Adapter 或 serializer helper。
-10. 生产文件和测试文件超过职责规模触发线时输出人工审查 warning，不单因行数阻断构建。
-11. `platform/shared/infra` 不得绕过业务 `public-api.ts` 深导入 Module，业务 Module 不得反向依赖 `app`。
-12. `public-api.ts` 经 `*.module.ts` 间接导出的返回契约也不得泄露 Repository、Adapter、serializer 或
-    `ObjectStorage`；门禁会递归追踪别名和多层接口组成的类型图。
+`backend/scripts/check-architecture.mjs` 是快速、只读的边界检查。**它检哪些规则，正文在后端编码规范
+Skill 的「[架构门禁](../../../skills/red-bean-nian-gao-backend-coding-conventions/SKILL.md)」节**，
+本节只记机制。
 
 运行入口为 `make be-architecture-check`（或在仓库根运行
 `pnpm --filter @red-bean-nian-gao/backend architecture:check`），并已接入
-`verify-quick` 和 `backend-ts-verify`。规则回归用例位于 `backend/test/architecture/`。若迁移期确需例外，
-只能精确登记源文件与目标文件，并在完成迁移后删除；不得把规则放宽为目录级豁免。
+`verify-quick` 和 `backend-ts-verify`。规则回归用例位于 `backend/test/architecture/`。
 
 门禁的源码解析与符号解析集中在 `backend/scripts/architecture-syntax.mjs`：它是 backend 内唯一接触
 TypeScript 编译器 API 的位置，把源码转成与编译器版本无关的中性结构（语句种类、声明种类与名字、
@@ -338,7 +314,9 @@ JSDoc、公开类型图引用名），并只对外提供两个语义查询——
 
 ## Port 边界名单与判据
 
-接口（Port）只服务于三种真实需求，命中任一即保留；三条都不命中（内部 1:1 空转）即删除：
+「接口该不该建」的**判据**唯一事实来源是共享通用件「依赖、接口与实现」：只服务于真实的多实现、替换
+需求或公开契约边界，内部 1:1 且无替换需求的能力接口不建。下表是这套判据在**本仓的落地**——命中哪条、
+全仓有哪些实例：
 
 | 判据 | 说明 | 全仓实例 |
 | --- | --- | --- |
@@ -349,8 +327,7 @@ JSDoc、公开类型图引用名），并只对外提供两个语义查询——
 
 **删除面（改造完成态）**：task 7 个空转接口、identity 3 个 application Port、`SessionQueryServicePort`、
 `SubAgentToolFactoryPort` 已删除；对应实现类直接承担消费方依赖并登记 `NON_PORT_IMPLEMENTATION_CLASSES`
-白名单。新增能力按上表判定：命中 ①②③ 建
-Port 并写 JSDoc 默认实现；未命中直接依赖实现类。
+白名单。
 
 ## 非目标
 

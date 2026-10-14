@@ -21,6 +21,7 @@
 ### 3 编码
 
 - 产品能力写入 `backend/src`。
+- TypeScript 测试位于 `backend/test` 的对应分层；生产导入使用 ESM `.js` 后缀。
 - 禁止恢复已退役的 `src/api|engine|cli` 与 `test/api|engine|cli`；业务公开 Model/Port 不得转发
   Runtime SDK DTO，产品与 SDK 的消息、事件和 Checkpoint 转换收口在 Runtime Adapter。
 - **数据库迁移**：一次任务相关的表、字段、索引和回滚 SQL 作为一个 migration 追加到

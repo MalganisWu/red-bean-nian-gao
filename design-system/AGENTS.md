@@ -26,8 +26,8 @@ design-system/
 
 通用 TypeScript 规范遵循跨仓共享的
 [`docs/standards/typescript-common-conventions.md`](../docs/standards/typescript-common-conventions.md)，
-产品仓特有约束见 [`docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md)，
-React/UI 规则遵循 [`frontend/docs/standards/coding-conventions.md`](../frontend/docs/standards/coding-conventions.md)。
+前端与 Design System 的特有约束见 Skill
+[`../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`](../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md)。
 
 ---
 
@@ -37,8 +37,12 @@ React/UI 规则遵循 [`frontend/docs/standards/coding-conventions.md`](../front
 组合留在 frontend；当组合形成复用模式或需要改变基础视觉语言时，再进入 design-system 评审。
 
 ```
-定义状态与视觉验收条件 → 设计/修改组件 → 写/更新 showcase 页 → 人工目视确认 → 前端才能使用该组件
+产出 mock → 人工确认 → 定义状态与视觉验收条件 → 设计/修改组件 → 写/更新 showcase 页 → 目视确认 → 前端才能使用该组件
 ```
+
+前两步是「UI 变更 mock 先行」的落点：mock 只存在于本地 `previews/`，**不入库**，确认后才进入组件设计。
+组件状态机（`proposal` → `accepted` → `implemented`）与各状态的准入条件见
+[`skills/red-bean-nian-gao-development-workflow/SKILL.md`](../skills/red-bean-nian-gao-development-workflow/SKILL.md)「UI 变更：mock 先行」。
 
 1. **验收先行**：实现前列出 Default、交互和边界状态；视觉缺陷先保存可复现的页面或截图证据
 2. **组件变更**：在 `src/components/` 下创建或修改组件
@@ -75,13 +79,20 @@ React/UI 规则遵循 [`frontend/docs/standards/coding-conventions.md`](../front
 
 每个组件 showcase 页必须覆盖以下状态：
 
-| 状态              | 说明                       |
-| ----------------- | -------------------------- |
-| Default           | 组件默认外观               |
-| Variants          | 所有 variant/size 组合     |
-| Loading/Streaming | 流式或加载中状态（如适用） |
-| Empty             | 空数据状态（如适用）       |
-| Error             | 错误状态（如适用）         |
+| 状态                  | 说明                       |
+| --------------------- | -------------------------- |
+| Default               | 组件默认外观               |
+| Variants              | 所有 variant/size 组合     |
+| Hover / Focus-visible | 悬停与键盘焦点态（如适用） |
+| Disabled              | 禁用态（如适用）           |
+| Loading/Streaming     | 流式或加载中状态（如适用） |
+| Empty                 | 空数据状态（如适用）       |
+| Error / Success       | 失败与成功状态（如适用）   |
+| 长文本                | 超长内容的换行与截断       |
+| 360px 宽度            | 窄视口下的布局与触控目标   |
+
+示例数据必须虚构：账户统一使用「张三 / `san.zhang` / `san.zhang@example.com`」，不得出现
+开发者真实身份。
 
 展示页模板参考现有 `ButtonsActionsPage.tsx`、`InputPage.tsx` 等。
 
@@ -107,7 +118,7 @@ React/UI 规则遵循 [`frontend/docs/standards/coding-conventions.md`](../front
 
 注释语言与共性规则见根
 [`docs/standards/typescript-common-conventions.md`「注释」](../docs/standards/typescript-common-conventions.md)
-与 [`frontend/docs/standards/coding-conventions.md` §9](../frontend/docs/standards/coding-conventions.md)，
+与 [`../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`](../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md)「注释」，
 本节只列 design-system 特有要求：
 
 - **Props 注释即对外 API 文档**：组件被前端经 alias 跨项目消费，每个公开 Props 成员必须 JSDoc 说明
@@ -131,6 +142,9 @@ CSS 变量遵循 **Primitive → Semantic → Component** 三层层级，定义�
 - **Component**：组件级组合（`--button-default-bg: var(--primary)`）
 
 颜色角色必须完整记录在 Color foundation 与 `philosophyMarkdown.ts`：文字、indicator、selection、focus、surface、普通边框和控件边框不得合并成一个泛化 token。状态文字使用 `--success-text` / `--danger-text`，图标与节点使用 `--success-indicator` / `--danger-indicator`；兼容别名 `--success` / `--danger` 只代表文字色。
+
+Light / Dark 只能替换语义 token；DOM 结构、信息层级和交互必须保持一致——同一组件在两个主题下是
+同一份实现，不是两份。
 
 ---
 
