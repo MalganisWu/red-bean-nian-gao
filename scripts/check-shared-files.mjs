@@ -18,14 +18,22 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const selfName = path.basename(root);
 const candidates = ["red-bean-qing-tuan", "red-bean-nian-gao"];
 
-/** 必须逐字相同的文件。 */
+/** 必须逐字相同的文件；两仓路径相同。 */
 const byteIdenticalFiles = [
-  "docs/standards/typescript-common-conventions.md",
-  "docs/standards/development-workflow.md",
   "tooling/typescript/tsconfig.base.json",
   "tooling/typescript/export-jsdoc-rules.mjs",
   "tooling/typescript/export-jsdoc-cases.json",
   "scripts/check-shared-files.mjs",
+];
+
+/**
+ * 必须逐字相同、但**两仓路径不同**的共享件：`<repo>` 展开成完整仓名。
+ * 规则正文住在各自的 Skill 目录里，所以路径天然带仓名；这里用占位符配对，
+ * 不写死「哪一仓是兄弟」。
+ */
+const repoScopedFiles = [
+  "skills/<repo>-coding-conventions/references/common.md",
+  "skills/<repo>-development-workflow/references/common.md",
 ];
 
 /** 必须语义相同的模块；列表内是允许各仓不同的导出名。 */
@@ -67,19 +75,33 @@ if (sibling === undefined) {
   process.exit(0);
 }
 
-for (const relative of byteIdenticalFiles) {
-  const mine = await readIfExists(path.join(root, relative));
-  const theirs = await readIfExists(path.join(sibling, relative));
+const expandRepo = (template, name) => template.replaceAll("<repo>", name);
+const siblingName = path.basename(sibling);
+
+const sharedPairs = [
+  ...byteIdenticalFiles.map((relative) => ({
+    mine: relative,
+    theirs: relative,
+  })),
+  ...repoScopedFiles.map((template) => ({
+    mine: expandRepo(template, selfName),
+    theirs: expandRepo(template, siblingName),
+  })),
+];
+
+for (const { mine: minePath, theirs: theirsPath } of sharedPairs) {
+  const mine = await readIfExists(path.join(root, minePath));
+  const theirs = await readIfExists(path.join(sibling, theirsPath));
   if (mine === undefined) {
-    failures.push(`本仓缺少共享件：${relative}`);
+    failures.push(`本仓缺少共享件：${minePath}`);
     continue;
   }
   if (theirs === undefined) {
-    failures.push(`兄弟仓缺少共享件：${relative}`);
+    failures.push(`兄弟仓缺少共享件：${theirsPath}`);
     continue;
   }
   if (mine !== theirs) {
-    failures.push(`${relative} 与兄弟仓不逐字相同`);
+    failures.push(`${minePath} 与兄弟仓的 ${theirsPath} 不逐字相同`);
   }
 }
 
@@ -112,7 +134,7 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `✓ 与 ${path.basename(sibling)} 的 ${String(byteIdenticalFiles.length)} 个共享件逐字一致、` +
+  `✓ 与 ${siblingName} 的 ${String(sharedPairs.length)} 个共享件逐字一致、` +
     `${String(semanticModules.length)} 个规则模块语义一致。`,
 );
 
