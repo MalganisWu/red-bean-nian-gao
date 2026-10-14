@@ -5,7 +5,7 @@
 | 正式场景 | 设计系统入口 | 覆盖要求 |
 |---|---|---|
 | 会话消息与过程 | Conversation / ProcessFold / Agent Delegation / QuestionCard / Markdown | 空会话、流式、停止、失败重试、父工具内委派、pending 确认、最终回答 |
-| 会话侧栏与账号 | Session sidebar Preview / Avatar / Menu | 新建、搜索、重命名、删除、折叠、移动抽屉、Account 菜单 |
+| 会话侧栏与账号 | Avatar / Menu | 新建、搜索、重命名、删除、折叠、移动抽屉、Account 菜单 |
 | 定时任务 | Scheduled Tasks | 列表、任务概览、执行记录、单次执行及各自 loading/empty/error |
 | 登录与注册 | 本文 + 系统状态规范 | 提交、字段错误、服务错误、认证恢复、移动端 |
 | 个人资料 | Avatar / Input / Menu + 系统状态规范 | 头像失败、长用户名、保存中、保存成功/失败 |
@@ -34,4 +34,4 @@
 - 不预建没有真实消费方的 FormField、Composer、IconButton、TextTabs 或 StatusIndicator；出现稳定复用
   需求时再按组件入册规则提炼。当前页面可以用既有原子件和 token 组合业务容器。
 
-后续新增 Preview 必须标注 proposal，不得在未确认前混入 canonical Showcase 或正式前端。
+后续新增 Preview 必须标注 proposal，不进版本库，也不得在未确认前混入 canonical Showcase 或正式前端。

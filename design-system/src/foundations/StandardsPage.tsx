@@ -10,7 +10,7 @@ const GOVERNANCE = [
   ['Token', 'design-tokens.css', 'Primitive → Semantic → Component；组件禁止复制 Hex。'],
   ['Component', 'src/components', '只收正式前端已消费或本次即将接入的共享组件。'],
   ['Showcase', 'src/showcase', '直接渲染真实组件，并覆盖适用的边缘状态。'],
-  ['Proposal', 'previews', '会改变既有视觉或行为的方案；确认前不进入正式前端。'],
+  ['Proposal', 'previews（本地，不入库）', '会改变既有视觉或行为的方案；确认前不进入正式前端。'],
 ] as const
 
 /**
@@ -39,7 +39,7 @@ const COVERAGE = [
     'Conversation · ProcessFold · QuestionCard · Markdown',
     '空会话、流式、停止、失败、确认',
   ],
-  ['账号', 'Avatar · Menu · Session sidebar preview', '虚构身份、长文本、菜单、移动抽屉'],
+  ['账号', 'Avatar · Menu', '虚构身份、长文本、菜单、移动抽屉'],
   ['定时任务', 'Scheduled Tasks', '列表、概览、执行记录、单次执行'],
   ['认证与个人页', 'Input · Button · Avatar + 状态规范', '提交、恢复、字段错误、保存反馈'],
   ['页面外壳', 'Brand · Menu · Toast', '返回、主题切换、全局反馈'],
@@ -166,8 +166,8 @@ export function StandardsPage() {
       <section>
         <h2 className="section-title">详细文档</h2>
         <p className="standards-doc-note">
-          工程细则位于 <code>design-system/docs/</code>：governance、interaction-accessibility、
-          system-states、layout-responsive、iconography 与 frontend-ui-coverage。
+          工程细则位于 <code>design-system/docs/</code>：interaction-accessibility、system-states、
+          layout-responsive、iconography 与 frontend-ui-coverage。
         </p>
       </section>
     </div>

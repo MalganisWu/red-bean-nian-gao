@@ -27,13 +27,28 @@ const byteIdenticalFiles = [
 ];
 
 /**
- * 必须逐字相同、但**两仓路径不同**的共享件：`<repo>` 展开成完整仓名。
- * 规则正文住在各自的 Skill 目录里，所以路径天然带仓名；这里用占位符配对，
- * 不写死「哪一仓是兄弟」。
+ * 必须逐字相同、但**两仓路径不同**的共享件。分组内的所有路径必须彼此逐字相同：
+ * 键是仓名，值是相对路径数组——同一仓允许出现多份（产品仓前后端 Skill 各存一份通用规范）。
+ * 路径带仓名，所以不写死「哪一仓是兄弟」，同一份代码在两仓都能跑。
  */
-const repoScopedFiles = [
-  "skills/<repo>-coding-conventions/references/common.md",
-  "skills/<repo>-development-workflow/references/common.md",
+const repoScopedFileGroups = [
+  {
+    "red-bean-qing-tuan": [
+      "skills/red-bean-qing-tuan-coding-conventions/references/common.md",
+    ],
+    "red-bean-nian-gao": [
+      "skills/red-bean-nian-gao-backend-coding-conventions/references/common.md",
+      "skills/red-bean-nian-gao-frontend-coding-conventions/references/common.md",
+    ],
+  },
+  {
+    "red-bean-qing-tuan": [
+      "skills/red-bean-qing-tuan-development-workflow/references/common.md",
+    ],
+    "red-bean-nian-gao": [
+      "skills/red-bean-nian-gao-development-workflow/references/common.md",
+    ],
+  },
 ];
 
 /** 必须语义相同的模块；列表内是允许各仓不同的导出名。 */
@@ -75,7 +90,6 @@ if (sibling === undefined) {
   process.exit(0);
 }
 
-const expandRepo = (template, name) => template.replaceAll("<repo>", name);
 const siblingName = path.basename(sibling);
 
 const sharedPairs = [
@@ -83,10 +97,19 @@ const sharedPairs = [
     mine: relative,
     theirs: relative,
   })),
-  ...repoScopedFiles.map((template) => ({
-    mine: expandRepo(template, selfName),
-    theirs: expandRepo(template, siblingName),
-  })),
+  ...repoScopedFileGroups.flatMap((group) => {
+    const minePaths = group[selfName] ?? [];
+    const theirsPaths = group[siblingName] ?? [];
+    if (minePaths.length === 0 || theirsPaths.length === 0) {
+      failures.push(
+        `共享件分组缺少 ${selfName} 或 ${siblingName} 的路径，无法比对`,
+      );
+      return [];
+    }
+    return minePaths.flatMap((mine) =>
+      theirsPaths.map((theirs) => ({ mine, theirs })),
+    );
+  }),
 ];
 
 for (const { mine: minePath, theirs: theirsPath } of sharedPairs) {

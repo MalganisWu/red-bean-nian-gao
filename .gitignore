@@ -31,6 +31,10 @@ node_modules/
 # 临时目录
 tmp/
 
+# UI 原型草稿（proposal）：plan 之前的一次性确认物，人工确认后进 design-system；
+# 草稿本身不留档，git 历史里也没有价值可追溯的内容。
+design-system/previews/
+
 # Claude Code worktrees（保留 .claude/CLAUDE.md 被跟踪）
 .claude/worktrees/
 

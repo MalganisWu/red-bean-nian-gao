@@ -41,7 +41,6 @@
 
 ### Design System 规范
 
-- [`../design-system/docs/governance.md`](../design-system/docs/governance.md)：治理与组件入册。
 - [`../design-system/docs/frontend-ui-coverage.md`](../design-system/docs/frontend-ui-coverage.md)：正式前端覆盖关系。
 - [`../design-system/docs/iconography.md`](../design-system/docs/iconography.md)：图标规范。
 - [`../design-system/docs/interaction-accessibility.md`](../design-system/docs/interaction-accessibility.md)：交互与无障碍。

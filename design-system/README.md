@@ -37,7 +37,6 @@ pnpm --filter design-system build
 
 ## 工程与覆盖规范
 
-- [设计系统治理](./docs/governance.md)
 - [交互与无障碍](./docs/interaction-accessibility.md)
 - [系统状态](./docs/system-states.md)
 - [布局与响应式](./docs/layout-responsive.md)

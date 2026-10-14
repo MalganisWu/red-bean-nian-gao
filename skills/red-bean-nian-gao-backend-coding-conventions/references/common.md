@@ -294,8 +294,8 @@ return runWithMiddleware(info, middleware, runRequest, signal);
 
 ## 门禁
 
-严格选项与 ESLint 规则以本仓 `tooling/typescript/` 为机械事实来源。检查命令以各仓 `Makefile`
-为准（见 [`SKILL.md`](../SKILL.md)「门禁」）。
+严格选项与 ESLint 规则以本仓 `tooling/typescript/` 为机械事实来源。门禁命令的完整清单见本仓根
+`AGENTS.md`「门禁」。
 
 `make verify*` 是只读检查。格式修复使用明确的写入命令；检查失败后必须修复真实类型或控制流，
 不得用断言、disable 注释或降低配置掩盖问题。
@@ -305,10 +305,11 @@ return runWithMiddleware(info, middleware, runRequest, signal);
 
 ## 跨仓一致性
 
-本文件在两仓各存一份，内容必须逐字相同。**两仓的相对路径不同**
-（`skills/red-bean-qing-tuan-coding-conventions/references/common.md` 与
-`skills/red-bean-nian-gao-coding-conventions/references/common.md`），由
-`scripts/check-shared-files.mjs` 的路径映射配对：
+本文件在各仓各存一份，内容必须逐字相同。**相对路径各不相同**：SDK 仓是
+`skills/red-bean-qing-tuan-coding-conventions/references/common.md`，产品仓是
+`skills/red-bean-nian-gao-backend-coding-conventions/references/common.md` 与
+`skills/red-bean-nian-gao-frontend-coding-conventions/references/common.md`（前后端 Skill
+各自自包含一份，由逐字比对保证不失真）。由 `scripts/check-shared-files.mjs` 的共享件分组配对：
 
 - 产品仓可直接比对 sibling SDK 工作区（CI 会把它按 `runtime.lock` 的 SHA checkout 成
   `../red-bean-qing-tuan`），因此「产品仓锁哪个 SDK 版本，就跟着那个版本的通用规范走」。
