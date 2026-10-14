@@ -166,8 +166,8 @@ export function StandardsPage() {
       <section>
         <h2 className="section-title">详细文档</h2>
         <p className="standards-doc-note">
-          工程细则位于 <code>design-system/docs/</code>：interaction-accessibility、system-states、
-          layout-responsive、iconography 与 frontend-ui-coverage。
+          工程细则位于 <code>design-system/docs/</code>：frontend-ui-coverage；产品视觉规范见仓库级
+          Skill <code>red-bean-nian-gao-visual-language</code>。
         </p>
       </section>
     </div>

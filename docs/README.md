@@ -11,7 +11,7 @@
 ## 活文档
 
 > 一次开发的产出只有 `plans/` / `decisions/` / `design/` 三样，触发判据与红线见
-> [`standards/development-workflow.md`](standards/development-workflow.md)「一次开发的产出」。
+> [`../skills/red-bean-nian-gao-development-workflow/references/common.md`](../skills/red-bean-nian-gao-development-workflow/references/common.md)。
 > 本节索引**活文档**（描述当前事实）；`design/` 不写进度与排期。
 
 ### 契约、架构与运行
@@ -33,8 +33,8 @@
 ### 模块开发标准
 
 - [`../backend/src/README.md`](../backend/src/README.md)：从 HTTP Controller 到 DTO、用例、Port 与 Adapter 的人工审查导航。
-- [`standards/typescript-common-conventions.md`](standards/typescript-common-conventions.md)：跨仓共享的 TypeScript 通用规范，与 Runtime SDK 仓逐字相同，由 `scripts/check-shared-files.mjs` 校验。
-- [`standards/typescript-coding-conventions.md`](standards/typescript-coding-conventions.md)：产品仓特有的 TypeScript 约束（前端、契约来源、HTTP 边界、组装与门禁）。
+- [`standards/typescript-common-conventions.md`](standards/typescript-common-conventions.md)：**短指针** → 编码规范 Skill 的 `references/common.md`；那份是跨仓共享件，与 Runtime SDK 仓逐字相同，由 `scripts/check-shared-files.mjs` 校验。
+- [`standards/typescript-coding-conventions.md`](standards/typescript-coding-conventions.md)：**短指针** → 两份编码规范 Skill（后端与 api-contract 见 backend 那份，前端与 Design System 见 frontend 那份）。
 - [`../backend/docs/standards/development-workflow.md`](../backend/docs/standards/development-workflow.md)：后端开发流程。
 - [`../frontend/docs/standards/coding-conventions.md`](../frontend/docs/standards/coding-conventions.md)：前端编码规范。
 - [`../frontend/docs/standards/development-workflow.md`](../frontend/docs/standards/development-workflow.md)：前端开发流程。
@@ -42,10 +42,7 @@
 ### Design System 规范
 
 - [`../design-system/docs/frontend-ui-coverage.md`](../design-system/docs/frontend-ui-coverage.md)：正式前端覆盖关系。
-- [`../design-system/docs/iconography.md`](../design-system/docs/iconography.md)：图标规范。
-- [`../design-system/docs/interaction-accessibility.md`](../design-system/docs/interaction-accessibility.md)：交互与无障碍。
-- [`../design-system/docs/layout-responsive.md`](../design-system/docs/layout-responsive.md)：布局与响应式。
-- [`../design-system/docs/system-states.md`](../design-system/docs/system-states.md)：系统状态。
+- [`../skills/red-bean-nian-gao-visual-language/SKILL.md`](../skills/red-bean-nian-gao-visual-language/SKILL.md)：产品视觉规范（Quiet Tool UI）——视觉语言核心、布局与响应式、图标、交互与无障碍、系统状态。
 - [`../design-system/src/foundations/`](../design-system/src/foundations/)：可运行的 Foundation 页面。
 - [`../design-system/src/showcase/`](../design-system/src/showcase/)：真实组件 Showcase。
 - [`../design-system/src/styles/design-tokens.css`](../design-system/src/styles/design-tokens.css)：token 单一实现源。

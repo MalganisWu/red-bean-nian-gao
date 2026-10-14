@@ -37,11 +37,9 @@ pnpm --filter design-system build
 
 ## 工程与覆盖规范
 
-- [交互与无障碍](./docs/interaction-accessibility.md)
-- [系统状态](./docs/system-states.md)
-- [布局与响应式](./docs/layout-responsive.md)
-- [图标规范](./docs/iconography.md)
 - [正式前端 UI 覆盖表](./docs/frontend-ui-coverage.md)
+- 产品视觉规范——视觉语言核心、布局与响应式、图标、交互与无障碍、系统状态——见仓库级 Skill
+  [`red-bean-nian-gao-visual-language`](../skills/red-bean-nian-gao-visual-language/SKILL.md)。
 
 ## 视觉口径
 

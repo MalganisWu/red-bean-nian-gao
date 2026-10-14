@@ -1,17 +1,68 @@
 # AGENTS.md · Frontend
 
-前端 AI 开发助手手册。写代码前先读本文件。
+Frontend 治理入口：目录边界、路由与命令。**编码规范与开发流程的规则本体在 Skill 里**，本文件不重复。
+
+## 开始任务
+
+1. 完整读取仓库根 [`AGENTS.md`](../AGENTS.md)。
+2. 完整读取本文件。
+3. 完整读取下面「编码规范」与「开发与测试流程」指向的 Skill——**规则本体在那里**。
+   规则冲突时以离目标文件最近者为准。
+4. 检查工作区状态，保留用户已有改动。
+
+---
+---
 
 ---
 
-## 项目概述
+## 编码规范
 
-React 前端，AI Agent 对话界面。采用 Light / Dark 对等的 Quiet Tool UI。
-技术栈：React 19 + TypeScript + Vite + Tailwind CSS 4 + Base UI。
+按范围分工，**本节不重复规则正文**：
+
+| 范围 | 唯一事实来源 |
+|------|-------------|
+| 通用 TypeScript（类型边界、`unknown`、可读性、判空、命名、注释） | [`../skills/red-bean-nian-gao-frontend-coding-conventions/references/common.md`](../skills/red-bean-nian-gao-frontend-coding-conventions/references/common.md) |
+| React / UI 与 Design System（组件结构、样式、状态、导入顺序、API 调用、注释、门禁） | [`../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`](../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md) |
+| 产品视觉规范（色值、布局与响应式、图标、交互与无障碍、系统状态） | [`../skills/red-bean-nian-gao-visual-language/SKILL.md`](../skills/red-bean-nian-gao-visual-language/SKILL.md) |
+
+冲突时以通用件为准。
 
 ---
 
-## API 契约同步（硬性红线）
+## 开发与测试流程
+
+新功能/变更按 6 阶段执行：**需求 → 计划 → 编码 → 验证 → 文档 → 交付**。
+
+前端特有的差异：
+
+- **阶段 1 与阶段 2 之间额外步骤：mock → 方向确认 → UI 组件盘点 + design-system 先行**
+  1. 产出 mock，落 `design-system/previews/`（本地、不入库），由开发者目视确认方向
+  2. 确认后才写 plan；plan 只写已确认的方向
+  3. 盘点需要的 UI 组件（哪些已有的、哪些要新建、哪些要改）
+  4. 在 design-system 完成组件设计 + showcase 页
+  5. 人工目视确认（启动 design-system dev server）
+  6. 确认后才进入阶段 3
+- 阶段 3 **测试分层**：逻辑层严格 TDD；组件先定义验收状态，可自动化的交互行为测试先行；纯视觉层使用 Showcase + 目视验证
+- 阶段 4 **硬性门禁**：format:check + typecheck + lint + test + build，外加 dev server 目视确认
+- 阶段 5 涉及 design-system 变更的，验证两端 `typecheck + build` 均通过
+
+**前端目录职责**：
+
+| 目录 | 放什么 | 不放什么 |
+|------|--------|---------|
+| `components/chat/` | 对话业务组件（MessageCard 等） | UI 基础组件 |
+| `components/task/` | 定时任务业务组件 | UI 基础组件 |
+| `components/layout/` | 布局组件 | UI 基础组件 |
+| `stores/` | Zustand 状态管理 | UI 逻辑 |
+| `hooks/` | 自定义 hooks（useChatStream 等） | UI 逻辑 |
+| `services/` | API 调用层 | - |
+| `types/` | 前端类型定义 | 组件 Props 类型（从 design-system import） |
+
+详见 → [`docs/standards/development-workflow.md`](docs/standards/development-workflow.md)
+
+---
+
+## 契约消费（硬性红线）
 
 **消费/新增任何后端接口前，先读 `../api-contract/src/`。`@red-bean/api-contract` 是机器唯一事实来源；
 [`../docs/contracts/api.md`](../docs/contracts/api.md) 只提供语义说明与示例。**
@@ -70,49 +121,7 @@ alias 映射表、漂移检查与 token 同步机制见
 
 ---
 
-## 编码规范
-
-按范围分工，**本节不重复规则正文**：
-
-| 范围 | 唯一事实来源 |
-|------|-------------|
-| 通用 TypeScript（类型边界、`unknown`、可读性、判空、命名、注释） | [`../skills/red-bean-nian-gao-frontend-coding-conventions/references/common.md`](../skills/red-bean-nian-gao-frontend-coding-conventions/references/common.md) |
-| React / UI 与 Design System（组件结构、样式、状态、导入顺序、API 调用、注释、门禁） | [`../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`](../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md) |
-
-冲突时以通用件为准。
-
 ---
-
-## 开发流程
-
-新功能/变更按 6 阶段执行：**需求 → 计划 → 编码 → 验证 → 文档 → 交付**。
-
-前端特有的差异：
-
-- **阶段 1 与阶段 2 之间额外步骤：mock → 方向确认 → UI 组件盘点 + design-system 先行**
-  1. 产出 mock，落 `design-system/previews/`（本地、不入库），由开发者目视确认方向
-  2. 确认后才写 plan；plan 只写已确认的方向
-  3. 盘点需要的 UI 组件（哪些已有的、哪些要新建、哪些要改）
-  4. 在 design-system 完成组件设计 + showcase 页
-  5. 人工目视确认（启动 design-system dev server）
-  6. 确认后才进入阶段 3
-- 阶段 3 **测试分层**：逻辑层严格 TDD；组件先定义验收状态，可自动化的交互行为测试先行；纯视觉层使用 Showcase + 目视验证
-- 阶段 4 **硬性门禁**：format:check + typecheck + lint + test + build，外加 dev server 目视确认
-- 阶段 5 涉及 design-system 变更的，验证两端 `typecheck + build` 均通过
-
-**前端目录职责**：
-
-| 目录 | 放什么 | 不放什么 |
-|------|--------|---------|
-| `components/chat/` | 对话业务组件（MessageCard 等） | UI 基础组件 |
-| `components/task/` | 定时任务业务组件 | UI 基础组件 |
-| `components/layout/` | 布局组件 | UI 基础组件 |
-| `stores/` | Zustand 状态管理 | UI 逻辑 |
-| `hooks/` | 自定义 hooks（useChatStream 等） | UI 逻辑 |
-| `services/` | API 调用层 | - |
-| `types/` | 前端类型定义 | 组件 Props 类型（从 design-system import） |
-
-详见 → [`docs/standards/development-workflow.md`](docs/standards/development-workflow.md)
 
 ---
 
@@ -137,3 +146,10 @@ pnpm check:drift   # Design System 组件与 token 漂移检查
 make doctor        # 检查工具链版本与 package 声明
 make verify        # 后端、前端与 Design System 本地统一门禁
 ```
+
+---
+
+## 项目概述
+
+React 前端，AI Agent 对话界面。采用 Light / Dark 对等的 Quiet Tool UI。
+技术栈：React 19 + TypeScript + Vite + Tailwind CSS 4 + Base UI。

@@ -1,14 +1,30 @@
 # AGENTS.md · Design System
 
-设计系统 AI 开发助手手册。写代码前先读本文件。
+Design System 治理入口：目录边界、路由与命令。**编码规范与开发流程的规则本体在 Skill 里**，本文件不重复。
+
+## 开始任务
+
+1. 完整读取仓库根 [`AGENTS.md`](../AGENTS.md)。
+2. 完整读取本文件。
+3. 完整读取下面「编码规范」与「开发与测试流程」指向的 Skill——**规则本体在那里**。
+   规则冲突时以离目标文件最近者为准。
+
+## 编码规范
+
+通用 TypeScript 规范遵循跨仓共享的
+[`../docs/standards/typescript-common-conventions.md`](../docs/standards/typescript-common-conventions.md)，
+前端与 Design System 的特有约束见
+[`../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`](../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md)；
+**产品视觉规范**见
+[`../skills/red-bean-nian-gao-visual-language/SKILL.md`](../skills/red-bean-nian-gao-visual-language/SKILL.md)。
+
+## 开发与测试流程
+
+通用流程见
+[`../skills/red-bean-nian-gao-development-workflow/SKILL.md`](../skills/red-bean-nian-gao-development-workflow/SKILL.md)；
+本 workspace 特有的流程红线见下面「开发流程（硬性红线）」。
 
 ---
-
-## 项目概述
-
-Quiet Tool UI 的可视化展示站点。独立于前端，提供 design token、组件示例和风格指南的集中展示。
-技术栈：React 19 + TypeScript + Vite + Tailwind CSS 4。
-
 ---
 
 ## 目录结构
@@ -63,124 +79,21 @@ design-system/
 
 明确要求评审新功能、页面、组件、主题或视觉方案时，使用仓库级
 `design-system-visual-review` Skill 执行双专家独立评审。Skill 只定义评审流程与评分方法；颜色、排版、组件和交互规则仍以本文件及实际 Foundation、Showcase、token 和前端消费页面为准。
-
----
-
-## 组件入册规则（防漂移，2026-08-26 瘦身对齐后生效）
-
-1. **design-system 只收前端可直接 import 的组件**（原子件 + 共享复合件）。每个组件必须有真实的前端消费方（或当次需求即将接入）。
-2. **禁止「模仿前端页面结构」的拷贝式场景页**。连接路由、Store 或 API 的页面级业务容器（如 `TaskDetailPanel`）留在 frontend；可被多个页面直接消费、无业务依赖的纯展示复合件（如 `ScheduledTaskOverview`）可以入册。Showcase 必须直接渲染真实组件，不能手写视觉副本。
-3. **禁止「先做组件等前端用」**。没有消费方的组件不入册。
-4. **内部件**（如 `ToolItem`）：仅被其他组件内部依赖，不单独出 showcase 页，不对外承诺 API，文件头注释标注「内部件」。
-
----
-
-## Showcase 页面规范
-
-每个组件 showcase 页必须覆盖以下状态：
-
-| 状态                  | 说明                       |
-| --------------------- | -------------------------- |
-| Default               | 组件默认外观               |
-| Variants              | 所有 variant/size 组合     |
-| Hover / Focus-visible | 悬停与键盘焦点态（如适用） |
-| Disabled              | 禁用态（如适用）           |
-| Loading/Streaming     | 流式或加载中状态（如适用） |
-| Empty                 | 空数据状态（如适用）       |
-| Error / Success       | 失败与成功状态（如适用）   |
-| 长文本                | 超长内容的换行与截断       |
-| 360px 宽度            | 窄视口下的布局与触控目标   |
-
-示例数据必须虚构：账户统一使用「张三 / `san.zhang` / `san.zhang@example.com`」，不得出现
-开发者真实身份。
-
-展示页模板参考现有 `ButtonsActionsPage.tsx`、`InputPage.tsx` 等。
-
-新增组件时 checklist：
-
-- [ ] 组件文件在 `src/components/`
-- [ ] Showcase 页在 `src/showcase/`
-- [ ] Tab ID 注册到 `tabs.ts`
-- [ ] Page 注册到 `App.tsx` 的 `PAGES` 映射
-- [ ] 启动 dev server 目视确认
-- [ ] 有交互行为时已补测试
-- [ ] `pnpm ai:check` 通过
-
----
-
-## 组件设计规范
-
-- **组件内部 import 用相对路径**（`./ToolItem`），不用 `@/components/retroui/...`。因为前端通过 Vite alias 加载时 `@/` 上下文不同。
-- 只有 showcase/foundations/app 层可用 `@/` alias import。
-- 组件必须 self-contained：不依赖 showcase 或 app 层代码。
-
-## 组件注释规范
-
-注释语言与共性规则见根
-[`docs/standards/typescript-common-conventions.md`「注释」](../docs/standards/typescript-common-conventions.md)
-与 [`../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`](../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md)「注释」，
-本节只列 design-system 特有要求：
-
-- **Props 注释即对外 API 文档**：组件被前端经 alias 跨项目消费，每个公开 Props 成员必须 JSDoc 说明
-  用途、缺省值、`undefined` 语义与状态组合；改 Props 必须同 diff 更新注释，否则视为破坏前端契约文档
-- **文件头职责注释**：每个组件文件头标明角色（原子件 / 复合件 / 内部件）与消费场景；
-  内部件必须在文件头标注「内部件」（与组件入册规则 §4 呼应，如 `ToolItem`、`MarkdownCodeBlock`）
-- **视觉/交互决策注释 why**：开合状态保留、兼容旧调用方映射、动效偏好等反直觉行为必须写原因，
-  组件注释是前端开发者唯一的本地文档
-- **测试注释**：交互测试的 setup、故障注入与断言原因用中文；用例名允许英文描述风格
-- **语言门禁**：由 `make ts-export-jsdoc-check` 机械校验（描述正文必须含中文字符）；专有协议名、
-  URL 与 TS 指令保留原文
-
----
-
-## Token 架构（三层级）
-
-CSS 变量遵循 **Primitive → Semantic → Component** 三层层级，定义在 `src/styles/design-tokens.css`（单一真实来源）：
-
-- **Primitive**：原始色值（如 `--color-bean-light: #99413C`）
-- **Semantic**：按用途命名，并由 light/dark 主题映射（如 `--action-confirm`、`--success`）
-- **Component**：组件级组合（`--button-default-bg: var(--primary)`）
-
-颜色角色必须完整记录在 Color foundation 与 `philosophyMarkdown.ts`：文字、indicator、selection、focus、surface、普通边框和控件边框不得合并成一个泛化 token。状态文字使用 `--success-text` / `--danger-text`，图标与节点使用 `--success-indicator` / `--danger-indicator`；兼容别名 `--success` / `--danger` 只代表文字色。
-
-Light / Dark 只能替换语义 token；DOM 结构、信息层级和交互必须保持一致——同一组件在两个主题下是
-同一份实现，不是两份。
-
----
-
 ## 视觉风格核心
 
-视觉语言是 **Quiet Tool UI**。完整规范见 Philosophy、Color、Typography 与 Conversation 页面；`src/foundations/philosophyMarkdown.ts` 是可下载的文字版本。
-
-- Light 默认、Dark 对等：纯白 `#FFFFFF` / 近黑 `#0B0B0C` 阅读面，几何和行为完全一致
-- 灰阶承担层级；Light 品牌文字 `#99413C`、品牌图形/选择/focus `#C87972`，Dark 对应角色均为 `#C87972`；品牌色仅用于身份、交互与确认动作
-- 成功绿、失败鲜红，只表达状态；状态必须同时有文字或图标
-- 默认使用 canonical 的 Inter + 系统无衬线栈；等宽字体只用于工具名、行内代码及展开后的参数/结果/错误原文，目标、耗时与状态保持无衬线；字重按角色固定
-- Final 与普通段落保持裸排；标题、列表、引用和表格依靠 Markdown 排版建立层级，只有 fenced code block 使用带语言标签和复制动作的独立弱表面；Process、Tool 保持透明，用户消息使用随内容收缩、受最大宽度约束的 muted 表面
-- Process 是连续时间线：不显示 Think / Tool / Content 分类标签；完成节点实心，唯一进行中节点轻微呼吸
-- 确认问答属于原 Process；Pending 常显，回答后原地收缩为“问题 + 回答”并继续，不拆成第二个过程
-- 确认按钮无填充、无常驻边框，仅使用豆沙红文字；沿用 canonical 的 `6px 0` 紧凑内边距
-- 圆角只保留 0 / 6 / 8 / 12；默认无阴影，仅浮层使用一档 `0 8px 24px` 阴影
+视觉语言是 **Quiet Tool UI**。色值、Dark 对等、灰阶层级、字体角色、圆角与阴影的**唯一事实来源**
+是 [`../skills/red-bean-nian-gao-visual-language/SKILL.md`](../skills/red-bean-nian-gao-visual-language/SKILL.md)；
+可运行的规范在 `src/foundations/`（Philosophy、Color、Typography、Spacing、Radius、Shadow、
+Conversation），token 的单一实现源是 `src/styles/design-tokens.css`。
 
 ---
 
-## ESLint 强制规则
+## 组件与 Token
 
-| 规则                             | 说明                                              |
-| -------------------------------- | ------------------------------------------------- |
-| 禁止 `#hex` 硬编码               | 必须用 Tailwind utility 或 `var(--color-*)` token |
-| 禁止 `rgba()` 硬编码             | 必须用 token                                      |
-| 禁止 inline style color/fontSize | 必须用 Tailwind utility                           |
-| Foundations/styles 文件豁免      | 这些文件刻意展示原始值                            |
-
-### Tailwind 硬编码 utility 替换（CVA 字符串内 ESLint 无法检测，需人工遵守）
-
-| 禁止            | 替换                    |
-| --------------- | ----------------------- |
-| `bg-white`      | `bg-popover`            |
-| `text-black`    | `text-foreground`       |
-| `border-black`  | `border-border`         |
-| `text-gray-700` | `text-muted-foreground` |
+组件怎么进册、Showcase 要覆盖哪些状态、组件内部 import 用相对路径还是 alias、token 的三层层级
+与 Light/Dark 约束、样式硬编码的 ESLint 规则与替换表——全在前端编码规范 Skill 的
+[`red-bean-nian-gao-frontend-coding-conventions`](../skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md)
+「Design System 组件」「Token 架构」「样式」三节。
 
 ---
 
@@ -232,3 +145,10 @@ pnpm ai:check      # lint + format:check + typecheck + test + build + drift
 make doctor        # 检查工具链版本与 package 声明
 make verify        # 后端、前端与 Design System 本地统一门禁
 ```
+
+---
+
+## 项目概述
+
+Quiet Tool UI 的可视化展示站点。独立于前端，提供 design token、组件示例和风格指南的集中展示。
+技术栈：React 19 + TypeScript + Vite + Tailwind CSS 4。
