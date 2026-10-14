@@ -64,45 +64,23 @@ design-system 组件 + showcase → 人工目视确认 → 前端使用
 - **人工确认 gate**：design-system dev server 目视确认后，前端才能在业务代码中使用
 - **前端通过 alias 自动引用**：`@/components/retroui/*` → `../design-system/src/components/*`，无需手动复制
 
-同步机制：
-
-| 层 | 配置文件 | 映射 |
-|----|---------|------|
-| Vite | `vite.config.ts` | `@/components/retroui` → `../design-system/src/components` |
-| TypeScript | `tsconfig.app.json` | `@/components/retroui/*` → `../design-system/src/components/*` |
-
-**设计系统组件内部必须用相对路径 import**（`./ToolGroup`），因为跨项目加载时 `@/` 上下文不同。
-
-修改 design-system 组件后，验证：
-```bash
-# 前端侧
-pnpm typecheck && pnpm build
-
-# design-system 侧
-cd ../design-system && pnpm ai:check
-```
+alias 映射表、漂移检查与 token 同步机制见
+[`../design-system/AGENTS.md`](../design-system/AGENTS.md)「同步机制」，本节不重复。
+修改 design-system 组件后，前端侧只需验证 `pnpm typecheck && pnpm build` 仍通过。
 
 ---
 
-## 编码规范速查
+## 编码规范
 
-通用 TypeScript 规则见
-[`../docs/standards/typescript-common-conventions.md`](../docs/standards/typescript-common-conventions.md)，
-产品仓特有约束见 [`../docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md)，
-React/UI 附加规则见 [`docs/standards/coding-conventions.md`](docs/standards/coding-conventions.md)。
+按范围分工，**本节不重复规则正文**：
 
-| 规则 | 说明 |
-|------|------|
-| 类型约束 | 禁止 `any`、非空断言和无校验断言；导出及跨边界函数显式标注，简单局部值允许推导 |
-| 注释 | 统一简体中文（专有名词保留原文）；公开 Props/方法/边界写清职责与原因，与代码同 diff 更新；测试 setup/断言原因优先中文（详共享通用规范「注释」） |
-| 可读性 | 禁止调用点现场组装复杂参数（多字段对象先具名预构建）；禁止嵌套三元与 `...(cond ? {} : {...})` 展开（详根 TS 规范「表达式与调用可读性」） |
-| 判空/命名 | 可空字段判空写法按字段类型选一种写全、不三种混用；私有成员用 `#`；参数"所有者/作用域在前"（详根 TS 规范「判空与可空映射」「命名与签名约定」） |
-| Props | 用 `interface` 定义，放组件上方 |
-| 组件结构 | 一个文件一个组件，函数组件 |
-| 样式 | 禁止硬编码颜色，必须用 Tailwind utility + token |
-| 导入顺序 | 第三方 → `@/` → 相对路径 |
-| 三态原则 | 数据组件必覆盖 loading / success / error |
-| 文件命名 | 组件 PascalCase，hook camelCase `use` 前缀 |
+| 范围 | 唯一事实来源 |
+|------|-------------|
+| 通用 TypeScript（类型边界、`unknown`、可读性、判空、命名、注释） | [`../docs/standards/typescript-common-conventions.md`](../docs/standards/typescript-common-conventions.md) |
+| 产品仓特有约束 | [`../docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md) |
+| React / UI（组件结构、样式、状态、导入顺序、文件命名） | [`docs/standards/coding-conventions.md`](docs/standards/coding-conventions.md) |
+
+冲突时以通用件为准。
 
 ---
 
@@ -138,6 +116,10 @@ React/UI 附加规则见 [`docs/standards/coding-conventions.md`](docs/standards
 ---
 
 ## 运行命令
+
+日常几条；**完整门禁清单见
+[`../docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md)「门禁」**，
+本节不重列。
 
 ```bash
 pnpm install --frozen-lockfile # 仓库根执行：workspace 单 lockfile 全仓安装

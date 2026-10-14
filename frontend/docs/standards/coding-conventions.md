@@ -9,32 +9,8 @@
 
 ## 1. TypeScript 严格模式
 
-**硬性规则**：继承全仓严格 TypeScript 配置，禁止隐式或显式 `any`。
-
-```tsx
-// ✅ 正确：明确类型
-function formatMessage(content: string, timestamp: number): string {
-  return `${timestamp}: ${content}`
-}
-
-// ❌ 错误：无类型，人和 AI 都看不懂用途
-function formatMessage(content, timestamp) {
-  return `${timestamp}: ${content}`
-}
-
-// ❌ 错误：显式 any；未知输入必须从 unknown 开始窄化
-function handle(data: any) { ... }
-```
-
-**导出函数与跨模块边界必须标注返回类型**；简单局部回调和类型已经完整约束的组件允许推导：
-
-```tsx
-// ✅ 正确：返回类型一目了然
-function useAuth(): { user: User | null; login: (token: string) => void } { ... }
-
-// ❌ 错误：看代码要跳到实现才知道返回什么
-function useAuth() { ... }
-```
+类型标注边界、禁止 `any` 与无校验断言、`unknown` 起步等规则见共享通用规范「类型标注边界」与
+「硬性禁止」，本节不重复。前端特有的一条：
 
 **interface vs type**：
 
@@ -242,8 +218,8 @@ AI 生成的代码默认不做性能优化（memo、lazy），避免过度优化
   分段标题，让执行顺序成为视觉事实
 - **测试**：setup/mock 的目的、故障注入与断言原因用中文注释；用例名允许英文描述风格
 - **三态节点**：loading / success / error 分支点注明展示语义，与页面验收「三态原则」对应
-- 注释语言不做机械门禁（协议名、URL、TS 指令等会被误报），由 review 与交付前人工扫描负责；发现
-  英文残留注释属于缺陷而非风格偏好，应随改动一并清理
+- 注释语言的机械门禁由 `make ts-export-jsdoc-check` 负责（描述正文必须含中文字符）；专有协议名、
+  URL 与 TS 指令保留原文。发现英文残留注释属于缺陷而非风格偏好，应随改动一并清理
 
 ---
 

@@ -176,33 +176,22 @@ TDD 约束的是行为增量，不要求为每一行实现代码单独写测试�
 
 所有现有与新增 TypeScript 代码共同遵循跨仓共享的
 [`docs/standards/typescript-common-conventions.md`](docs/standards/typescript-common-conventions.md)
-（与 Runtime SDK 仓逐字相同，由 `scripts/check-common-conventions.sh` 校验）；产品仓特有约束见
-[`docs/standards/typescript-coding-conventions.md`](docs/standards/typescript-coding-conventions.md)。硬性红线包括：
+（与 Runtime SDK 仓逐字相同，由 `scripts/check-shared-files.mjs` 校验）；产品仓特有约束见
+[`docs/standards/typescript-coding-conventions.md`](docs/standards/typescript-coding-conventions.md)。
+**本节不重复通用规则**（禁止 `any`、显式标注边界、`unknown` 起步、禁用 Decorator/enum、
+接口角色后缀、`implements` 义务、无对应接口实现类的白名单判据等都在通用件里），只列产品仓的落点：
 
-- 禁止显式 `any`、非空断言、无校验的类型断言、浮空 Promise 与隐式强制转换。
-- 错误码/状态码/事件类型/命令 kind 等字面量联合的比较与 case 标签必须引用 const 成员
-  （`CODE.X`），禁止字符串字面量（详见 typescript-common-conventions 硬性禁止）。
-- 导出函数及 API、SSE、Tool、Checkpoint、持久化和配置边界必须显式标注类型。
-- 简单局部值允许可靠推导；不要用 `const count: number = 1` 一类重复标注制造噪声。
-- 业务代码禁止 Decorator/Reflect 自动注入、Service Locator、`enum` 与复杂递归类型体操。
-- 注入型行为接口必须使用可辨识的角色名；已有 `Repository`、`Adapter`、`Store`、`Registry`、
-  `Dispatcher`、`Factory`、`Hook`、`Tracer`、`Loader`、`Runner`、`Collector` 可直接表达 Port 语义，
-  含糊的 `Service` 接口必须使用 `ServicePort` 后缀。
-- 生产类必须显式 `implements` 它承诺的 Port；Module 内默认实现在对应 `*.module.ts` 中以明确的
-  `new ConcreteClass(...)` 绑定，全局 `src/app/composition-root.ts` 只连接基础设施和各 Module 的公开能力，
-  不得依赖结构化类型巧合或匿名对象隐藏实现关系。
-- 接口只服务于真实的多实现/外部边界/跨模块共享；内部 1:1 且无多实现需求的业务 Service 不建 Port，
-  Controller 直接依赖实现类，实现类以"公开方法串联私有小方法"组织，保证一个方法能读完完整流程。
-  无 Port 实现类需登记在 `backend/scripts/architecture-rules.mjs` 的 `NON_PORT_IMPLEMENTATION_CLASSES`
-  白名单（含改造记录说明）。
-- 外部输入从 `unknown` 开始并通过运行时 Schema 校验；静态类型不能替代运行时验证。
+- 生产类的默认实现在对应 `*.module.ts` 中以明确的 `new ConcreteClass(...)` 绑定，
+  `src/app/composition-root.ts` 只连接基础设施和各 Module 的公开能力。
+- 无对应接口的默认实现类登记在 `backend/scripts/architecture-rules.mjs` 的
+  `NON_PORT_IMPLEMENTATION_CLASSES` 白名单并附改造记录说明。
 - `src/modules/<module>/**/controller/*.dto.ts` 只允许 type re-export；同域的 Schema、parser、serializer、
   presenter 与 Controller 分别放在专责文件中，业务函数归属 Module 内的 application service。
 - 业务 Module 的公开 Model/Port 不得直接依赖 Runtime SDK DTO；产品 Session、展示和持久化使用业务自有
   类型，由 Runtime Adapter 负责双向映射。纯数据 model 不放 parser、serializer 或业务函数。
-- 禁止用 `eslint-disable`、`@ts-ignore` 或放宽 `tsconfig` 逃避修复。
 
-机械门禁由 `make typecheck`、`make ts-lint` 和 `make ts-policy-check` 执行，并纳入 `make verify`。
+机械门禁由 `make typecheck`、`make ts-lint` 和 `make ts-policy-check` 执行，并纳入 `make verify`；
+逐项清单见 [`docs/standards/typescript-coding-conventions.md`](docs/standards/typescript-coding-conventions.md)「门禁」。
 
 ### 注释规范
 
@@ -212,11 +201,6 @@ TDD 约束的是行为增量，不要求为每一行实现代码单独写测试�
 **本节不重复规则，只列产品仓的额外强调**，避免同一判据出现两份表述：
 
 - DTO、Port、Adapter 和 Application Service 的模块入口要说明所有权、失败语义或数据转换方向。
-- 业务应用服务（Controller / Service 用例）的公开方法要说明做什么、边界在哪、何时抛错，不能只有方法名。
-- 流程超过三个阶段的业务方法用 `// ── 阶段名 ──` 分段标题，让执行顺序成为视觉事实。
-- 跨任务决策（为什么选这条路、代价是什么）记入 `docs/decisions/`（ADR 式，只追加不修改）；
-  代码注释只承载局部「为什么」。
-- 方法体内注释以「意图与取舍、不变量与前提、分支划分依据」为最高价值。
 ### 文档影响门禁
 
 每次代码、配置、依赖或目录结构改动完成后，提交前必须查看完整 diff 并完成文档影响审查。阶段 5 可以不修改文档，但不能跳过审查；结论为“无需更新”时，交付说明必须写明理由。

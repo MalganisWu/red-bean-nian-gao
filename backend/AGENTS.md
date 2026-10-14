@@ -82,32 +82,24 @@ Fastify 解耦的用例签名，并负责 wire DTO 投影和 HTTP 应用错误�
 
 所有 `.ts` 遵循跨仓共享的通用规范
 [`../docs/standards/typescript-common-conventions.md`](../docs/standards/typescript-common-conventions.md)，
-产品仓特有约束见 [`../docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md)。特别注意：
+产品仓特有约束见 [`../docs/standards/typescript-coding-conventions.md`](../docs/standards/typescript-coding-conventions.md)。
+**本节不重复通用规则**（类型标注边界、`unknown` 起步、禁用 Decorator/Service Locator、接口角色后缀、
+`implements` 义务、接口白名单判据、调用点可读性、判空、命名、cause 链等都在通用件里），
+只列后端特有的落点与额外约束：
 
-- 导出函数、公开方法和 API/SSE/数据库/配置边界显式标注类型；简单局部值允许可靠推导。
-- 禁止 `any`、非空断言、无校验类型断言、Decorator DI、Service Locator、`enum` 和复杂类型体操。
-- HTTP body、数据库 JSON、Redis JSON、环境变量、LLM 和 Tool 输出从 `unknown` 开始并在边界校验。
-- 可选字段的缺失与显式 `undefined` 不混用；数据库 nullable 必须明确映射。
-- 外部依赖经构造函数或显式 factory 注入；异步操作必须传播错误和 `AbortSignal`。
-- 注入型行为接口使用明确角色后缀；含糊的 Service 接口命名为 `*ServicePort`。生产实现类必须显式
-  `implements` 对应 Port，Port 的 JSDoc 应注明默认实现与 composition root 组装位置。
-- 接口只服务于真实的多实现/外部边界/跨模块共享（SDK、Redis、Postgres、MinIO 适配层与跨 Module 能力）；
-  内部 1:1 且无多实现需求的业务 Service 不建 Port，Controller 直接依赖实现类。实现类以"公开方法串联
-  私有小方法"组织，保证一个方法能读完完整流程（行数红线服从该验收标准）。无 Port 实现类必须登记在
-  `scripts/architecture-rules.mjs` 的 `NON_PORT_IMPLEMENTATION_CLASSES` 白名单并附改造记录说明。
-- 调用点禁止现场组装复杂参数（多字段对象先具名预构建再传入），禁止嵌套三元、参数内联三元与
-  `...(cond ? {} : { field })` 条件展开三分（详见根 TS 规范「表达式与调用可读性」）。
-- 可空字段判空写法全仓统一、私有成员用 `#` 不混写 `private`、方法参数"所有者/作用域在前"、
-  错误包装保留 cause 链、错误消息与日志中文（分别见根 TS 规范「判空与可空映射」「命名与签名约定」
-  「控制流与错误」「注释」）。
+- 可选字段的缺失与显式 `undefined` 不混用；**数据库 nullable 必须明确映射**。
+- Port 的 JSDoc 应注明默认实现与 composition root 组装位置。
 - Module 内默认实现在对应 `*.module.ts` 通过 `new ConcreteClass(...)` 绑定；全局
   `src/app/composition-root.ts` 只负责跨 Module 接线和进程级基础设施。生产代码不得用匿名对象充当默认实现；
   factory 返回协议对象时必须声明返回类型或使用 `satisfies`。测试 fake 可使用对象字面量，但必须接受显式
   Port 类型约束。
+- 无对应接口的默认实现类登记在 `scripts/architecture-rules.mjs` 的
+  `NON_PORT_IMPLEMENTATION_CLASSES` 白名单并附改造记录说明。
 - `*RouteDependencies` 等 Controller 依赖清单必须用中文 JSDoc 标明各依赖的生产默认实现，并指向
   对应 `*.module.ts`；涉及跨 Module 绑定时再指向 `src/app/composition-root.ts`。默认绑定变化时，接线代码与
   该注释必须在同一次变更中更新。
-- 注释见共享通用规范的「注释」章节（适用范围、机械门禁、书写要求、提交前检查均在那里）；新增公开模块、DTO、Port、Adapter 或复杂编排时必须补充足以支持人工审查的中文职责说明。
+- 注释的适用范围、机械门禁与书写要求见共享通用规范「注释」；新增公开模块、DTO、Port、Adapter 或
+  复杂编排时必须补充足以支持人工审查的中文职责说明。
 - `public-api.ts` 不得通过业务 Model/Port 转发 Runtime SDK 类型；公开边界需要的 JSON 与消息结构由产品
   Module 持有，转换函数放在 Adapter、serializer 或 presenter，不能放进纯数据 model。
 - Service、Adapter 和 Model 不得为兼容旧路径转发 Port 或其他权威类型；消费者必须直接从定义文件

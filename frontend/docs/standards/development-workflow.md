@@ -84,15 +84,8 @@ spec 和 plan 在当前任务的确认、实施阶段可以修订；任务交付
 
 Bug 修复能自动复现时，必须先添加失败的回归测试并确认失败原因正确。纯文档、配置、生成文件或无法可靠自动化的视觉变化可以不先写测试，但必须说明原因并执行最接近风险的验证。
 
-**组件规范**：
-- 使用 design-system 中已有的组件（`@/components/retroui/*` → `../design-system/src/components/*` 别名自动引用，无需复制）
-- 禁止在前端复制 retro UI 基础组件；页面级业务组件留在 frontend
-- 禁止硬编码颜色（`#hex`、`rgba()`），用 Tailwind utility 或 token
-- 新组件需支持键盘基本操作（可点击元素用 `<button>` 而非 `<div onClick>`）
-
-**状态管理**：
-- 全局状态用 Zustand，放在 `src/stores/`
-- 局部状态用 `useState`
+**组件规范与状态管理**：见 [`coding-conventions.md`](coding-conventions.md) §2（组件结构）、
+§3（样式与 token）、§4（状态管理），本节不重复。
 
 ---
 
@@ -100,16 +93,9 @@ Bug 修复能自动复现时，必须先添加失败的回归测试并确认失�
 
 **目的**：确保代码质量和功能正确。
 
-**硬性门禁（全部必须通过）**：
-
-```bash
-make doctor       # 在仓库根检查工具链版本与 package 声明
-pnpm format:check # Prettier 格式检查（只读）
-pnpm typecheck    # TypeScript 类型检查
-pnpm lint         # ESLint
-pnpm test         # vitest（如有测试用例）
-pnpm build        # 生产构建
-```
+**硬性门禁（全部必须通过）**：逐项清单见
+[`../../../docs/standards/typescript-coding-conventions.md`](../../../docs/standards/typescript-coding-conventions.md)「门禁」。
+前端侧即 `pnpm format:check` + `pnpm typecheck` + `pnpm lint` + `pnpm test` + `pnpm build`。
 
 **目视确认**（打开 dev server 人工检查）：
 
@@ -144,20 +130,8 @@ pnpm dev   # → http://localhost:5173
 | 工具链命令变化 | 更新 `frontend/AGENTS.md` |
 | 文档增删、移动、改名或分类变化 | 更新 `docs/README.md`，并检查所有相关活文档的链接与语义 |
 
-**设计系统同步协议**：
-
-design-system 组件通过 Vite alias **自动引用**（`retroui` 目录已删除，无需手动复制）：
-
-```bash
-# design-system 侧：组件 + showcase + 人工目视确认
-cd design-system && pnpm ai:check
-
-# 前端侧（消费方）：验证 alias 引用
-cd frontend && pnpm typecheck && pnpm build
-```
-
-- 新增/修改 UI 组件一律在 `design-system/src/components/` 操作，并注册 showcase 到 `tabs.ts` + `App.tsx`
-- design-system 组件内部用相对路径 import，跨项目加载不依赖 `@/` 别名
+**设计系统同步协议**：见 [`../../../design-system/AGENTS.md`](../../../design-system/AGENTS.md)「同步机制」
+（alias 映射、漂移检查、token 同步），本节不重复。前端侧只需验证 `pnpm typecheck && pnpm build` 仍通过。
 
 ---
 

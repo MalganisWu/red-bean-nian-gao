@@ -117,7 +117,8 @@ React/UI 规则遵循 [`frontend/docs/standards/coding-conventions.md`](../front
 - **视觉/交互决策注释 why**：开合状态保留、兼容旧调用方映射、动效偏好等反直觉行为必须写原因，
   组件注释是前端开发者唯一的本地文档
 - **测试注释**：交互测试的 setup、故障注入与断言原因用中文；用例名允许英文描述风格
-- 注释语言不做机械门禁（协议名、URL、TS 指令会被误报），由 review 与交付前人工扫描负责
+- **语言门禁**：由 `make ts-export-jsdoc-check` 机械校验（描述正文必须含中文字符）；专有协议名、
+  URL 与 TS 指令保留原文
 
 ---
 

@@ -77,11 +77,10 @@ README，不回写历史 spec / plan 来描述新现状。完整分类见仓库 
 - 产品能力写入 `backend/src`
 - 禁止恢复已退役的 `src/api|engine|cli` 与 `test/api|engine|cli`；业务公开 Model/Port 不得转发 Runtime SDK
   DTO，产品与 SDK 的消息、事件和 Checkpoint 转换收口在 Runtime Adapter
-- 依赖经构造函数或显式 factory 注入，composition root 不得演化为 Service Locator
-- 外部输入在 API、数据库、Redis、配置、LLM 或 Tool 边界进行运行时校验
-- 异步操作传播 `AbortSignal` 和带上下文的错误，不吞掉 Promise
-- 遵守跨仓共享的 [TypeScript 通用规范](../../../docs/standards/typescript-common-conventions.md)
-  与产品仓特有的 [本仓规范](../../../docs/standards/typescript-coding-conventions.md)
+
+通用编码规则（依赖注入、外部输入校验、取消传播、命名与注释等）见跨仓共享的
+[TypeScript 通用规范](../../../docs/standards/typescript-common-conventions.md) 与产品仓特有的
+[本仓规范](../../../docs/standards/typescript-coding-conventions.md)，本节不重复。
 
 **测试要求**：
 - 覆盖核心 happy path
@@ -102,16 +101,8 @@ README，不回写历史 spec / plan 来描述新现状。完整分类见仓库 
 
 **目的**：确保代码质量和功能正确。
 
-**必须通过**：
-
-```bash
-make doctor         # 固定工具链版本与 package 声明
-make backend-ts-verify # TypeScript 后端格式、类型、Lint、测试与构建
-make backend-verify # TypeScript 后端全部检查
-make compose-check  # 本地 Compose 安全配置静态检查
-make secrets-check  # 环境文件忽略策略与高置信度密钥检查
-make verify         # 交付前运行全仓门禁（不修改 Git 跟踪文件）
-```
+**必须通过**一条 `make verify`；逐项清单见
+[`../../../docs/standards/typescript-coding-conventions.md`](../../../docs/standards/typescript-coding-conventions.md)「门禁」。
 
 **建议**（非强制）：
 - 手动跑一次 happy path

@@ -34,14 +34,13 @@
 
 ## 组装与实现绑定
 
-- Module 内默认实现必须在对应 `*.module.ts` 中以 `new ConcreteClass(...)` 显式绑定；跨 Module
-  能力与进程级基础设施再由 `src/app/composition-root.ts` 连接。
+默认实现的绑定落点（`*.module.ts` 与 `src/app/composition-root.ts`、无对应接口实现类的白名单）
+见根 [`AGENTS.md`](../../AGENTS.md)「TypeScript 安全基线」。本节只写组装的组织方式：
+
 - `*.module.ts` 按「组装目录」组织：组装体拆成按能力分段的私有工厂函数，函数名即段落标题（如
   `createPersistence` / `createDelivery` / `createScheduler` / `createCases`），主入口只保留
   解构 + 工厂调用 + 返回组装；每段配一行中文段标题注释（`// ── 段名 ──` 或 JSDoc），保证组装清单
   从上到下一条流水线读完，不逐行编码对象构造。目录页化只重组模块文件，不改接线对象与行为。
-- 无 Port 实现类必须登记在 `backend/scripts/architecture-rules.mjs` 的
-  `NON_PORT_IMPLEMENTATION_CLASSES` 白名单并附改造记录说明。
 - 错误类与错误码常量放在同行 model（如 `model/session.ts` 的 `SessionStoreError` 与错误码并列），
   不放 `service/` 段——避免架构门禁把 service 段导出类误判为「受管实现」而要求显式 `implements`；
   Controller 与 Service 使用的领域错误统一从 model 导入。
@@ -50,13 +49,23 @@
 
 ## 门禁
 
-严格选项与 ESLint 规则以 `tooling/typescript/` 为机械事实来源。至少执行：
+严格选项与 ESLint 规则以 `tooling/typescript/` 为机械事实来源。**本仓门禁命令的唯一清单**就在这里；
+其他文档只引用，不重列。`make verify` 依次执行：
 
 ```bash
-make typecheck
-make ts-lint
-make ts-policy-check
-make verify
+make require-install     # 确认依赖已按 lockfile 安装
+make doctor              # 工具链版本与 package 声明
+make diff-check          # git diff 空白检查
+make docs-check          # 文档索引与链接
+make shared-files-check  # 跨仓共享件逐字一致
+make secrets-check       # 环境文件与高置信度密钥扫描
+make compose-check       # 本地 Compose 安全配置
+make ts-policy-check     # TypeScript 政策
+make ts-export-jsdoc-check # 注释门禁
+make backend-verify      # 后端格式、类型、Lint、测试与构建
+make frontend-verify     # 前端格式、类型、Lint、测试与构建
+make ds-check            # Design System
+make sdk-verify          # sibling Runtime SDK 与 runtime.lock 一致
 ```
 
 `make verify*` 是只读检查。格式修复使用明确的写入命令；检查失败后不得用断言、disable 注释或降低
