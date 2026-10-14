@@ -122,13 +122,18 @@ make sdk-verify            # sibling Runtime SDK 与 runtime.lock 一致
 
 ## Skill
 
-规则本体住在 Skill 里，各级 `AGENTS.md` 指向适用的那一份。`skills/` 是**唯一源**，仓库不向任何
-客户端目录复制规则正文，**也不绑定任何 AI 工具**——`.claude/`、`.agents/`、`.cursor/`、`.codex/`
-等一律在 `.gitignore` 里，各 harness 怎么发现 Skill 由开发者本地决定。
+规则本体住在 Skill 里，各级 `AGENTS.md` 指向适用的那一份。`skills/` 是**唯一源**，任何地方都
+不复制规则正文。
+
+**`.agents/skills/` 随仓走**——它是 [Agent Skills](https://agentskills.io) 的开放标准路径，多个
+工具（Codex、OpenCode 等）从这里发现 Skill，仓库因此不偏向任何一家。其余是各家工具的私有目录
+（`.claude/`、`.cursor/`、`.codex/` …），**一律不进库**；用哪个，自己在本地建符号链接指向
+`skills/<name>` 即可。
 
 Skill 按任务自动触发，本文件与各级 `AGENTS.md` 的路由是另一条到达路径。**Skill 不替代
 `AGENTS.md`**，出现冲突时以离目标路径最近的 `AGENTS.md` 为准。`make docs-check` 校验 Skill 的
-frontmatter 格式与「`name` 必须等于目录名」这两条机械事实。
+frontmatter 格式、「`name` 必须等于目录名」，以及 `.agents/skills/` 下每个 Skill 都是指向
+`skills/<name>` 的符号链接。
 
 ## 决策权限
 

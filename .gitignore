@@ -51,7 +51,6 @@ design-system/previews/
 .opencode/
 opencode.json
 opencode.jsonc
-.agents/
 .windsurf/
 .windsurfrules
 .codeiumignore

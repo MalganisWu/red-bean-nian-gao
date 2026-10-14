@@ -78,6 +78,28 @@ check_skill_format() {
 	fi
 }
 
+check_agents_skill_link() {
+	local name="$1"
+	local canonical="$2"
+	local entry="$root/.agents/skills/$name"
+	local resolved_canonical
+	local resolved_entry
+
+	if [[ ! -L "$entry" ]]; then
+		report_error ".agents/skills/$name 必须是指向 skills/$name 的符号链接（Agent Skills 标准路径）"
+		return
+	fi
+	if [[ ! -f "$entry/SKILL.md" ]]; then
+		report_error ".agents/skills/$name 无法解析到 SKILL.md"
+		return
+	fi
+	resolved_canonical="$(cd "$canonical" && pwd -P)"
+	resolved_entry="$(cd "$entry" && pwd -P)"
+	if [[ "$resolved_entry" != "$resolved_canonical" ]]; then
+		report_error ".agents/skills/$name 未指向 skills/$name 权威目录"
+	fi
+}
+
 for skill_dir in "$root"/skills/*; do
 	[[ -d "$skill_dir" ]] || continue
 	name="$(basename "$skill_dir")"
@@ -89,6 +111,7 @@ for skill_dir in "$root"/skills/*; do
 		continue
 	fi
 	check_skill_format "$skill_dir"
+	check_agents_skill_link "$name" "$skill_dir"
 done
 
 check_living_doc_index() {
