@@ -176,7 +176,7 @@ red-bean-nian-gao/
 - [`docs/design/backend/architecture.md`](docs/design/backend/architecture.md) — layering and dependency direction
 - [`docs/design/agent/pipeline.md`](docs/design/agent/pipeline.md) — the main session pipeline and hooks
 - [`docs/design/session/session-trajectory.md`](docs/design/session/session-trajectory.md) — the audit view's information architecture
-- [`docs/decisions/`](docs/decisions/) — ADRs: what was chosen, what it cost, what it rules out
+- [`docs/decisions/`](docs/decisions/) — decision records: what was chosen, what it cost, what it rules out
 - [`backend/STACK.md`](backend/STACK.md) — backend technology choices and the reasoning behind them
 - [`AGENTS.md`](AGENTS.md) — the development conventions this repository is held to
 

@@ -10,6 +10,10 @@
 
 ## 活文档
 
+> 一次开发的产出只有 `plans/` / `decisions/` / `design/` 三样，触发判据与红线见
+> [`standards/development-workflow.md`](standards/development-workflow.md)「一次开发的产出」。
+> 本节索引**活文档**（描述当前事实）；`design/` 不写进度与排期。
+
 ### 契约、架构与运行
 
 - [`../api-contract/src/`](../api-contract/src/)：前后端 HTTP/SSE 的机器可执行唯一契约源。
@@ -29,7 +33,7 @@
 ### 模块开发标准
 
 - [`../backend/src/README.md`](../backend/src/README.md)：从 HTTP Controller 到 DTO、用例、Port 与 Adapter 的人工审查导航。
-- [`standards/typescript-common-conventions.md`](standards/typescript-common-conventions.md)：跨仓共享的 TypeScript 通用规范，与 Runtime SDK 仓逐字相同，由 `scripts/check-common-conventions.sh` 校验。
+- [`standards/typescript-common-conventions.md`](standards/typescript-common-conventions.md)：跨仓共享的 TypeScript 通用规范，与 Runtime SDK 仓逐字相同，由 `scripts/check-shared-files.mjs` 校验。
 - [`standards/typescript-coding-conventions.md`](standards/typescript-coding-conventions.md)：产品仓特有的 TypeScript 约束（前端、契约来源、HTTP 边界、组装与门禁）。
 - [`../backend/docs/standards/development-workflow.md`](../backend/docs/standards/development-workflow.md)：后端开发流程。
 - [`../frontend/docs/standards/coding-conventions.md`](../frontend/docs/standards/coding-conventions.md)：前端编码规范。
@@ -52,7 +56,8 @@
 
 ## 决策记录
 
-- [`decisions/`](decisions/)：ADR 式决策记录（为什么选这条路、代价与后果），只追加不修改。
+- [`decisions/`](decisions/)：决策记录（格式为 ADR 式的「背景 / 选项 / 决策 / 理由 / 后果」），
+  只追加不修改。**不是全部都是架构决策**，因此不用「ADR」泛指它们。
 
 决策记录用于解释“当时为什么这样决定”，不作为当前接口或行为的唯一依据。当前行为以活文档、
 可执行契约、Design System 页面和源码为准。

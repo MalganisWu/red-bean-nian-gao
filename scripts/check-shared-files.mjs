@@ -21,6 +21,7 @@ const candidates = ["red-bean-qing-tuan", "red-bean-nian-gao"];
 /** 必须逐字相同的文件。 */
 const byteIdenticalFiles = [
   "docs/standards/typescript-common-conventions.md",
+  "docs/standards/development-workflow.md",
   "tooling/typescript/tsconfig.base.json",
   "tooling/typescript/export-jsdoc-rules.mjs",
   "tooling/typescript/export-jsdoc-cases.json",

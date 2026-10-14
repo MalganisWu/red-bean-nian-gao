@@ -134,7 +134,7 @@ Fastify 解耦的用例签名，并负责 wire DTO 投影和 HTTP 应用错误�
 - 必须询问：破坏公开契约、不可逆数据变更、现有范围外的新能力、外部成本或未批准的安全边界变化。
 - Fastify、PostgreSQL、Redis、MinIO、Croner、OpenTelemetry 等已批准的等价迁移依赖可直接安装和接线，
   不重复询问。
-- 已批准 spec/plan 内的兼容扩展、migration、启动组装与跨模块重构，告知影响后继续。
+- 已批准 plan 内的兼容扩展、migration、启动组装与跨模块重构，告知影响后继续。
 - 实现、测试、文档同步和本地验证可自主完成；commit、push、部署仍须用户明确授权。
 
 ## 常用命令
