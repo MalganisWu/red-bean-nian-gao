@@ -20,10 +20,9 @@ const DEFAULT_USER_ID = 'USER_default_001'
  * 每次启动都会把这里的内容并入 `core_agents.sys_tool_ids`，因此「给默认 Agent 授权」必须改这里，
  * 只改数据库会在下次启动时被并集覆盖。
  *
- * `sys_shell` 是任意命令执行，把它列入这里是明确的安全边界决策，理由与代价见
- * `docs/decisions/2026-09-17-default-agent-shell-authorization.md`。该授权**不**延伸到定时任务：
- * `EXCLUDED_TASK_TOOL_NAMES` 排除 `sys_shell`，理由见
- * `docs/decisions/2026-10-08-scheduled-task-shell-exclusion.md`。
+ * `sys_shell` 是任意命令执行，把它列入这里是明确的安全边界决策；该授权**不**延伸到定时任务：
+ * `EXCLUDED_TASK_TOOL_NAMES` 排除 `sys_shell`。这两项授权的前提、边界与代价见
+ * `docs/design/tool/tool-system.md`。
  */
 const DEFAULT_AGENT_TOOL_IDS = Object.freeze([
   'sys_get_time',

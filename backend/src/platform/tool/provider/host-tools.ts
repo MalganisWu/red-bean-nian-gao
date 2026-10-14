@@ -23,8 +23,7 @@ import type { FileReadLedger, Tool } from 'red-bean-qing-tuan/tools'
  * 闸门永远读不到读取记录，从而静默失去保护。因此账本在这里创建一次并向两侧注入。
  *
  * 这些工具都不限制路径，只在部署平台已提供文件系统沙箱时才是安全的；产品由部署者自持，Agent
- * 需要通读宿主机文件才能完成真实的代码与配置任务，代价与边界见
- * `docs/decisions/2026-09-17-unrestricted-agent-file-read.md`。
+ * 需要通读宿主机文件才能完成真实的代码与配置任务，前提与边界见 `docs/design/tool/tool-system.md`。
  *
  * `sys_shell` 是任意命令执行：它会发起网络请求、安装依赖、启动进程，并且**绕过全部文件闸门**
  * （`sed -i`、`tee` 都不经过读取账本），因此「先读后写」在本工具可用时只剩引导作用而非强制约束。

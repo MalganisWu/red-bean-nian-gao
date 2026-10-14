@@ -95,7 +95,7 @@ export const SCHEDULED_TASK_SYSTEM_PROMPT = `你是定时任务执行器。定�
  * 定时任务运行在无人观察的后台，排除项因此不只有交互类工具：
  * `sys_ask_user` 无人可问，`sys_scheduled_task_manage` 防止任务自我复制，
  * `sys_shell` 是任意命令执行——继承它等于开出一条无人值守的命令执行路径。
- * 决策与代价见 `docs/decisions/2026-10-08-scheduled-task-shell-exclusion.md`。
+ * 授权边界与代价见 `docs/design/tool/tool-system.md`。
  */
 const EXCLUDED_TASK_TOOL_NAMES = [
   'sys_ask_user',

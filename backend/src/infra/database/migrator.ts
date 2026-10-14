@@ -465,7 +465,7 @@ export const MIGRATIONS: readonly Migration[] = Object.freeze([
     '20260911000001',
     'create_session_runs',
     [
-      // 会话轨迹事实日志（docs/decisions/2026-09-11-session-trajectory-fact-log.md）：
+      // 会话轨迹事实日志（设计见 docs/design/session/session-trajectory.md）：
       // 一个 run 一行 append-only，facts 以 JSONB 追加 user/assistant/tool 三类消息级事实。
       `CREATE TABLE IF NOT EXISTS session_runs (
         run_id VARCHAR(50) PRIMARY KEY,
