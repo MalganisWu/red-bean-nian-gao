@@ -35,8 +35,18 @@
 [`AGENTS.md`](../../../AGENTS.md)「门禁」。
 
 **测试要求**：覆盖核心 happy path 与主要 error path，外部输入至少覆盖非法形状；纯领域测试优先用
-内存 fake，SQL / Redis 原子语义 / MinIO / 完整 HTTP 生命周期必须有真实基础设施证据；多 case 场景
-用表驱动。
+内存 fake；多 case 场景用表驱动。
+
+**基础门禁与「连接真实服务的集成验收」是两件事，报告里不得混写。**
+
+- **基础门禁** `make verify`：不依赖外部服务，覆盖格式、类型、Lint、单元与契约测试、构建。
+- **集成验收** `make be-test-integration` / `make verify-full`：需要真实的 PostgreSQL、Redis、
+  MinIO。migration 的 up/status/down、SQL 与 Redis 原子语义、MinIO 和完整 HTTP 生命周期的证据
+  属于这一类。
+
+本地与 CI 没有可用服务时，**可以先完成代码交付**，但交付说明必须逐项标注真实服务验证「待验证」、
+写清受影响的行为与所需环境；**不得把 `make verify` 通过写成真实基础设施已验证**。环境具备后补做
+并记录结果——真实验证的要求不因此取消。
 
 ### 5 文档更新
 
@@ -49,7 +59,7 @@
 |---------|-------------|
 | Bug fix / 小调整 / 重构（不改接口） | 通常不需要 |
 | 给已有模块加功能 | 更新 `docs/design/<module>/` |
-| 新增 engine 模块 | **必须新建** `docs/design/<module>/`，更新 `AGENTS.md` 目录结构 |
+| 新增业务 Module | **必须新建** `docs/design/<module>/`，更新 `AGENTS.md` 目录结构 |
 | 修改跨模块接口 | 更新对应 design doc，检查所有实现与调用方 |
 | 新增 migration | 更新 `docs/design/` 中数据库相关文档 |
 | 新增/修改编码规范 | 更新 `docs/standards/` 对应文档 |
@@ -62,14 +72,16 @@
 - [ ] 所有测试通过、lint 无错误
 - [ ] 文档影响已审查；必要文档已更新，无需更新项已有理由
 - [ ] commit message 描述清晰
-- [ ] 回顾计划：实际实现与计划是否一致？有偏差的更新 design doc
+- [ ] 对照**最新** plan 核对结果。执行期发现的偏差应在实施中就地处理（何时改 plan、何时新增
+      decision、何时需重新确认授权，见共享件「执行纪律」）；design 只描述最终实现与运行方式，
+      不用它追认执行期的偏差
 - [ ] 仅在用户明确授权时 commit、push、merge 或提 PR
 
 ## 模块级 vs 非模块级
 
 | 属于模块级 | 不属于模块级 |
 |-----------|-------------|
-| 新增 engine 模块 | 修 bug |
+| 新增业务 Module | 修 bug |
 | 修改跨模块公开接口 | 调整日志格式 |
 | 新增 migration | 重构内部实现（不改接口） |
 | 新增 API 端点 | 补充测试 |

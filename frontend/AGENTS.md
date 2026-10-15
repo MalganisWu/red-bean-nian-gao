@@ -35,13 +35,14 @@ Frontend 治理入口：目录边界、路由与命令。**编码规范与开发
 
 前端特有的差异：
 
-- **阶段 1 与阶段 2 之间额外步骤：mock → 方向确认 → UI 组件盘点 + design-system 先行**
+- **阶段 1 与阶段 2 之间额外步骤：mock → 方向确认**
   1. 产出 mock，落 `design-system/previews/`（本地、不入库），由开发者目视确认方向
-  2. 确认后才写 plan；plan 只写已确认的方向
-  3. 盘点需要的 UI 组件（哪些已有的、哪些要新建、哪些要改）
-  4. 在 design-system 完成组件设计 + showcase 页
-  5. 人工目视确认（启动 design-system dev server）
-  6. 确认后才进入阶段 3
+  2. 确认后才写 plan；plan 只写已确认的方向。**这不是所有 UI 改动的必经步骤**——已有设计约定、
+     预期行为清楚的简单修复可直接实施；涉及新的外观或交互方案选择时，先问开发者要不要 mock
+- **阶段 2 计划**：盘点需要的 UI 组件（哪些已有的、哪些要新建、哪些要改），定下复用还是新增的
+  **方案**——本步不写组件代码
+- **阶段 3 编码起步**：先在 design-system 完成真实组件 + Showcase 并目视确认（启动 design-system
+  dev server），再开发正式前端
 - 阶段 3 **测试分层**：逻辑层严格 TDD；组件先定义验收状态，可自动化的交互行为测试先行；纯视觉层使用 Showcase + 目视验证
 - 阶段 4 **硬性门禁**：format:check + typecheck + lint + test + build，外加 dev server 目视确认
 - 阶段 5 涉及 design-system 变更的，验证两端 `typecheck + build` 均通过

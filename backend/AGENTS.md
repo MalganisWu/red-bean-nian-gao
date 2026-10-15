@@ -102,6 +102,11 @@ make verify                 # 全仓 TypeScript 门禁
 make verify-full            # 发布级门禁和真实基础设施测试
 ```
 
+**这两类不是一回事，报告里不得混写**：`make verify` 不依赖外部服务；`make be-test-integration` 与
+`make verify-full` 需要真实的 PostgreSQL / Redis / MinIO。本地与 CI 没有可用服务时，可以先交付
+代码，但交付说明要逐项标注真实服务验证「待验证」——**不得把 `make verify` 通过写成真实基础设施
+已验证**。判据见 [`docs/standards/development-workflow.md`](docs/standards/development-workflow.md)「4 验证」。
+
 ## 文档影响
 
 每次完成代码、依赖、命令或目录变化后，从

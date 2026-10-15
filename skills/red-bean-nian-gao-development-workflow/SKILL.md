@@ -26,7 +26,7 @@ description: 在 red-bean-nian-gao 中开发、修复、重构、评审、测试
 
 - **plan 的落点**：跨 workspace 落仓库根 `docs/plans/<date>-<feature>.md`；仅影响单个 workspace 时
   落 `backend/docs/plans/` 或 `frontend/docs/plans/`。
-- **模块级 vs 非模块级**：新增 engine 模块、修改跨模块公开接口、新增 migration、新增 API 端点、
+- **模块级 vs 非模块级**：新增业务 Module、修改跨模块公开接口、新增 migration、新增 API 端点、
   新增外部依赖属模块级，必须走完六阶段。
 - **交付前跑一条 `make verify`**，它会依次跑四个 workspace 的验证；逐项清单见
   [`AGENTS.md`](../../AGENTS.md)「门禁」。
@@ -42,8 +42,8 @@ description: 在 red-bean-nian-gao 中开发、修复、重构、评审、测试
 | --- | --- | --- |
 | ① | 产出 mock：落 `design-system/previews/`，本地、**不入库**；可同时有多个候选 | `proposal` |
 | ② | **开发者目视确认方向**；不通过回 ① | → `accepted` |
-| ③ | 进阶段 2：plan 只写已确认的方向，不写待定候选 | `accepted` |
-| ④ | 阶段 3 先落 design-system：真实组件 + Showcase | → `implemented` |
+| ③ | 进阶段 2：plan 只写已确认的方向，不写待定候选；**盘点组件缺口，定下复用还是新增** | `accepted` |
+| ④ | 进阶段 3：先落 design-system 真实组件 + Showcase，**目视确认后**再开发正式前端 | → `implemented` |
 | ⑤ | 前后端开发：前端引用已入册组件，后端供接口 | `implemented` |
 | ⑥ | 验收 | `implemented` |
 | — | 组件退场：先标出替代方案与移除窗口，再清空引用 | `deprecated` → `removed` |
@@ -62,6 +62,12 @@ description: 在 red-bean-nian-gao 中开发、修复、重构、评审、测试
   确认结论写进 plan 或提交说明，草稿本身不留档。
 - **顺序不可颠倒**：plan 必须写已确认的视觉方向；design-system 先于前后端开发，前端只能引用
   已入册的组件。
+- **不是所有 UI 改动都要 mock**：已有设计约定、预期行为清楚的**简单修复**可直接实施；涉及新的
+  外观或交互方案选择时，先问开发者是否需要 mock，再按答复执行。
+- **改哪一层决定从哪起手**：改共享组件、token 或基础视觉语言 → 先在 Design System 更新真实组件与
+  Showcase 并验证，再检查正式前端；改产品特有的页面级业务组件 → 直接在前端做，复用已有的
+  Design System 组件与 token，**不为走流程而在 Design System 里复制一份**。两类都要定义验收场景、
+  执行适当测试、目视验证，并审查设计文档影响。
 - **非 UI 改动不走这条**（纯后端、纯文档、纯配置），直接走通用六阶段。
 
 ## Design System 资产变更分级（本仓特有）
