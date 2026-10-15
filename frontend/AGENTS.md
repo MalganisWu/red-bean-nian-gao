@@ -9,6 +9,9 @@ Frontend 治理入口：目录边界、路由与命令。**编码规范与开发
 3. 完整读取下面「编码规范」与「开发与测试流程」指向的 Skill——**规则本体在那里**。
    规则冲突时以离目标文件最近者为准。
 4. 检查工作区状态，保留用户已有改动。
+5. 读代码遇到「以为自己认识」的词，查 [`../docs/glossary.md`](../docs/glossary.md)（产品术语表）。
+   **前端最常遇到的是** `execution view state` / `trajectory` / `compaction` / `session`
+   （`session` 在后端叫 `thread`，两者在 Runtime Adapter 边界映射，**不是不一致**）。
 
 ---
 ---

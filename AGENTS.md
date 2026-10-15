@@ -95,9 +95,6 @@ red-bean-nian-gao/
 | 计划 | `docs/plans/` 及模块同名目录 | 任务文档；执行期可修订，交付后冻结 |
 | 决策记录 | `docs/decisions/` | 冻结；只追加不修改 |
 
-读代码遇到「以为自己认识」的词，先查 [`docs/glossary.md`](docs/glossary.md)（本仓术语表）——
-它只写一句话定义与「不是……」的边界，是**读者索引**，不是第二个事实来源。
-
 根 `docs/standards/` 的三份是**短指针**——规则实体在 `skills/`。完整导航见 [`docs/README.md`](docs/README.md)。
 
 ## 门禁
