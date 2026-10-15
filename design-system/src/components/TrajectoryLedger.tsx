@@ -280,6 +280,15 @@ function OutputRow(props: {
   const { label, text, callId, selectedId, onSelect, filterText } = props
   const q = filterText.trim().toLowerCase()
   const hit = !q || text.toLowerCase().includes(q)
+
+  // 键盘激活：Enter/Space 与点击等价 —— `role="button"` 只声明语义，不附带行为。
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onSelect?.(callId, label)
+    }
+  }
+
   return (
     <div
       role="button"
@@ -289,6 +298,7 @@ function OutputRow(props: {
       data-hidden={!hit || undefined}
       // 带上 label：点「正文」就该看到正文，而不是默认停在「思考」tab
       onClick={() => onSelect?.(callId, label)}
+      onKeyDown={handleKeyDown}
       className={cn(
         `relative grid min-h-[30px] cursor-default ${GRID} items-center gap-x-2.5 border-b border-border/40 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus-ring`,
         'hover:bg-surface-hover',
@@ -1336,7 +1346,8 @@ export function TrajectoryLedger(props: TrajectoryLedgerProps) {
   }
 
   // 轮次标题行的键盘激活：等价于点击它（切换本轮折叠）。
-  function handleTurnKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+  // 摘要行与轮次标题的键盘激活：元素自身带 `onClick`，直接复用它的行为。
+  function handleActivateOnKey(event: KeyboardEvent<HTMLDivElement>): void {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       event.currentTarget.click()
@@ -1430,6 +1441,7 @@ export function TrajectoryLedger(props: TrajectoryLedgerProps) {
                 tabIndex={0}
                 aria-expanded={false}
                 onClick={() => setCollapsedCalls((prev) => removeFromSet(prev, item.call.id))}
+                onKeyDown={handleActivateOnKey}
                 className={`grid min-h-[20px] cursor-pointer ${GRID} items-center gap-x-2.5 border-b border-border/40 text-label text-foreground-muted transition-colors hover:bg-surface-hover`}
               >
                 <span />
@@ -1535,7 +1547,7 @@ export function TrajectoryLedger(props: TrajectoryLedgerProps) {
             aria-expanded={!collapsed}
             onDoubleClick={() => setCollapsedTurns((prev) => toggleInSet(prev, turn.turn))}
             onClick={() => setCollapsedTurns((prev) => toggleInSet(prev, turn.turn))}
-            onKeyDown={handleTurnKeyDown}
+            onKeyDown={handleActivateOnKey}
             // **不 sticky**：轮次标题是记录流的一部分，随内容滚动（轮次标记只是
             // 行内角标）。只有工具栏与列头钉在顶部——多钉一层会让被穿过的行与它重叠，
             // 看起来像断层。
@@ -1615,6 +1627,7 @@ export function TrajectoryLedger(props: TrajectoryLedgerProps) {
               tabIndex={0}
               aria-expanded={false}
               onClick={() => setCollapsedTurns((prev) => removeFromSet(prev, turn.turn))}
+              onKeyDown={handleActivateOnKey}
               className={`grid min-h-[20px] cursor-pointer ${GRID} items-center gap-x-2.5 border-b border-border/40 text-label text-foreground-muted transition-colors hover:bg-surface-hover`}
             >
               <span />

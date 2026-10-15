@@ -6,6 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 import { restrictedSyntaxRules, typescriptSafetyRules } from '../tooling/typescript/policy.mjs'
+import { keyboardActivationRule } from '../tooling/typescript/react-a11y-rules.mjs'
 
 export default defineConfig([
   globalIgnores(['dist']),
@@ -26,7 +27,7 @@ export default defineConfig([
     },
     rules: {
       ...typescriptSafetyRules,
-      'no-restricted-syntax': ['error', ...restrictedSyntaxRules],
+      'no-restricted-syntax': ['error', ...restrictedSyntaxRules, keyboardActivationRule],
     },
   },
   {

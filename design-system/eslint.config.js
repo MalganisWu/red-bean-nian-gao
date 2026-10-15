@@ -8,6 +8,7 @@ import {
   restrictedSyntaxRules,
   typescriptSafetyRules,
 } from '../tooling/typescript/policy.mjs'
+import { keyboardActivationRule } from '../tooling/typescript/react-a11y-rules.mjs'
 
 export default tseslint.config(
   { ignores: ['dist', 'eslint.config.js'] },
@@ -41,6 +42,7 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         ...restrictedSyntaxRules,
+        keyboardActivationRule,
         {
           selector: 'Literal[value=/#[0-9A-Fa-f]{3,8}$/]',
           message:
