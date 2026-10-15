@@ -1,8 +1,8 @@
 # Task Module
 
 负责任务配置、执行历史、调度和结果投递。模块顶层分为 `controller/`（HTTP）与 `service/`（业务）两大块，
-业务按四条链分组：`cases/`（HTTP 用例）、`scheduling/`（调度）、`delivery/`（投递）、`tool/`（工具）、
-`persistence/`（PostgreSQL 仓储）。
+`service/` 下按职责分组：`cases/`（HTTP 用例）、`scheduling/`（调度）、`delivery/`（投递）、
+`tool/`（工具）、`persistence/`（PostgreSQL 仓储）与 `error/`（领域错误与错误包装）。
 
 ## HTTP 用例链
 
@@ -73,7 +73,8 @@ Task 对展示消息的 HTTP 投影与 PostgreSQL 写入共用
 
 ## 文件规模审查
 
-`TaskController` 当前约 221 行，略高于 Controller 的人工审查触发线。它保留的是同一 HTTP 资源下的薄
-Query/Command 端点；请求解析、Wire Presenter 和业务规则已经分别位于 `task-request-parser.ts`、
-`task-presenter.ts` 与用例 Service。继续只按行数拆 Controller 会分散同一资源的传输映射，
-因此本轮保留；后续增加新端点或重新引入业务判断时，应优先按资源子域拆 Controller。
+`TaskController` 超过 Controller 的人工审查触发线，**门禁每次都会报**（`make be-architecture-check`
+的 file-size-review 报的是当下行数，这里不复制）。保留的理由是职责而不是行数：它承载同一 HTTP 资源
+下的薄 Query/Command 端点，请求解析、Wire Presenter 和业务规则已经分别在 `task-request-parser.ts`、
+`task-presenter.ts` 与用例 Service。继续只按行数拆会分散同一资源的传输映射；增加新端点或重新引入
+业务判断时，应优先按资源子域拆 Controller。

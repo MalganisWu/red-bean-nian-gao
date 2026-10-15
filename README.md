@@ -107,6 +107,12 @@ make run                     # 后端 → http://localhost:8080
 pnpm --filter frontend dev   # 前端 → http://localhost:5173
 ```
 
+或者一条命令同时起两个；**任一退出时两个都会清理**，不会留下占着 8080 的后端：
+
+```bash
+make full-dev                # 后端 8080 + 前端 5173
+```
+
 `make init` 是唯一的一键入口，它依次做四件事：检查工具链 → 把 Runtime SDK 克隆到本仓同级目录、切到
 `runtime.lock` 锁定的 revision 并构建 → 安装 workspace 依赖 → 把 `backend/.env.local.example`
 复制到位。**它不会覆盖已有的 `.env.local`，重复跑也没问题。**
@@ -158,6 +164,7 @@ red-bean-nian-gao/
 ## 文档
 
 - [`docs/README.md`](docs/README.md) —— 全部活文档与决策记录的索引
+- [`docs/glossary.md`](docs/glossary.md) —— 术语表：读代码时最容易「以为自己认识」的词，含前后端分工与与 Runtime 契约词的对照
 - [`docs/design/backend/architecture.md`](docs/design/backend/architecture.md) —— 后端分层与依赖方向
 - [`docs/design/agent/pipeline.md`](docs/design/agent/pipeline.md) —— 主会话 Pipeline 与 Hook
 - [`docs/design/session/session-trajectory.md`](docs/design/session/session-trajectory.md) —— 轨迹审计视图的信息架构

@@ -94,7 +94,9 @@ Task 调用的后台执行与外部回合写入还会在 `test/modules/task/deli
 
 ## 文件规模审查
 
-本轮按职责自然拆分了运行编排辅助函数、展示消息收集与中断组装、子执行心跳与结果处理、
-Session 行映射以及 Task 投递消息投影。`SessionLifecycle` 保留约 277 行：`load/save`
-共同维护 lease、fencing、revision、buffer generation 和恢复提交不变量，属于同一个一致性状态机；
-继续按行数拆分会让关键状态转换分散到多个对象，反而降低审查时的完整性。
+运行编排辅助函数、展示消息收集与中断组装、子执行心跳与结果处理、Session 行映射以及 Task 投递消息
+投影都已按职责拆开。`SessionLifecycle`（`session/run/service/default-session-run-service.ts`）超过
+Service 的审查触发线，**门禁每次都会报**（`make be-architecture-check` 的 file-size-review 报的是
+当下行数，这里不复制）：它的 `load`/`save` 共同维护 lease、fencing、revision、buffer generation 和
+恢复提交不变量，属于同一个一致性状态机；继续按行数拆会让关键状态转换分散到多个对象，反而降低审查
+时的完整性。

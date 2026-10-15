@@ -1,4 +1,4 @@
-# red-bean-nian-gao
+# red-bean-nian-gao Backend
 
 > AI Agent 对话服务的严格 TypeScript 后端实现，提供会话管理、定时任务调度、用户认证和文件存储能力。
 
