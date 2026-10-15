@@ -39,6 +39,24 @@ description: 在 red-bean-nian-gao 中编写、修改、重构或评审 backend 
   `platform/{llm,tool,observability}/` 和 `app/composition-root.ts`；其他位置依赖业务 Port/Model。
   该约束由 `pnpm architecture:check` 扫描全部 `backend/src`。
 
+### 后缀各自的语义角色
+
+通用规范只说了「用职责后缀」，没写它们**差在哪**——而本仓 `*Port`(261) 与 `*Repository`(257)
+并存，选错是每天都在发生的事：
+
+| 后缀 | 语义角色 |
+| --- | --- |
+| `*Port` | **注入型行为接口**；实现由对应 `*.module.ts` 绑定，是跨 Module 协作的边界 |
+| `*Repository` | **业务实体的持久化读写**；不是通用"存取层"，也不放业务规则 |
+| `*Adapter` | **面向外部系统**的实现（Fastify / pg / Redis / MinIO / Runtime SDK） |
+| `*Service` | **用例编排**；不是工具类集合 |
+| `*Loader` | 从存储**加载定义**（如 agent 定义），启动期或按需 |
+| `*Registry` | 启动期注册、之后**封闭** |
+| `*Controller` / `*.routes.ts` | HTTP 用例控制器 / 传输投影，见「HTTP 边界与 Controller」 |
+
+同角色跨仓不同名是**分层**，不是不一致：本仓持久化接口用 `*Repository`，Runtime SDK 侧同一角色
+叫 `*Store`——两仓各自命名，在 Adapter 边界映射。
+
 ## HTTP 边界与 Controller
 
 HTTP 边界按业务能力组织在 `src/modules/<module>/**/controller/`；公开 DTO 集中在
