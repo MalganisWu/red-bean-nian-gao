@@ -118,12 +118,10 @@ interface TraceHookDependencies {
   readonly tracer: TracerPort
 }
 
-/*
- * 请求级状态挂在 WeakMap 上，而不是塞进 request 对象或某个全局 Map。
- * WeakMap 的键是请求对象本身：请求结束、没有别的引用之后条目自动消失，
- * 既不需要在 onResponse 里逐个清理（下面那些 delete 只是为了及时释放大对象），
- * 也不会让并发请求之间串状态。
- */
+// 请求级状态挂在 WeakMap 上，而不是塞进 request 对象或某个全局 Map。
+// WeakMap 的键是请求对象本身：请求结束、没有别的引用之后条目自动消失，
+// 既不需要在 onResponse 里逐个清理（下面那些 delete 只是为了及时释放大对象），
+// 也不会让并发请求之间串状态。
 /** 请求 → trace ID；请求结束、无其它引用后条目自动回收。 */
 const requestTraceIds = new WeakMap<FastifyRequest, string>()
 /** 请求 → `http.request` span；onResponse 收尾时需要用它。 */
@@ -191,12 +189,10 @@ export function createHttpServer(options: HttpServerOptions): FastifyInstance {
     finishRequestSpan(request, reply, done)
   )
 
-  /**
-   * 统一错误出口。**日志级别按「这是不是我们预期的错误」分层**：
-   * 有 `cause` 或非 `AppError` 的走 error（同一条错误反复出现说明有故障），
-   * 而 `AppError` 是业务主动抛的（404、限流、校验失败），走 debug——
-   * 把用户输错参数记成 error 会让真正的故障淹没在噪声里。
-   */
+  // 统一错误出口。**日志级别按「这是不是我们预期的错误」分层**：
+  // 有 `cause` 或非 `AppError` 的走 error（同一条错误反复出现说明有故障），
+  // 而 `AppError` 是业务主动抛的（404、限流、校验失败），走 debug——
+  // 把用户输错参数记成 error 会让真正的故障淹没在噪声里。
   server.setErrorHandler((error, request, reply): void =>
     handleRequestError(error, request, reply, jsonBodyLimit)
   )
@@ -221,12 +217,10 @@ async function beginRequestContext(
   allowedOrigins: readonly string[],
   allowAllOrigins: boolean
 ): Promise<void> {
-  /*
-   * 两种断连必须都覆盖，只监听一个会漏掉一半的取消来源：
-   * - `aborted`：请求还没读完客户端就断了。
-   * - `close` + `writableFinished === false`：响应还没写完连接就关了（SSE 场景里这是最常见的）。
-   *   加 `writableFinished` 判断是因为正常结束也会触发 `close`，不加就会把每次正常请求都当成取消。
-   */
+  // 两种断连必须都覆盖，只监听一个会漏掉一半的取消来源：
+  // - `aborted`：请求还没读完客户端就断了。
+  // - `close` + `writableFinished === false`：响应还没写完连接就关了（SSE 场景里这是最常见的）。
+  // 加 `writableFinished` 判断是因为正常结束也会触发 `close`，不加就会把每次正常请求都当成取消。
   const controller = new AbortController()
   if (request.raw.aborted) controller.abort(new Error('HTTP request aborted'))
   else {
@@ -234,7 +228,7 @@ async function beginRequestContext(
       controller.abort(new Error('HTTP request aborted'))
     })
   }
-  /** 连接关闭且响应未写完：视为客户端断连，中止整条链路。 */
+  // 连接关闭且响应未写完：视为客户端断连，中止整条链路。
   function onResponseClose(): void {
     if (!reply.raw.writableFinished) {
       controller.abort(new Error('HTTP response disconnected'))
@@ -304,13 +298,11 @@ function attachTraceContext(
   }
   const span = dependencies.tracer.start({ name: 'http.request', attributes })
   requestSpans.set(request, span)
-  /*
-   * 用 `span.within` 包住 `done()` 而不是直接调用：`within` 会把该 span 设为异步上下文里的活跃 span，
-   * 后续 handler 里新建的 span（LLM、工具、DB）才能自动挂到它下面。
-   * 这也解释了为什么必须用 `void ... .catch`：`within` 返回 Promise，而 Fastify 的 done 回调风格
-   * 要求同步返回，只能把异步失败转回 `done(error)`。
-   */
-  /** 在 span 的异步上下文里放行 `done`，使后续新建的 span 自动挂到它下面。 */
+  // 用 `span.within` 包住 `done()` 而不是直接调用：`within` 会把该 span 设为异步上下文里的活跃 span，
+  // 后续 handler 里新建的 span（LLM、工具、DB）才能自动挂到它下面。
+  // 这也解释了为什么必须用 `void ... .catch`：`within` 返回 Promise，而 Fastify 的 done 回调风格
+  // 要求同步返回，只能把异步失败转回 `done(error)`。
+  // 在 span 的异步上下文里放行 `done`，使后续新建的 span 自动挂到它下面。
   function continueWithinSpan(): Promise<void> {
     done()
     return Promise.resolve()
@@ -438,7 +430,7 @@ export class FixedWindowRateLimiter {
    * @returns 绑定到本实例配额的 Fastify 异步 preHandler 钩子。
    */
   public preHandler(): preHandlerAsyncHookHandler {
-    /** 按客户端 IP 判定配额；超限时写 `retry-after` 并抛 429。 */
+    // 按客户端 IP 判定配额；超限时写 `retry-after` 并抛 429。
     const rateLimitGuard = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const decision = this.allow(request.ip, this.#now())
       if (decision.allowed) return
@@ -455,11 +447,9 @@ export class FixedWindowRateLimiter {
    * @returns 本次判定结果：是否放行，以及被拒时建议客户端等待的秒数。
    */
   private allow(key: string, now: number): RateLimitDecision {
-    /*
-     * 惰性清理而不是定时器：只在「距上次清理超过一个窗口」时才扫一遍，
-     * 把 O(条目数) 的成本摊到多次请求上。定时器会在服务空闲时也持续唤醒事件循环，
-     * 而且需要在关闭时显式清掉，这里没必要引入那份复杂度。
-     */
+    // 惰性清理而不是定时器：只在「距上次清理超过一个窗口」时才扫一遍，
+    // 把 O(条目数) 的成本摊到多次请求上。定时器会在服务空闲时也持续唤醒事件循环，
+    // 而且需要在关闭时显式清掉，这里没必要引入那份复杂度。
     if (now - this.#lastCleanup >= this.#windowMilliseconds) {
       for (const [entryKey, entry] of this.#entries.entries()) {
         if (now - entry.windowStartedAt >= this.#windowMilliseconds) {

@@ -21,7 +21,7 @@ export function TaskDetailPage() {
     setSearchParams(next, { replace: true })
   }
 
-  /** 查看某次执行详情：按任务与执行 id 跳转到执行详情路由。 */
+  // 查看某次执行详情：按任务与执行 id 跳转到执行详情路由。
   function openExecutionDetail(taskId: string, executionId: string): void {
     void navigate(ROUTES.TASK_EXECUTION_DETAIL.replace(':id', taskId).replace(':eid', executionId))
   }

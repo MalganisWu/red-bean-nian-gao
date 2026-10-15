@@ -76,7 +76,7 @@ export function ScheduledTaskHistory(props: ScheduledTaskHistoryProps) {
     hasMore = false,
     onLoadMore,
   } = props
-  /** 渲染一条执行记录；分组标签只在与上一条不同时出现。 */
+  // 渲染一条执行记录；分组标签只在与上一条不同时出现。
   function renderRecord(record: ScheduledTaskRunSummary, index: number): ReactElement {
     const previousGroup = records[index - 1]?.groupLabel
     return (

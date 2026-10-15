@@ -171,7 +171,7 @@ class FactsProjector {
    */
   public addRun(run: SessionRunRecord): void {
     let turn = this.#turns.at(-1)
-    /* 本 run 是否真的续写了轮次记录：空事实 run（启动即失败）不得改写上一轮终态 */
+    // 本 run 是否真的续写了轮次记录：空事实 run（启动即失败）不得改写上一轮终态
     let wroteRecords = false
     for (const fact of run.facts) {
       if (fact.type === 'user') {
@@ -357,9 +357,9 @@ class FactsProjector {
           ...previous,
           durationMs: fact.durationMs,
           status: failed ? 'error' : 'success',
-          /* 摘要保留挂起时的问题文本：审批行读的是「当时问了什么」，
-             结果与错误另在 result 字段；覆盖成结果会与实时侧（card 事件摘要）不一致，
-             流式结束后重拉就会无端变样。 */
+          // 摘要保留挂起时的问题文本：审批行读的是「当时问了什么」，
+          // 结果与错误另在 result 字段；覆盖成结果会与实时侧（card 事件摘要）不一致，
+          // 流式结束后重拉就会无端变样。
           ...(failed
             ? { result: fact.error }
             : fact.result === undefined
@@ -368,7 +368,7 @@ class FactsProjector {
           waitMs: Math.max(0, closedAt - pending.startedAt),
         }
       }
-      /* 同一 callId 多于两条记录时继续就地更新，取最后一次状态，不重复成行 */
+      // 同一 callId 多于两条记录时继续就地更新，取最后一次状态，不重复成行
       return
     }
     for (const record of this.#toolRecords(fact)) this.#addRecord(turn, record)
@@ -486,8 +486,8 @@ function runEndState(
           ? ('cancelled' as const)
           : run.status === SESSION_RUN_STATUSES.EXHAUSTED
             ? ('exhausted' as const)
-            : /* 剩下的终态只可能是 INTERRUPTED：全仓唯一赋值点是 Runtime 的 suspended，
-                 语义是「LLM 发起挂起、等待用户作答」，不是中断。 */
+            : // 剩下的终态只可能是 INTERRUPTED：全仓唯一赋值点是 Runtime 的 suspended，
+              // 语义是「LLM 发起挂起、等待用户作答」，不是中断。
               ('interrupt' as const)
   return {
     state,

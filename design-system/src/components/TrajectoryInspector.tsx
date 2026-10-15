@@ -96,17 +96,15 @@ export function TrajectoryInspector(props: TrajectoryInspectorProps) {
                 ? ['概览']
                 : []
   const [activeTab, setActiveTab] = useState<string | undefined>(undefined)
-  /**
-   * tab 跨记录记忆：用户点过一次「概览」后，再点别的记录仍停在
-   * 「概览」，而不是每次弹回第一个可用 tab。
-   *
-   * 用 state 而不是 ref：它参与 `currentTab` 的解析、会影响渲染，而 **React 禁止在渲染期读 ref**
-   * （`react-hooks` 规则会直接报错）。记忆是「用户上一次的选择」，用 state 表达也更准确。
-   */
+  // tab 跨记录记忆：用户点过一次「概览」后，再点别的记录仍停在
+  // 「概览」，而不是每次弹回第一个可用 tab。
+  //
+  // 用 state 而不是 ref：它参与 `currentTab` 的解析、会影响渲染，而 **React 禁止在渲染期读 ref**
+  // （`react-hooks` 规则会直接报错）。记忆是「用户上一次的选择」，用 state 表达也更准确。
   const [rememberedTab, setRememberedTab] = useState<string | undefined>(undefined)
-  /* 用户在面板内点过 tab 就听用户的；否则用调用方指定的 initialTab（点「正文」直接看正文）；
-     都没有才回落到第一个可用 tab。 */
-  /* 优先级：面板内主动点过的 → 调用方指定的（点产出行）→ 上次记住的 → 第一个可用 */
+  // 用户在面板内点过 tab 就听用户的；否则用调用方指定的 initialTab（点「正文」直接看正文）；
+  // 都没有才回落到第一个可用 tab。
+  // 优先级：面板内主动点过的 → 调用方指定的（点产出行）→ 上次记住的 → 第一个可用
   const currentTab =
     activeTab && tabs.includes(activeTab)
       ? activeTab
@@ -118,20 +116,20 @@ export function TrajectoryInspector(props: TrajectoryInspectorProps) {
 
   if (!target) return null
 
-  /** 切换详情页签；用户主动点过就同时记住这次选择，别的记录也沿用。 */
+  // 切换详情页签；用户主动点过就同时记住这次选择，别的记录也沿用。
   function selectTab(tab: string): void {
     setActiveTab(tab)
     setRememberedTab(tab)
   }
 
-  /** 渲染一次尝试的按钮行；非最后一次的失败额外标注「触发重试」。 */
+  // 渲染一次尝试的按钮行；非最后一次的失败额外标注「触发重试」。
   function renderAttempt(
     req: TrajectoryAttempt,
     index: number,
     all: TrajectoryAttempt[]
   ): ReactElement {
-    /* 非最后一次的失败 = 这次失败**触发了重试**，把原因显式说出来；
-       最后一次失败就是这次调用最终失败，不带「触发重试」。 */
+    // 非最后一次的失败 = 这次失败**触发了重试**，把原因显式说出来；
+    // 最后一次失败就是这次调用最终失败，不带「触发重试」。
     const triggeredRetry = req.status === 'error' && index < all.length - 1
     return (
       <button
@@ -180,12 +178,10 @@ export function TrajectoryInspector(props: TrajectoryInspectorProps) {
   return (
     <aside
       aria-label="记录检查器"
-      /*
-       * 覆盖式窗格（不是挤压式）：调用方把它绝对定位在表格容器右侧，表格宽度不受影响。
-       * 宽 clamp(320px,38%,440px) + max-w-[calc(100%-280px)]（保证表格永远留 ≥280px），
-       * 顶部贴容器、无圆角、**无投影**——它是「贴在右侧的一块面」，不是浮空卡片；
-       * 边界只由 1px 左边框承担。
-       */
+      // 覆盖式窗格（不是挤压式）：调用方把它绝对定位在表格容器右侧，表格宽度不受影响。
+      // 宽 clamp(320px,38%,440px) + max-w-[calc(100%-280px)]（保证表格永远留 ≥280px），
+      // 顶部贴容器、无圆角、**无投影**——它是「贴在右侧的一块面」，不是浮空卡片；
+      // 边界只由 1px 左边框承担。
       className={cn(
         'flex h-full flex-col border-l border-border bg-background',
         'w-[clamp(320px,38%,440px)] max-w-[calc(100%-280px)]',

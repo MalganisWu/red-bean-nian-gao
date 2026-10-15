@@ -131,7 +131,7 @@ class Projector implements RecordMapperContext {
         continue
       }
       if (message.role !== 'assistant') continue
-      /* 会话不以用户消息开始时，首个 assistant 消息自立一轮 */
+      // 会话不以用户消息开始时，首个 assistant 消息自立一轮
       current ??= this.#openTurn(turns, message)
       this.#projectAssistant(current, message)
     }
@@ -140,7 +140,7 @@ class Projector implements RecordMapperContext {
     return this.#assemble(finalized)
   }
 
-  /* ── 轮次游标 ── */
+  // ── 轮次游标 ──
 
   /**
    * 新开一轮并把游标追加到轮次表；轮次号按已开轮数递增。
@@ -160,7 +160,7 @@ class Projector implements RecordMapperContext {
     return turn
   }
 
-  /* ── assistant 消息逐段投影 ── */
+  // ── assistant 消息逐段投影 ──
 
   /**
    * 投影一条 assistant 消息：有 sections 时逐段展开，否则回落到顶层 content。
@@ -204,14 +204,14 @@ class Projector implements RecordMapperContext {
       }
       return
     }
-    /* 无 sections 的旧格式：只剩顶层 content（think[] 已随存量兼容清理移除） */
+    // 无 sections 的旧格式：只剩顶层 content（think[] 已随存量兼容清理移除）
     if (message.content !== undefined && message.content !== '') {
       this.#attachTextReply(turn, message.content, message.timestamp)
       turn.hasReply = true
     }
   }
 
-  /* ── 回复并入 ── */
+  // ── 回复并入 ──
 
   /**
    * 把 content 段并入本轮：上一条若是尚无回复的步骤则就地补写，否则新开一步。
@@ -225,8 +225,8 @@ class Projector implements RecordMapperContext {
     if (content === null || content === '') return
     const at = section['timestamp']
     const atMs = typeof at === 'number' && Number.isFinite(at) ? at : 0
-    /* 一步 = 思考 + 回复；仅当上一条是尚无回复的步骤时并入，否则新开一步
-       （工具执行后的 content 属于下一步 LLM 调用，即便它没有思考段）。 */
+    // 一步 = 思考 + 回复；仅当上一条是尚无回复的步骤时并入，否则新开一步
+    // （工具执行后的 content 属于下一步 LLM 调用，即便它没有思考段）。
     const last = turn.records.at(-1)
     if (last !== undefined && last.kind === 'call' && last.reply === undefined) {
       turn.records[turn.records.length - 1] = {
@@ -257,7 +257,7 @@ class Projector implements RecordMapperContext {
     turn.records.push({ ...base, reply: content, tokens: null, attempts: [] })
   }
 
-  /* ── 轮次定稿与会话汇总 ── */
+  // ── 轮次定稿与会话汇总 ──
 
   /**
    * 定稿一轮：结算耗时与终态。有回复即视为 completed，否则终态缺省（「进行中」）。

@@ -16,10 +16,8 @@ import type {
   TrajectoryTurnEnd,
 } from '@/components/retroui/TrajectoryLedger'
 
-/**
- * wire DTO（epoch 毫秒）→ 组件模型（HH:MM:SS 展示字符串）的适配边界。
- * 契约类型不得直接进组件；所有时间格式化集中在本模块。
- */
+// wire DTO（epoch 毫秒）→ 组件模型（HH:MM:SS 展示字符串）的适配边界。
+// 契约类型不得直接进组件；所有时间格式化集中在本模块。
 
 /**
  * epoch 毫秒 → HH:MM:SS。

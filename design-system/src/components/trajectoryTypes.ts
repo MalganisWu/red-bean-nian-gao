@@ -1,7 +1,5 @@
-/**
- * 会话轨迹组件的纯数据模型（TrajectoryTimeline / TrajectoryLedger / TrajectoryInspector 共享）。
- * 只放纯数据类型；格式化等纯函数工具也收在这里，避免三个组件各自重复。
- */
+// 会话轨迹组件的纯数据模型（TrajectoryTimeline / TrajectoryLedger / TrajectoryInspector 共享）。
+// 只放纯数据类型；格式化等纯函数工具也收在这里，避免三个组件各自重复。
 
 /**
  * 轨迹记录类型封闭联合：用户消息 / LLM 调用 / 工具调用 / 子 Agent 委派 / 轮次结束 / 会话结束。

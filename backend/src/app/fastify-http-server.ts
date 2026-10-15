@@ -39,7 +39,7 @@ export class FastifyHttpServer implements HttpServer {
     this.#server = server
     this.#host = options.host
     this.#port = port
-    /** onClose 钩子：兑现 `#closed`，结束 `listen` 的驻留等待。 */
+    // onClose 钩子：兑现 `#closed`，结束 `listen` 的驻留等待。
     const onServerClose = (): Promise<void> => {
       this.#closed.resolve()
       return Promise.resolve()
@@ -117,15 +117,15 @@ function numericPort(value: string | number): number {
  */
 function raceWithAbort(operation: Promise<void>, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return Promise.reject(abortReason(signal))
-  /** 完成或中止竞速的 executor：abort 先到时拒绝，否则等 operation 落定后解绑监听。 */
+  // 完成或中止竞速的 executor：abort 先到时拒绝，否则等 operation 落定后解绑监听。
   return new Promise<void>(function raceAgainstAbort(resolve, reject): void {
     const onAbort = (): void => reject(abortReason(signal))
-    /** 操作落定：解绑取消监听后兑现。 */
+    // 操作落定：解绑取消监听后兑现。
     function resolveAfterOperation(): void {
       signal.removeEventListener('abort', onAbort)
       resolve()
     }
-    /** 操作失败：解绑取消监听后以归一化错误拒绝。 */
+    // 操作失败：解绑取消监听后以归一化错误拒绝。
     function rejectAfterOperation(cause: unknown): void {
       signal.removeEventListener('abort', onAbort)
       reject(cause instanceof Error ? cause : new Error(String(cause)))

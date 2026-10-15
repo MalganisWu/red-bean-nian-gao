@@ -1,8 +1,6 @@
-/**
- * 会话轨迹的业务域模型（只读审计视图）。
- * 与 wire DTO（@red-bean/api-contract 的 trajectory/dto）同形但归业务所有；
- * controller 层的 presenter 负责领域 → wire 的纯映射。时间字段一律 epoch 毫秒。
- */
+// 会话轨迹的业务域模型（只读审计视图）。
+// 与 wire DTO（@red-bean/api-contract 的 trajectory/dto）同形但归业务所有；
+// controller 层的 presenter 负责领域 → wire 的纯映射。时间字段一律 epoch 毫秒。
 
 /** 一次 LLM 调用的 token 三段用量；cache 为 null 表示 Provider 未返回 / 未采集。 */
 export interface TrajectoryTokenUsage {

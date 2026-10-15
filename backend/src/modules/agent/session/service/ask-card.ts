@@ -204,7 +204,7 @@ function resolveCardInMessage(message: DisplayMessage, marker: AnswerMarker): Di
   if (sections.length === 0) return message
   let changed = false
 
-  /** 重写单个 section 的卡片状态：未命中原样返回，命中则复制并置位 `changed`。 */
+  // 重写单个 section 的卡片状态：未命中原样返回，命中则复制并置位 `changed`。
   function answerSection(section: AgentJsonValue): AgentJsonValue {
     const card = cardFromSection(section)
     if (card?.interactionId !== marker.interactionId || !isJsonObject(section)) return section
@@ -245,10 +245,8 @@ export function mergeContinuation(
 
   let merged = false
 
-  /**
-   * 在当前消息里插入 continuation：只插一次（`merged` 置位后其余消息原样返回），
-   * 未找到卡片 section 的消息也原样返回。
-   */
+  // 在当前消息里插入 continuation：只插一次（`merged` 置位后其余消息原样返回），
+  // 未找到卡片 section 的消息也原样返回。
   function mergeIntoMessage(message: DisplayMessage): DisplayMessage {
     if (merged) return message
     const sections = sectionsFrom(message)

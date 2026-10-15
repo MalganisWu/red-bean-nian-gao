@@ -193,7 +193,7 @@ export default function App() {
 
   useEffect(() => applyTheme(theme), [theme])
 
-  /** 渲染一个侧栏分组；分组下没有页签时不渲染。 */
+  // 渲染一个侧栏分组；分组下没有页签时不渲染。
   function renderNavGroup(group: TabGroupDefinition): ReactElement | null {
     const items = TABS.filter((tab) => tab.group === group.id)
     if (items.length === 0) return null

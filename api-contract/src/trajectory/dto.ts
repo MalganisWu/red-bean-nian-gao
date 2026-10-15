@@ -1,9 +1,7 @@
-/**
- * 会话轨迹域的 wire DTO。只放纯数据类型；运行时校验在同域 schema.ts。
- * 时间字段一律 epoch 毫秒（number），展示格式化归前端。
- * G0 说明：调用 token（tokens）、尝试明细（attempts）、轮次终态（endState）允许为 null，
- * 表示"未采集"——前端据此显示占位而非虚构。
- */
+// 会话轨迹域的 wire DTO。只放纯数据类型；运行时校验在同域 schema.ts。
+// 时间字段一律 epoch 毫秒（number），展示格式化归前端。
+// G0 说明：调用 token（tokens）、尝试明细（attempts）、轮次终态（endState）允许为 null，
+// 表示"未采集"——前端据此显示占位而非虚构。
 
 /** 一次 LLM 调用的 token 三段用量。 */
 export interface TrajectoryTokenUsageDto {

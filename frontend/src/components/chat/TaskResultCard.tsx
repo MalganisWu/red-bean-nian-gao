@@ -57,7 +57,7 @@ export function TaskResultCard(props: TaskResultCardProps) {
   // 服务端状态返回前不渲染结果，避免已读历史内容先展开、随后突然收起。
   const [resultCollapsed, setResultCollapsed] = useState<boolean | null>(initialResultCollapsed)
 
-  /** 结果区的初始折叠态：服务端状态尚未返回时保持 null，等状态就绪后再定。 */
+  // 结果区的初始折叠态：服务端状态尚未返回时保持 null，等状态就绪后再定。
   function initialResultCollapsed(): boolean | null {
     if (!executionID) return false
     const state = useTaskStore.getState()
@@ -83,7 +83,7 @@ export function TaskResultCard(props: TaskResultCardProps) {
 
   useEffect(restoreServerCollapsedState, [isLatest, meta, viewState, viewStateLoaded])
 
-  /** 服务端状态就绪后用它覆盖一次折叠态；之后只由用户操作驱动，不再跟随服务端。 */
+  // 服务端状态就绪后用它覆盖一次折叠态；之后只由用户操作驱动，不再跟随服务端。
   function restoreServerCollapsedState(): void {
     if (!meta || !viewStateLoaded || collapseInitialized.current) return
     setResultCollapsed(
@@ -104,7 +104,7 @@ export function TaskResultCard(props: TaskResultCardProps) {
     viewStateLoaded,
   ])
 
-  /** 结果区滚入视口时把本次执行标记为已读；标记失败最多重试 3 次。 */
+  // 结果区滚入视口时把本次执行标记为已读；标记失败最多重试 3 次。
   function markResultSeenWhenVisible(): (() => void) | undefined {
     if (
       !meta ||
@@ -121,7 +121,7 @@ export function TaskResultCard(props: TaskResultCardProps) {
     let disposed = false
     let visible = false
 
-    /** 清掉两个可能待触发的计时器。 */
+    // 清掉两个可能待触发的计时器。
     function clearTimers(): void {
       if (visibilityTimer) clearTimeout(visibilityTimer)
       if (retryTimer) clearTimeout(retryTimer)
@@ -129,7 +129,7 @@ export function TaskResultCard(props: TaskResultCardProps) {
       retryTimer = undefined
     }
 
-    /** 标记本次执行已读；失败且仍可见时按已尝试次数递增退避重试。 */
+    // 标记本次执行已读；失败且仍可见时按已尝试次数递增退避重试。
     async function attemptMarkSeen(): Promise<void> {
       visibilityTimer = undefined
       retryTimer = undefined
@@ -142,14 +142,14 @@ export function TaskResultCard(props: TaskResultCardProps) {
       }
     }
 
-    /** 安排一次首次标记（800ms 后）；已有待触发计时器时不重复安排。 */
+    // 安排一次首次标记（800ms 后）；已有待触发计时器时不重复安排。
     function scheduleInitialAttempt(): void {
       if (!visibilityTimer && !retryTimer) {
         visibilityTimer = setTimeout(() => void attemptMarkSeen(), 800)
       }
     }
 
-    /** 卸载清理：停止计时器，并让在途的标记回调失效。 */
+    // 卸载清理：停止计时器，并让在途的标记回调失效。
     function dispose(): void {
       disposed = true
       clearTimers()
@@ -161,7 +161,7 @@ export function TaskResultCard(props: TaskResultCardProps) {
       return dispose
     }
 
-    /** 可见性变化：进入 60% 视口才安排标记，移出视口则撤掉计时器。 */
+    // 可见性变化：进入 60% 视口才安排标记，移出视口则撤掉计时器。
     function handleIntersection(entries: IntersectionObserverEntry[]): void {
       const entry = entries[0]
       if (!entry) return

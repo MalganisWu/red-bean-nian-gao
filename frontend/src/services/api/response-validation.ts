@@ -1,10 +1,8 @@
-/*
- * 服务层专用的「容器」守卫。
- *
- * 契约包的守卫校验的是**载荷本身**（TaskDto、TaskExecutionDto…），而接口返回的是
- * 把它们包在具名键下的对象（`{ task }`、`{ view_states }`…）。这层守卫负责剥掉外层键，
- * 让调用方拿到收窄后的载荷类型；键名写错会在编译期就暴露。
- */
+// 服务层专用的「容器」守卫。
+//
+// 契约包的守卫校验的是**载荷本身**（TaskDto、TaskExecutionDto…），而接口返回的是
+// 把它们包在具名键下的对象（`{ task }`、`{ view_states }`…）。这层守卫负责剥掉外层键，
+// 让调用方拿到收窄后的载荷类型；键名写错会在编译期就暴露。
 import {
   isExecutionViewState,
   isRecord,
@@ -19,7 +17,7 @@ import type {
   TaskListItemDto,
 } from '@red-bean/api-contract'
 
-/** 兼容现有服务层命名；字段判断由共享契约包统一执行。 */
+// 兼容现有服务层命名；字段判断由共享契约包统一执行。
 export {
   decodeEmptyEnvelope,
   decodeEnvelopeData,

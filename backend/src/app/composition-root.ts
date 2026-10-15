@@ -63,7 +63,7 @@ export function buildApplication(
 ): Promise<ServerApplication> {
   return buildManaged(buildServerApplication)
 
-  /** 在受管生命周期内按上述五步顺序完成组装，任一步失败都会反向释放已建资源。 */
+  // 在受管生命周期内按上述五步顺序完成组装，任一步失败都会反向释放已建资源。
   async function buildServerApplication(lifecycle: Lifecycle): Promise<ServerApplication> {
     // 1. 建立进程级基础设施，并把关闭责任登记到统一生命周期。
     const logger = createLogger({ format: config.server.logFormat, level: config.server.logLevel })

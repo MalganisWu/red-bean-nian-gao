@@ -1,8 +1,6 @@
-/*
- * 复合件 · QuestionCard（确认卡）。
- * 一次需要人工确认的交互的可作答表单：单选 / 多选 / 自定义输入 / 跳过四种作答方式，
- * 并覆盖已答与拒答之后的只读形态。
- */
+// 复合件 · QuestionCard（确认卡）。
+// 一次需要人工确认的交互的可作答表单：单选 / 多选 / 自定义输入 / 跳过四种作答方式，
+// 并覆盖已答与拒答之后的只读形态。
 'use client'
 
 import { useId, useState, type ReactNode } from 'react'

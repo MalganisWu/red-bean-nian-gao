@@ -44,7 +44,7 @@ function groupSessionsByUpdatedAt(sessions: SessionSummary[], now = new Date()):
   const older: SessionGroup = { label: '更早', sessions: [] }
   const groups: SessionGroup[] = [today, recent, older]
 
-  /** 把单个会话按 updated_at 落入今天 / 最近 7 天 / 更早分组；时间无法解析时归入更早。 */
+  // 把单个会话按 updated_at 落入今天 / 最近 7 天 / 更早分组；时间无法解析时归入更早。
   function addSessionToGroup(session: SessionSummary): void {
     const updatedAt = new Date(session.updated_at)
     if (Number.isNaN(updatedAt.getTime())) {
@@ -124,7 +124,7 @@ export function SessionSidebar(props: SessionSidebarProps): React.ReactElement {
     void navigate(ROUTES.LOGIN)
   }
 
-  /** 渲染单条历史会话：标题、绝对时间，以及当前会话的高亮态。 */
+  // 渲染单条历史会话：标题、绝对时间，以及当前会话的高亮态。
   function renderSessionItem(session: SessionSummary): React.ReactElement {
     const active = session.id === activeSessionId
     const title = session.title || '新会话'

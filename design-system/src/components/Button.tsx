@@ -1,8 +1,6 @@
-/*
- * 原子件 · Button。
- * 设计系统的按钮基元：变体与尺寸由 `buttonVariants` 一处给出，调用方只选择组合，
- * 不自行拼接 Tailwind 类——否则「主按钮长什么样」会在各处漂移。
- */
+// 原子件 · Button。
+// 设计系统的按钮基元：变体与尺寸由 `buttonVariants` 一处给出，调用方只选择组合，
+// 不自行拼接 Tailwind 类——否则「主按钮长什么样」会在各处漂移。
 import { Button as BaseButton } from '@base-ui/react/button'
 import { cva } from 'class-variance-authority'
 import React from 'react'

@@ -167,7 +167,7 @@ export class RuntimeSubAgentToolFactory {
         },
       },
     })
-    /** 把子运行事件包成父运行的 agent_event，投递到本次加载记录的事件出口。 */
+    // 把子运行事件包成父运行的 agent_event，投递到本次加载记录的事件出口。
     function publishChildEvent(
       executionId: string,
       parentCallId: string,

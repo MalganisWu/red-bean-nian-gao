@@ -10,14 +10,14 @@ import type { Readable } from 'node:stream'
  * @param signal - 请求生命周期信号；它可能长期存活，因此流终结后必须解除监听
  */
 export function bindDownloadStreamToAbort(body: Readable, signal: AbortSignal): void {
-  /** 流已自然结束：摘掉全部监听，不再保持与长生命周期信号的联动。 */
+  // 流已自然结束：摘掉全部监听，不再保持与长生命周期信号的联动。
   function cleanup(): void {
     signal.removeEventListener('abort', onAbort)
     body.removeListener('end', cleanup)
     body.removeListener('close', cleanup)
     body.removeListener('error', cleanup)
   }
-  /** 请求被取消：摘掉监听并销毁下载流，避免泄漏上游连接。 */
+  // 请求被取消：摘掉监听并销毁下载流，避免泄漏上游连接。
   function onAbort(): void {
     signal.removeEventListener('abort', onAbort)
     body.destroy(abortReason(signal))

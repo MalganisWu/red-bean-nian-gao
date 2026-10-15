@@ -104,7 +104,7 @@ export function readDuration(value: unknown): number | null {
 export function readSections(message: DisplayMessage): readonly SectionLike[] | null {
   const sections: unknown = message.sections
   if (!Array.isArray(sections)) return null
-  /* Array.isArray 把 unknown 收窄为 any[]，逐元素用对象守卫过滤（不做类型断言） */
+  // Array.isArray 把 unknown 收窄为 any[]，逐元素用对象守卫过滤（不做类型断言）
   const out: Record<string, unknown>[] = []
   for (const item of sections) {
     if (isRecord(item)) out.push(item)

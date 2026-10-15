@@ -1,10 +1,8 @@
 import type { ReactNode } from 'react'
 import { BrandMark } from '@/components/BrandMark'
 
-/**
- * Brand / 字标 —— 红豆年糕的品牌 mark 正式展示页。
- * 平视是一个点，近看是一枚红豆瓣。品牌色只承担识别与确认，不承担状态。
- */
+// Brand / 字标 —— 红豆年糕的品牌 mark 正式展示页。
+// 平视是一个点，近看是一枚红豆瓣。品牌色只承担识别与确认，不承担状态。
 
 /**
  * 一条带下划线的分组标题，把品牌页的展示区按语义分段。

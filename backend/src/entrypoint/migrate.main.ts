@@ -17,7 +17,7 @@ process.once('SIGTERM', abort)
 
 try {
   const command = parseMigrationCommand(process.argv[2])
-  /* 与 server.main 同源：本地配置只写在 backend/.env.local，入口处统一注入 */
+  // 与 server.main 同源：本地配置只写在 backend/.env.local，入口处统一注入
   loadLocalEnvFile(process.cwd())
   const config = await loadConfig()
   const database = await connectPostgres(config.database.url, abortController.signal)

@@ -16,7 +16,7 @@ export function useScrollAnchor(
 
   useEffect(anchorToBottom, [messagesDependency, pendingDependency])
 
-  /** 依赖变化时把容器滚到底部。 */
+  // 依赖变化时把容器滚到底部。
   function anchorToBottom(): void {
     if (ref.current) {
       ref.current.scrollTop = ref.current.scrollHeight

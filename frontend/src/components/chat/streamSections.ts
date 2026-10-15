@@ -6,13 +6,11 @@ import type {
   ToolCard,
 } from '@/types/chat'
 
-/**
- * 流式 section 组装纯函数：从 chat-store 的实时组装动作抽取，
- * 主消息 pendingSections 与子 agent 内层 sections（sub_agent section 的 items.sections）
- * 共用同一套组装语义，保证「主流程什么样、子 agent 就什么样」。
- *
- * 全部不可变：返回新数组/新 section，输入不被修改。
- */
+// 流式 section 组装纯函数：从 chat-store 的实时组装动作抽取，
+// 主消息 pendingSections 与子 agent 内层 sections（sub_agent section 的 items.sections）
+// 共用同一套组装语义，保证「主流程什么样、子 agent 就什么样」。
+//
+// 全部不可变：返回新数组/新 section，输入不被修改。
 
 /**
  * 追加一段正文增量：末位是 content 则就地拼接，否则新开一个 content section。

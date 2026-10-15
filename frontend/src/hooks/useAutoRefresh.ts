@@ -10,11 +10,11 @@ export function useAutoRefresh(): void {
 
   useEffect(watchTokenExpiry, [isAuthenticated, token, setToken, clearAuth])
 
-  /** 每 60s 检查一次 token，过期前 5 分钟自动 refresh；退出登录或卸载时清除定时器。 */
+  // 每 60s 检查一次 token，过期前 5 分钟自动 refresh；退出登录或卸载时清除定时器。
   function watchTokenExpiry(): (() => void) | undefined {
     if (!isAuthenticated || !token) return undefined
 
-    /** 检查当前 token：已过期则刷新，失败即登出；临期则刷新，失败继续沿用。 */
+    // 检查当前 token：已过期则刷新，失败即登出；临期则刷新，失败继续沿用。
     async function refreshTokenIfNeeded(): Promise<void> {
       const currentToken = useAuthStore.getState().token
       if (!currentToken) return

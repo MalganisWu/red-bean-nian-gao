@@ -58,14 +58,14 @@ export function connectSSE(options: SSEConnectionOptions): AbortController {
   // 避免前端 isStreaming/awaiting 永久悬挂。
   let firstEventTimer: number | undefined
 
-  /** 解除首事件看门狗（幂等）。 */
+  // 解除首事件看门狗（幂等）。
   function clearFirstEventTimer(): void {
     if (firstEventTimer === undefined) return
     window.clearTimeout(firstEventTimer)
     firstEventTimer = undefined
   }
 
-  /** 首事件超时：按连接失败上报，并中止连接。 */
+  // 首事件超时：按连接失败上报，并中止连接。
   function handleFirstEventTimeout(): void {
     firstEventTimer = undefined
     options.onError(new Error('连接超时：服务端长时间未响应，请重试。'))
@@ -74,7 +74,7 @@ export function connectSSE(options: SSEConnectionOptions): AbortController {
 
   firstEventTimer = window.setTimeout(handleFirstEventTimeout, FIRST_EVENT_TIMEOUT_MS)
 
-  /** onopen：非 2xx 时取业务 message（失败回退状态码文案）上报错误，并中止连接。 */
+  // onopen：非 2xx 时取业务 message（失败回退状态码文案）上报错误，并中止连接。
   async function handleOpen(response: Response): Promise<void> {
     if (response.ok) {
       // HTTP 头已到：首个事件仍由看门狗覆盖（onopen 不等同于事件流可用）

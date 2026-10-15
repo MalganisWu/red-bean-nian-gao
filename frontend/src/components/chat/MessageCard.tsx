@@ -129,14 +129,14 @@ export function MessageCard(props: MessageCardProps) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(tickNowWhileStreaming, [isStreaming])
 
-  /** 流式期间每秒刷新一次 now，驱动总耗时按整秒跳动。 */
+  // 流式期间每秒刷新一次 now，驱动总耗时按整秒跳动。
   function tickNowWhileStreaming(): (() => void) | undefined {
     if (!isStreaming) return undefined
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }
 
-  /** 本轮总耗时文案：流式中按 now 与起点实时算，结束后按包络公式定格。 */
+  // 本轮总耗时文案：流式中按 now 与起点实时算，结束后按包络公式定格。
   function computeTotalDuration(): string | undefined {
     if (!sections) return undefined
     if (isStreaming) {
@@ -155,7 +155,7 @@ export function MessageCard(props: MessageCardProps) {
 
   // 子 Agent 委派块：嵌套 sections 按主消息同规则收束——
   // process 步骤平铺为旁注 items（内层不再有自己的折叠区，spec §6.4），content 合并为最终输出
-  /** 子 Agent 委派块：内层 sections 按主消息同规则收束为旁注 items 与最终输出。 */
+  // 子 Agent 委派块：内层 sections 按主消息同规则收束为旁注 items 与最终输出。
   function renderDelegation(d: SubAgentSectionData): React.ReactElement {
     const inner = normalizeSections(d.sections ?? [], { isStreaming })
     const items: ReasonItem[] = []
@@ -183,7 +183,7 @@ export function MessageCard(props: MessageCardProps) {
     )
   }
 
-  /** 确认卡片：按卡片状态与提交状态推导展示态与回调。 */
+  // 确认卡片：按卡片状态与提交状态推导展示态与回调。
   function renderApproval(card: CardSectionData): React.ReactElement {
     const submission =
       cardSubmission?.interactionId === card.interaction_id ? cardSubmission : undefined
@@ -213,7 +213,7 @@ export function MessageCard(props: MessageCardProps) {
     )
   }
 
-  /** 把一个过程步骤投影成 ProcessFold 的展示步骤（工具 / 委派 / 确认 / 叙述）。 */
+  // 把一个过程步骤投影成 ProcessFold 的展示步骤（工具 / 委派 / 确认 / 叙述）。
   function toFoldStep(step: ProcessStepItem, active: boolean): ProcessStep {
     switch (step.kind) {
       case 'tool':
@@ -287,7 +287,7 @@ export function MessageCard(props: MessageCardProps) {
   // 总耗时挂在唯一 Process 标签上（包络是整回合的）
   const lastProcessIdx = normalized?.map((s) => s.type).lastIndexOf('process') ?? -1
 
-  /** 推断整条 Process 的展示状态：待确认 > 流式中 > 终态。 */
+  // 推断整条 Process 的展示状态：待确认 > 流式中 > 终态。
   function resolveProcessStatus(steps: ProcessStepItem[]): ProcessStatus {
     if (
       steps.some(
@@ -314,10 +314,8 @@ export function MessageCard(props: MessageCardProps) {
     return 'completed'
   }
 
-  /**
-   * 渲染归一化后的单个 section：process 折叠区、最终正文或确认卡片。
-   * 形参顺序对齐 `Array.prototype.map`，可直接作为其回调；`sections` 即被遍历的数组本身。
-   */
+  // 渲染归一化后的单个 section：process 折叠区、最终正文或确认卡片。
+  // 形参顺序对齐 `Array.prototype.map`，可直接作为其回调；`sections` 即被遍历的数组本身。
   function renderSection(
     section: MessageSection,
     i: number,

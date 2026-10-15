@@ -24,7 +24,7 @@ process.once('SIGINT', onInterrupt)
 process.once('SIGTERM', onTerminate)
 
 try {
-  /* 本地单源：先把 backend/.env.local 注入 process.env（不覆盖已存在的变量），再解析配置 */
+  // 本地单源：先把 backend/.env.local 注入 process.env（不覆盖已存在的变量），再解析配置
   loadLocalEnvFile(process.cwd())
   const config = await loadConfig()
   const application = await buildApplication(config, processController.signal, {

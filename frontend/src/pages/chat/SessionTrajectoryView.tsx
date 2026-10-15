@@ -135,7 +135,7 @@ function liveTurnToTurn(
     seq += 1
     const next: TrajectoryRecord = { ...record, seq }
     if (record.attempts !== undefined) {
-      /* 尝试明细展开在所属调用下方，序号按同一展示顺序续接 */
+      // 尝试明细展开在所属调用下方，序号按同一展示顺序续接
       const attempts: TrajectoryAttempt[] = []
       for (const attempt of record.attempts) {
         seq += 1
@@ -148,7 +148,7 @@ function liveTurnToTurn(
   return {
     turn: turnNo,
     startedAt: t.startedAt,
-    /* nowTick 未跳秒前（isLive 刚置真）耗时按 0 显示，不做虚构 */
+    // nowTick 未跳秒前（isLive 刚置真）耗时按 0 显示，不做虚构
     durationMs: nowMs > 0 ? Math.max(0, nowMs - t.startedAtMs) : 0,
     tokens: null,
     records,
@@ -288,39 +288,37 @@ export function SessionTrajectoryView(props: SessionTrajectoryViewProps) {
   const { onBack } = props
   const activeSessionId = useChatStore((state) => state.activeSessionId)
   const [view, setView] = useState<SessionTrajectoryView | null>(null)
-  /* 以「已为哪个会话加载成功」推导加载态，避免在 effect 体内同步 setState */
+  // 以「已为哪个会话加载成功」推导加载态，避免在 effect 体内同步 setState
   const [loadedFor, setLoadedFor] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
-  /** 点产出行时携带的 tab（思考 / 正文 / 工具调用），让详情直接停在那一块。 */
+  // 点产出行时携带的 tab（思考 / 正文 / 工具调用），让详情直接停在那一块。
   const [selectedTab, setSelectedTab] = useState<string | undefined>(undefined)
   const [focusIds, setFocusIds] = useState<ReadonlySet<string> | null>(null)
 
-  /* 实时投影：本会话流式进行中时，把 liveTurns 叠加到历史视图之后 */
+  // 实时投影：本会话流式进行中时，把 liveTurns 叠加到历史视图之后
   const liveTurns = useTrajectoryStore((s) => s.liveTurns)
   const streamingSessionId = useTrajectoryStore((s) => s.streamingSessionId)
   const liveSessionId = useTrajectoryStore((s) => s.liveSessionId)
-  /* 「正在流式」只驱动跟随尾部、跳秒与隐藏会话终态；「有实时轮次可展示」独立成立：
-     流结束后实时轮次必须继续渲染，直到流结束触发的持久化重拉落地，否则会出现
-     "实时已撤、历史未到"的空窗（看起来就是轨迹突然清空或直接跳到上一场的终态）。 */
+  // 「正在流式」只驱动跟随尾部、跳秒与隐藏会话终态；「有实时轮次可展示」独立成立：
+  // 流结束后实时轮次必须继续渲染，直到流结束触发的持久化重拉落地，否则会出现
+  // "实时已撤、历史未到"的空窗（看起来就是轨迹突然清空或直接跳到上一场的终态）。
   const streaming = streamingSessionId !== null && streamingSessionId === activeSessionId
   const hasLiveTurn = liveTurns.length > 0 && liveSessionId === activeSessionId
 
   const loading = activeSessionId !== null && loadedFor !== activeSessionId && error === null
 
-  /**
-   * 读取持久化轨迹。
-   *
-   * 实时轮次与持久化轮次的交接规则：**只要这次拿到的历史里，实时轮次所在的位置已经是一条
-   * 已终结的轮次，就说明那个 run 已经落库，实时轮次必须当场丢弃**——不能依赖"流结束"这个
-   * 时间点触发，否则流被中止、DONE 丢失或实例不一致时，实时轮次会一直挂着，与历史上同一个
-   * run 并列成两条同号轮次（刷新才恢复）。
-   *
-   * 判定用轮次位置而不是时间：alignToHistory 让实时轮次编号等于"已终结历史轮次数 + 1"，
-   * 所以 `settledCount >= liveTurnNo` 恰好等价于"持久化已经接管这一轮"。判定必须在
-   * alignToHistory 之前做，因为它会重编号实时轮次。
-   */
+  // 读取持久化轨迹。
+  //
+  // 实时轮次与持久化轮次的交接规则：**只要这次拿到的历史里，实时轮次所在的位置已经是一条
+  // 已终结的轮次，就说明那个 run 已经落库，实时轮次必须当场丢弃**——不能依赖"流结束"这个
+  // 时间点触发，否则流被中止、DONE 丢失或实例不一致时，实时轮次会一直挂着，与历史上同一个
+  // run 并列成两条同号轮次（刷新才恢复）。
+  //
+  // 判定用轮次位置而不是时间：alignToHistory 让实时轮次编号等于"已终结历史轮次数 + 1"，
+  // 所以 `settledCount >= liveTurnNo` 恰好等价于"持久化已经接管这一轮"。判定必须在
+  // alignToHistory 之前做，因为它会重编号实时轮次。
   const load = (sessionId: string): Promise<void> =>
     fetchSessionTrajectory(sessionId)
       .then((dto) => applyLoadedTrajectory(dto, sessionId, setView, setLoadedFor))
@@ -328,7 +326,7 @@ export function SessionTrajectoryView(props: SessionTrajectoryViewProps) {
         setError(cause instanceof Error ? cause.message : '加载轨迹失败')
       })
 
-  /** 当前会话尚未加载成功时，排一次微任务读取持久化轨迹（避免在 effect 体内同步 setState）。 */
+  // 当前会话尚未加载成功时，排一次微任务读取持久化轨迹（避免在 effect 体内同步 setState）。
   function loadTrajectoryOnce(): (() => void) | undefined {
     if (!activeSessionId) return undefined
     if (loadedFor === activeSessionId) return undefined
@@ -340,11 +338,11 @@ export function SessionTrajectoryView(props: SessionTrajectoryViewProps) {
 
   useEffect(loadTrajectoryOnce, [activeSessionId, loadedFor])
 
-  /* 展示轮次 = 历史轮次 + 实时轮次（流式进行中，或流刚结束但持久化重拉尚未落地）；
-     时钟由 1s 跳秒驱动（不在 render/useMemo 里直接调 Date.now） */
+  // 展示轮次 = 历史轮次 + 实时轮次（流式进行中，或流刚结束但持久化重拉尚未落地）；
+  // 时钟由 1s 跳秒驱动（不在 render/useMemo 里直接调 Date.now）
   const [nowTick, setNowTick] = useState(0)
 
-  /** 流式期间每秒跳秒，驱动实时轮次耗时与跟随尾部（不在 render/useMemo 里直接读 Date.now）。 */
+  // 流式期间每秒跳秒，驱动实时轮次耗时与跟随尾部（不在 render/useMemo 里直接读 Date.now）。
   function tickWhileStreaming(): (() => void) | undefined {
     if (!streaming) return undefined
     const timer = window.setInterval(() => setNowTick(Date.now()), 1000)
@@ -358,7 +356,7 @@ export function SessionTrajectoryView(props: SessionTrajectoryViewProps) {
     [view, hasLiveTurn, liveTurns, nowTick]
   )
 
-  /* 选中解析必须在 displayTurns（历史 + 实时）上做：流式期间实时轮次不在 view 里。 */
+  // 选中解析必须在 displayTurns（历史 + 实时）上做：流式期间实时轮次不在 view 里。
   const selectedRecord = useMemo(
     () => findRecord(displayTurns, selectedId),
     [displayTurns, selectedId]
@@ -371,15 +369,15 @@ export function SessionTrajectoryView(props: SessionTrajectoryViewProps) {
     selectedId && view?.compaction?.id === selectedId ? findCompaction(view) : undefined
   const inspectorOpen = Boolean(selectedRecord || selectedRequest || selectedCompaction)
 
-  /* 检查器 Esc 关闭（与 × 等价，设计文档承诺的交互）。
-     只在检查器打开时监听，避免常驻键盘钩子；泳道的 Esc 复位范围选择由泳道自己处理。 */
-  /** 检查器打开时监听 Esc 关闭（忽略可编辑元素内的 Esc）；返回解绑函数。 */
+  // 检查器 Esc 关闭（与 × 等价，设计文档承诺的交互）。
+  // 只在检查器打开时监听，避免常驻键盘钩子；泳道的 Esc 复位范围选择由泳道自己处理。
+  // 检查器打开时监听 Esc 关闭（忽略可编辑元素内的 Esc）；返回解绑函数。
   function listenInspectorEscape(): (() => void) | undefined {
     if (!inspectorOpen) return undefined
     function handleKeyDown(event: KeyboardEvent): void {
       if (event.key !== 'Escape') return
-      /* 输入框/可编辑元素里的 Esc 属于该控件自己（清空、取消输入），不该关面板。
-         没有这条守卫时，在搜索框里按 Esc 会误关检查器。 */
+      // 输入框/可编辑元素里的 Esc 属于该控件自己（清空、取消输入），不该关面板。
+      // 没有这条守卫时，在搜索框里按 Esc 会误关检查器。
       const target = event.target
       if (
         target instanceof HTMLElement &&
@@ -397,14 +395,14 @@ export function SessionTrajectoryView(props: SessionTrajectoryViewProps) {
 
   useEffect(listenInspectorEscape, [inspectorOpen])
 
-  /* 流式结束后必须重拉：中途取到的历史快照必然缺少终态、token 与请求子记录，
-     以持久化数据为准，否则页面会停在"没有结束标记"的中间态。
-     终态交接由 load 内部的"已终结轮次数 ≥ 实时轮次号"判定完成，与本次 effect 的时序无关；
-     重拉失败则保留实时轮次——宁可展示内存里的真实投影，也不退回旧快照或空态。
-     用 ref 记录"本会话曾进入流式"，避免在 effect 里同步 setState 引发级联渲染。 */
+  // 流式结束后必须重拉：中途取到的历史快照必然缺少终态、token 与请求子记录，
+  // 以持久化数据为准，否则页面会停在"没有结束标记"的中间态。
+  // 终态交接由 load 内部的"已终结轮次数 ≥ 实时轮次号"判定完成，与本次 effect 的时序无关；
+  // 重拉失败则保留实时轮次——宁可展示内存里的真实投影，也不退回旧快照或空态。
+  // 用 ref 记录"本会话曾进入流式"，避免在 effect 里同步 setState 引发级联渲染。
   const streamedSessionRef = useRef<string | null>(null)
 
-  /** 流结束时重拉轨迹：本会话曾进入流式，则由持久化数据接管实时投影。 */
+  // 流结束时重拉轨迹：本会话曾进入流式，则由持久化数据接管实时投影。
   function reloadTrajectoryAfterStream(): void {
     if (streaming) {
       streamedSessionRef.current = streamingSessionId
@@ -421,19 +419,19 @@ export function SessionTrajectoryView(props: SessionTrajectoryViewProps) {
   const hasContent = displayTurns.length > 0
   const showLoading = loading && !hasLiveTurn
 
-  /* 跟随尾部：流式进行中内容增长自动贴底；用户上滚暂停、回到底部附近恢复（含阈值与复位语义） */
+  // 跟随尾部：流式进行中内容增长自动贴底；用户上滚暂停、回到底部附近恢复（含阈值与复位语义）
   const { containerRef: ledgerScrollRef, onScroll: handleLedgerScroll } = useFollowTail({
     active: streaming,
     contentKey: displayTurns,
   })
 
-  /** 加载失败重试：清空错误并重拉当前会话轨迹。 */
+  // 加载失败重试：清空错误并重拉当前会话轨迹。
   function retryLoadTrajectory(): void {
     setError(null)
     if (activeSessionId) void load(activeSessionId)
   }
 
-  /** 记录表选中一行：带上 tab 停留该详情，再次点击同一行（无 tab）则取消选中。 */
+  // 记录表选中一行：带上 tab 停留该详情，再次点击同一行（无 tab）则取消选中。
   function handleLedgerSelect(id: string, tab?: string): void {
     setSelectedTab(tab)
     setSelectedId((cur) => (cur === id && tab === undefined ? undefined : id))
@@ -541,7 +539,7 @@ export function SessionTrajectoryView(props: SessionTrajectoryViewProps) {
                 <TrajectoryLedger
                   turns={displayTurns}
                   compaction={view?.compaction}
-                  /* 实时轮次还在展示时不得声称会话已结束：会话终态只代表"上一次运行"的终态 */
+                  // 实时轮次还在展示时不得声称会话已结束：会话终态只代表"上一次运行"的终态
                   sessionEnd={hasLiveTurn ? undefined : view?.sessionEnd}
                   filterText={filter}
                   selectedId={selectedId}

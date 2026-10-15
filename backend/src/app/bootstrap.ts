@@ -151,15 +151,13 @@ async function seedDefaults(
     ],
     signal
   )
-  /*
-   * 每次启动都**先摘掉三个高权限工具再并入白名单**，这不是冗余清理，而是一条安全不变量：
-   * `sys_fetch_url` / `sys_http_request` 能出网，`sys_read_file` 能读文件系统，
-   * 默认助手一律不予授权（`DEFAULT_AGENT_TOOL_IDS` 里没有它们）。
-   *
-   * 之所以要「摘」而不只是「并」：库里可能存着历史版本写过、或有人手工加上的授权。
-   * 只做并集的话，这些残留会在每次启动时被保留下来，安全默认值就形同虚设。
-   * 顺序也关键——先 array_remove 再 `||`，反过来会把自己刚并进去的又删掉。
-   */
+  // 每次启动都**先摘掉三个高权限工具再并入白名单**，这不是冗余清理，而是一条安全不变量：
+  // `sys_fetch_url` / `sys_http_request` 能出网，`sys_read_file` 能读文件系统，
+  // 默认助手一律不予授权（`DEFAULT_AGENT_TOOL_IDS` 里没有它们）。
+  //
+  // 之所以要「摘」而不只是「并」：库里可能存着历史版本写过、或有人手工加上的授权。
+  // 只做并集的话，这些残留会在每次启动时被保留下来，安全默认值就形同虚设。
+  // 顺序也关键——先 array_remove 再 `||`，反过来会把自己刚并进去的又删掉。
   await database.query(
     `UPDATE core_agents
      SET sys_tool_ids = ARRAY(

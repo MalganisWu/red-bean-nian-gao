@@ -1,10 +1,8 @@
-/*
- * Task 模块的 wire DTO。
- *
- * 命名在**同一个模块内是混用的**：任务实体用 PascalCase（TaskID / ScheduleType …），
- * 分页、偏好与补丁类字段用 snake_case。这是既有契约，前后端两侧都按此解析，
- * 改名必须两侧同步——不要按「统一风格」的直觉只改一边。
- */
+// Task 模块的 wire DTO。
+//
+// 命名在**同一个模块内是混用的**：任务实体用 PascalCase（TaskID / ScheduleType …），
+// 分页、偏好与补丁类字段用 snake_case。这是既有契约，前后端两侧都按此解析，
+// 改名必须两侧同步——不要按「统一风格」的直觉只改一边。
 import type { PersistedDisplayMessageDto } from '../presentation/dto.js'
 
 /** 调度方式：单次 或 周期。 */

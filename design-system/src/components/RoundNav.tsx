@@ -1,8 +1,6 @@
-/*
- * 复合件 · RoundNav（轮次导航边沟）。
- * 对话页的轮次索引：每轮一根横杠，悬停出摘要卡、点击回调跳转。
- * 纯展示组件——轮次数据派生与滚动定位都在调用方。
- */
+// 复合件 · RoundNav（轮次导航边沟）。
+// 对话页的轮次索引：每轮一根横杠，悬停出摘要卡、点击回调跳转。
+// 纯展示组件——轮次数据派生与滚动定位都在调用方。
 'use client'
 
 import { useRef, useState, type FocusEvent, type ReactNode } from 'react'
@@ -92,7 +90,7 @@ export function RoundNav(props: RoundNavProps) {
     })
   }
 
-  /** 把位置吸附到最近的横杠：更新波纹宽度并展示该轮摘要。 */
+  // 把位置吸附到最近的横杠：更新波纹宽度并展示该轮摘要。
   function activateAt(position: number, clientY?: number): void {
     if (entries.length === 0) return
     const clamped = Math.max(0, Math.min(entries.length - 1, position))
@@ -103,7 +101,7 @@ export function RoundNav(props: RoundNavProps) {
     if (button && entry) showPreview(entry, button, clientY)
   }
 
-  /** 清空波纹与悬停摘要，回到静止态。 */
+  // 清空波纹与悬停摘要，回到静止态。
   function resetWave(): void {
     setWavePosition(null)
     setHover(null)
@@ -112,13 +110,13 @@ export function RoundNav(props: RoundNavProps) {
   const remainsInRail = (target: EventTarget | null): boolean =>
     target instanceof Node && Boolean(listRef.current?.contains(target))
 
-  /** 键盘聚焦某根横杠时，用它的中心高度激活波纹与摘要。 */
+  // 键盘聚焦某根横杠时，用它的中心高度激活波纹与摘要。
   function handleMarkerFocus(index: number, event: FocusEvent<HTMLButtonElement>): void {
     const rect = event.currentTarget.getBoundingClientRect()
     activateAt(index, rect.top + rect.height / 2)
   }
 
-  /** 把指针的纵向位置换算成横杠序号（首杠中心为原点，杠距为步长）。 */
+  // 把指针的纵向位置换算成横杠序号（首杠中心为原点，杠距为步长）。
   function handlePointerMove(clientY: number): void {
     const first = buttonRefs.current[0]
     const second = buttonRefs.current[1]

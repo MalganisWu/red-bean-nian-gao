@@ -1,4 +1,4 @@
-/** 聊天请求及 SSE wire DTO；不包含解析、展示或业务逻辑。 */
+// 聊天请求及 SSE wire DTO；不包含解析、展示或业务逻辑。
 
 /** 单条对话消息；`role` 只有 user / assistant，`content` 非空。 */
 export interface ChatMessageDto {

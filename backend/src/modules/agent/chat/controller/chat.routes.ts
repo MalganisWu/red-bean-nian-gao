@@ -136,7 +136,7 @@ async function sendSse(
   disconnectSignal: AbortSignal,
   run: StartedChatRun
 ): Promise<void> {
-  /** 客户端断连：以断连原因关闭运行句柄；收尾失败无需再向已不可写的响应发数据。 */
+  // 客户端断连：以断连原因关闭运行句柄；收尾失败无需再向已不可写的响应发数据。
   function onDisconnect(): void {
     void run.handle.close('client_disconnected').catch((): void => {
       // 断连后的运行收尾失败只记录，不向不可写的响应再发数据。

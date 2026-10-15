@@ -73,7 +73,7 @@ export function ChatPage() {
 
   // 抽屉焦点管理：开启移入、关闭归还触发钮；开启时锁 body 滚动、关闭恢复
   // （Escape 处理在遮罩 onKeyDown）
-  /** 抽屉开合副作用：焦点归位 + body 滚动锁；卸载时恢复滚动。 */
+  // 抽屉开合副作用：焦点归位 + body 滚动锁；卸载时恢复滚动。
   function syncDrawerFocus(): () => void {
     if (sidebarOpen) {
       drawerRef.current?.focus()
@@ -100,7 +100,7 @@ export function ChatPage() {
   useEffect(loadActiveSessionTasks, [activeSessionId, loadSessionTasks])
 
   // 流结束后刷新会话列表（更新侧栏标题/排序）
-  /** 比较前后两次流式状态：由流式转为空闲时重拉会话列表，并记录本轮流式状态。 */
+  // 比较前后两次流式状态：由流式转为空闲时重拉会话列表，并记录本轮流式状态。
   function refreshSessionsAfterStream(): void {
     if (prevStreamingRef.current && !chat.isStreaming) {
       void loadSessions()
@@ -112,7 +112,7 @@ export function ChatPage() {
 
   // 订阅 store 事件（非 effect 体内同步 setState）：
   // START 受理（isStreaming↑）→ 清草稿（期间用户新打的字不清）+ 解锁；失败（error↑）→ 解锁，草稿留在输入框
-  /** 处理 store 状态变化：START 受理时清草稿并解锁，出错时解锁（草稿留在输入框）。 */
+  // 处理 store 状态变化：START 受理时清草稿并解锁，出错时解锁（草稿留在输入框）。
   function handleStoreChange(
     state: { isStreaming: boolean; error: ErrorEvent | null },
     prev: { isStreaming: boolean; error: ErrorEvent | null }
@@ -134,8 +134,8 @@ export function ChatPage() {
     const messages: ChatMessage[] = [{ role: 'user', content: input.trim() }]
     lastDraftRef.current = input.trim()
     setAwaiting(true)
-    /* 轨迹实时投影：用户消息发送即开轮（不等 SSE START），与 chat-store 同刻；
-       带上已知会话 id，新会话则为 null（START 事件会补齐） */
+    // 轨迹实时投影：用户消息发送即开轮（不等 SSE START），与 chat-store 同刻；
+    // 带上已知会话 id，新会话则为 null（START 事件会补齐）
     useTrajectoryStore.getState().beginUserTurn(input.trim(), activeSessionId)
     chat.send(messages, activeSessionId ?? undefined)
   }
@@ -143,7 +143,7 @@ export function ChatPage() {
   // awaiting 兜底：请求发出后若 START/error 均迟迟不到（连接半开等异常），
   // 30s 后强制复位等待窗，避免输入框与页面状态被永久锁死（fetch-sse 首事件看门狗
   // 会并行报错，这里保证 UI 状态绝不悬挂）。
-  /** 等待窗超时兜底：awaiting 期间超过阈值未收到确认即强制复位。 */
+  // 等待窗超时兜底：awaiting 期间超过阈值未收到确认即强制复位。
   function resetAwaitingAfterTimeout(): (() => void) | undefined {
     if (!awaiting) return undefined
     const timer = window.setTimeout(() => {
@@ -169,14 +169,14 @@ export function ChatPage() {
     setAwaiting(false)
   }
 
-  /** 会话任务列表选中任务：进入任务详情（停在概览页签）。 */
+  // 会话任务列表选中任务：进入任务详情（停在概览页签）。
   function handleOpenTask(taskId: string): void {
     setSelectedTaskId(taskId)
     setSelectedTaskTab('overview')
     setSessionView('task-detail')
   }
 
-  /** 会话任务列表选中一次执行：进入执行详情（停在历史页签）。 */
+  // 会话任务列表选中一次执行：进入执行详情（停在历史页签）。
   function handleOpenExecution(taskId: string, executionId: string): void {
     setSelectedTaskId(taskId)
     setSelectedExecutionId(executionId)
@@ -184,19 +184,19 @@ export function ChatPage() {
     setSessionView('execution')
   }
 
-  /** 任务详情返回：回到会话任务列表并清空选中任务。 */
+  // 任务详情返回：回到会话任务列表并清空选中任务。
   function handleBackToTaskList(): void {
     setSelectedTaskId(null)
     setSessionView('task-list')
   }
 
-  /** 任务详情查看某次执行：进入执行详情。 */
+  // 任务详情查看某次执行：进入执行详情。
   function handleViewExecution(executionId: string): void {
     setSelectedExecutionId(executionId)
     setSessionView('execution')
   }
 
-  /** 执行详情返回：回到任务详情的历史页签。 */
+  // 执行详情返回：回到任务详情的历史页签。
   function handleBackToTaskDetail(): void {
     setSelectedExecutionId(null)
     setSelectedTaskTab('history')

@@ -8,7 +8,7 @@ import { cn } from '../lib/utils'
 
 /** 提示气泡的视觉变体；`default` 为深底浅字的高对比浮层，不改动时为它。 */
 type TooltipVariantProps = {
-  /** 变体名；`default`/`primary`/`solid` 目前在基础样式上等价，留作后续按语境分化。 */
+  // 变体名；`default`/`primary`/`solid` 目前在基础样式上等价，留作后续按语境分化。
   variant?: 'default' | 'primary' | 'solid'
 }
 

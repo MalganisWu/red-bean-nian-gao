@@ -1,4 +1,4 @@
-/** Agent Module 的公开入口；对外只暴露 Module 工厂与跨模块协作所需的 Port。 */
+// Agent Module 的公开入口；对外只暴露 Module 工厂与跨模块协作所需的 Port。
 export {
   createAgentModule,
   createAgentModuleCore,

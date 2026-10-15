@@ -126,7 +126,7 @@ export class ServerApplication {
         if (outcome[1].error !== undefined) errors.push(outcome[1].error)
       } else {
         this.#health?.setDraining(true)
-        /** 关闭期在超时预算内并行执行的排空动作。 */
+        // 关闭期在超时预算内并行执行的排空动作。
         const drainWithinTimeout = async (timeoutSignal: AbortSignal): Promise<void> => {
           // HTTP 停止接收新连接与业务运行排空必须并行，避免长连接互相等待。
           await Promise.all([
@@ -227,7 +227,7 @@ function waitForAbort(signal: AbortSignal): AbortWait {
     return { promise: Promise.resolve(), dispose(): void {} }
   }
   let listener = (): void => {}
-  /** executor：把 resolve 交给 abort 监听器，交给调用方按需 `dispose`。 */
+  // executor：把 resolve 交给 abort 监听器，交给调用方按需 `dispose`。
   const promise = new Promise<void>(function captureAbortResolve(resolve): void {
     listener = resolve
     signal.addEventListener('abort', listener, { once: true })
@@ -254,9 +254,9 @@ async function withTimeout(
 ): Promise<void> {
   const controller = new AbortController()
   let timeout: ReturnType<typeof setTimeout> | undefined
-  /** executor：到点后中止 controller 并以超时错误拒绝，`timeout` 句柄由调用方在 finally 里清理。 */
+  // executor：到点后中止 controller 并以超时错误拒绝，`timeout` 句柄由调用方在 finally 里清理。
   const expired = new Promise<never>(function awaitTimeout(_resolve, reject): void {
-    /** 到点：中止 controller 并以超时错误拒绝。 */
+    // 到点：中止 controller 并以超时错误拒绝。
     function expireAfterTimeout(): void {
       const error = new Error(message)
       controller.abort(error)

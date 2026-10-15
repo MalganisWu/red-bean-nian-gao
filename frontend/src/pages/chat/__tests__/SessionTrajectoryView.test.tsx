@@ -9,7 +9,7 @@ import { useTrajectoryStore } from '@/stores/trajectory-store'
 
 import { SessionTrajectoryView } from '../SessionTrajectoryView'
 
-/* fetchSessionTrajectory 打桩为永不返回：模拟历史加载进行中 / 无历史可加载 */
+// fetchSessionTrajectory 打桩为永不返回：模拟历史加载进行中 / 无历史可加载
 vi.mock('@/services/api/trajectory', () => ({
   fetchSessionTrajectory: vi.fn(() => new Promise<never>(() => {})),
 }))
@@ -138,7 +138,7 @@ function settledTurnDto(sessionId: string): SessionTrajectoryDto {
 describe('SessionTrajectoryView：空态与跟随尾部', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    /* 每个用例从干净的桩开始：默认永不返回（模拟加载中），必要时用 mockResolvedValueOnce 指定快照 */
+    // 每个用例从干净的桩开始：默认永不返回（模拟加载中），必要时用 mockResolvedValueOnce 指定快照
     vi.mocked(fetchSessionTrajectory).mockReset()
     vi.mocked(fetchSessionTrajectory).mockImplementation(() => new Promise<never>(() => {}))
     useTrajectoryStore.getState().reset()
@@ -212,7 +212,7 @@ describe('SessionTrajectoryView：空态与跟随尾部', () => {
   })
 
   it('流式进行中：运行中的 run 只出现一个轮次，且不显示任何终态标记', async () => {
-    /* 历史快照是在运行中途取到的：该 run 已落库但尚未终结（endState=null） */
+    // 历史快照是在运行中途取到的：该 run 已落库但尚未终结（endState=null）
     const inProgress: SessionTrajectoryDto = {
       sessionId: 's-live',
       title: '会话标题',
@@ -271,8 +271,8 @@ describe('SessionTrajectoryView：空态与跟随尾部', () => {
     render(<SessionTrajectoryView onBack={() => {}} />)
     expect(screen.getByText('先搜资料')).toBeInTheDocument()
 
-    /* 回归：TOKEN 只更新 reply、从不更新摘要 → 整个作答期间记录行文本一动不动，
-       用户看到的是"轨迹吐完第一段就不吐了"。摘要必须与持久化投影同口径地跟随回答。 */
+    // 回归：TOKEN 只更新 reply、从不更新摘要 → 整个作答期间记录行文本一动不动，
+    // 用户看到的是"轨迹吐完第一段就不吐了"。摘要必须与持久化投影同口径地跟随回答。
     act(() => {
       useTrajectoryStore.getState().applyEvent(sse(SSE_EVENT_TYPES.TOKEN, { content: '第一段：' }))
       useTrajectoryStore
@@ -297,8 +297,8 @@ describe('SessionTrajectoryView：空态与跟随尾部', () => {
         .applyEvent(sse(SSE_EVENT_TYPES.DONE, { tokens_used: 2643, session_id: 's-live' }))
     })
 
-    /* 回归：DONE 立刻把 isLive 置假 → 实时轮次被丢弃、历史快照里又没有这一轮，
-       记录表瞬间变成空态或加载态，看起来就是"轨迹没了、直接会话完毕"。 */
+    // 回归：DONE 立刻把 isLive 置假 → 实时轮次被丢弃、历史快照里又没有这一轮，
+    // 记录表瞬间变成空态或加载态，看起来就是"轨迹没了、直接会话完毕"。
     expect(screen.queryByText('该会话暂无可回放的轨迹记录。')).not.toBeInTheDocument()
     expect(screen.queryByText('正在加载会话轨迹…')).not.toBeInTheDocument()
     expect(screen.getByText('先搜资料')).toBeInTheDocument()
@@ -326,19 +326,19 @@ describe('SessionTrajectoryView：空态与跟随尾部', () => {
     expect(useTrajectoryStore.getState().liveTurns).toHaveLength(0)
     expect(screen.getAllByText('轮次 1')).toHaveLength(1)
     expect(screen.getAllByText(/轮次 1 结束/)).toHaveLength(1)
-    /* 终态行改为「细规则 + 空心终态 chip」：状态由 chip 承担，正文只写「会话结束」，
-       两者各出现一次——不是重复记录，也不是「结束」说两遍。 */
+    // 终态行改为「细规则 + 空心终态 chip」：状态由 chip 承担，正文只写「会话结束」，
+    // 两者各出现一次——不是重复记录，也不是「结束」说两遍。
     expect(screen.getAllByText('会话结束')).toHaveLength(1)
-    /* 「完成」是空心终态 chip 的文案：本 fixture 有轮次结束与会话结束两条终态行 → 两个。
-       关键是正文不再重复状态（旧的「会话结束 · 完成」写法已移除）。 */
+    // 「完成」是空心终态 chip 的文案：本 fixture 有轮次结束与会话结束两条终态行 → 两个。
+    // 关键是正文不再重复状态（旧的「会话结束 · 完成」写法已移除）。
     expect(screen.getAllByText('完成')).toHaveLength(2)
     expect(screen.queryByText(/会话结束 · 完成/)).toBeNull()
     expect(vi.mocked(fetchSessionTrajectory)).toHaveBeenCalledTimes(2)
   })
 
   it('流被中止后重新打开：历史已包含该 run 时不再并列显示实时轮次（防重复）', async () => {
-    /* 场景：DONE 从未到达（连接被中止 / 切会话），实时轮次一直挂在 store 里。
-       此时持久化已经把这个 run 收尾，视图重挂载后必须由历史接管，而不是两条同号轮次。 */
+    // 场景：DONE 从未到达（连接被中止 / 切会话），实时轮次一直挂在 store 里。
+    // 此时持久化已经把这个 run 收尾，视图重挂载后必须由历史接管，而不是两条同号轮次。
     seedLiveTurn('s-dup', '帮我调研红豆年糕')
     useChatStore.setState({ activeSessionId: 's-dup' })
     vi.mocked(fetchSessionTrajectory).mockResolvedValue(settledTurnDto('s-dup'))
@@ -394,7 +394,7 @@ describe('SessionTrajectoryView：空态与跟随尾部', () => {
       await Promise.resolve()
     })
 
-    /* 检查器根节点带 aria-label，作为"是否打开"的稳定判据 */
+    // 检查器根节点带 aria-label，作为"是否打开"的稳定判据
     const inspector = () => container.querySelector('[aria-label="记录检查器"]')
     expect(inspector()).toBeNull()
 

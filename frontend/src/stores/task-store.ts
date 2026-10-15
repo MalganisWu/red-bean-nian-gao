@@ -256,7 +256,7 @@ function createTaskStore(
   set: Parameters<StateCreator<TaskStore>>[0],
   get: Parameters<StateCreator<TaskStore>>[1]
 ): TaskStore {
-  /** 拉取某个会话下的任务列表。 */
+  // 拉取某个会话下的任务列表。
   async function loadSessionTasks(sessionId: string): Promise<void> {
     set({ sessionTasksLoading: true, error: null })
     try {
@@ -269,7 +269,7 @@ function createTaskStore(
     }
   }
 
-  /** 拉取任务列表：带游标时追加，否则整体替换；正在加载时跳过。 */
+  // 拉取任务列表：带游标时追加，否则整体替换；正在加载时跳过。
   async function loadTasks(cursor?: string): Promise<void> {
     const { tasksLoading } = get()
     if (tasksLoading) return
@@ -287,7 +287,7 @@ function createTaskStore(
     }
   }
 
-  /** 拉取任务详情；响应回来时若已有更新的请求，则整条结果丢弃。 */
+  // 拉取任务详情；响应回来时若已有更新的请求，则整条结果丢弃。
   async function loadTaskDetail(taskId: string): Promise<void> {
     const requestSerial = ++taskDetailRequestSerial
     set({ currentTask: null, currentTaskLoading: true, error: null })
@@ -306,7 +306,7 @@ function createTaskStore(
     }
   }
 
-  /** 拉取某任务的执行列表；首屏先清空旧列表，响应回来时丢弃过期请求。 */
+  // 拉取某任务的执行列表；首屏先清空旧列表，响应回来时丢弃过期请求。
   async function loadExecutions(taskId: string, cursor?: string): Promise<void> {
     const requestSerial = ++executionListRequestSerial
     set({
@@ -332,7 +332,7 @@ function createTaskStore(
     }
   }
 
-  /** 拉取执行详情；响应回来时若已有更新的请求，则整条结果丢弃。 */
+  // 拉取执行详情；响应回来时若已有更新的请求，则整条结果丢弃。
   async function loadExecutionDetail(taskId: string, executionId: string): Promise<void> {
     const requestSerial = ++executionDetailRequestSerial
     set({ activeExecution: null, activeExecutionLoading: true, error: null })
@@ -351,7 +351,7 @@ function createTaskStore(
     }
   }
 
-  /** 批量补拉执行视图状态（未加载或加载失败的），失败重试两次后退化为默认态。 */
+  // 批量补拉执行视图状态（未加载或加载失败的），失败重试两次后退化为默认态。
   async function loadExecutionViewStates(executionIds: string[]): Promise<void> {
     const uniqueIDs = [...new Set(executionIds)].filter(Boolean)
     const current = get()
@@ -412,7 +412,7 @@ function createTaskStore(
     }
   }
 
-  /** 标记执行已读；已读过则直接返回成功，否则写服务端并以回执落状态。 */
+  // 标记执行已读；已读过则直接返回成功，否则写服务端并以回执落状态。
   async function markExecutionSeen(taskId: string, executionId: string): Promise<boolean> {
     const previous = get().executionViewStates[executionId] ?? EMPTY_VIEW_STATE(executionId)
     if (previous.seen_at) return true
@@ -445,7 +445,7 @@ function createTaskStore(
     }
   }
 
-  /** 设置执行折叠态：先乐观写入，服务端回执或失败后各自回填。 */
+  // 设置执行折叠态：先乐观写入，服务端回执或失败后各自回填。
   async function setExecutionCollapsed(
     taskId: string,
     executionId: string,
@@ -498,7 +498,7 @@ function createTaskStore(
     }
   }
 
-  /** 切换任务启用态，并把新状态同步到详情与各列表项。 */
+  // 切换任务启用态，并把新状态同步到详情与各列表项。
   async function toggleTaskActive(taskId: string): Promise<void> {
     const task = get().currentTask
     if (!task) return
@@ -518,7 +518,7 @@ function createTaskStore(
     }
   }
 
-  /** 删除任务，并从会话任务列表与任务列表中一并移除。 */
+  // 删除任务，并从会话任务列表与任务列表中一并移除。
   async function deleteTask(taskId: string): Promise<void> {
     set({ error: null })
     try {
@@ -551,10 +551,10 @@ function createTaskStore(
   }
 }
 
-/* store 一律不做热替换：React Fast Refresh 只重建"接受更新"的组件边界，没被重建的模块
-   （如 useChatStream）会继续持有旧 store 实例，于是写入方与读取方各绑一份 state——
-   表现就是实时投影不再跟随 SSE、流结束后同一轮出现两次。这里声明自接受并整页刷新，
-   代价是开发期一次刷新，换来实例唯一（import.meta.hot 在生产构建中为 undefined）。 */
+// store 一律不做热替换：React Fast Refresh 只重建"接受更新"的组件边界，没被重建的模块
+// （如 useChatStream）会继续持有旧 store 实例，于是写入方与读取方各绑一份 state——
+// 表现就是实时投影不再跟随 SSE、流结束后同一轮出现两次。这里声明自接受并整页刷新，
+// 代价是开发期一次刷新，换来实例唯一（import.meta.hot 在生产构建中为 undefined）。
 if (import.meta.hot) {
   import.meta.hot.accept(() => {
     window.location.reload()

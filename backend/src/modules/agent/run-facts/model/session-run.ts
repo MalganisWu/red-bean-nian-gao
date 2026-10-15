@@ -1,11 +1,9 @@
 import type { AgentJsonValue } from '../../model/json-value.js'
 import type { RunFact } from './run-fact.js'
 
-/**
- * session_runs 行的 run 容器模型（设计见 docs/design/session/session-trajectory.md）。
- * 一个 run 一行 append-only：状态只从 running 向终态单向推进。
- * 时间字段在领域内一律 epoch 毫秒，PostgreSQL TIMESTAMPTZ 的转换收口在 row mapper。
- */
+// session_runs 行的 run 容器模型（设计见 docs/design/session/session-trajectory.md）。
+// 一个 run 一行 append-only：状态只从 running 向终态单向推进。
+// 时间字段在领域内一律 epoch 毫秒，PostgreSQL TIMESTAMPTZ 的转换收口在 row mapper。
 
 /** run 生命周期状态；终态成员由 FinalizeSessionRunCommand 之外单独收敛。 */
 export const SESSION_RUN_STATUSES = Object.freeze({

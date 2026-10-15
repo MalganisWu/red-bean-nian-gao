@@ -1,7 +1,5 @@
-/*
- * Task 模块的请求 schema 与响应类型守卫；字段名与 `dto.ts` 严格对应。
- * 守卫只在客户端解析服务端响应时使用，因此失败一律判假，不做抛错与兼容填充。
- */
+// Task 模块的请求 schema 与响应类型守卫；字段名与 `dto.ts` 严格对应。
+// 守卫只在客户端解析服务端响应时使用，因此失败一律判假，不做抛错与兼容填充。
 import type {
   ExecutionViewStateDto,
   ExecutionViewStatePatchDto,

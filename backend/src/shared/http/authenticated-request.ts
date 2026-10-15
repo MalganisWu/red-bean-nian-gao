@@ -54,11 +54,9 @@ async function authenticateRequest(
   if (!authorization.startsWith('Bearer ') || authorization.length === 'Bearer '.length) {
     throw unauthorizedError(options.malformedMessage ?? '认证头格式错误，应为 Bearer <token>')
   }
-  /*
-   * 校验失败统一映射为「无效或已过期」，**不区分**签名错、过期、用户不存在等具体原因——
-   * 区分它们等于给攻击者一个探测 token 状态的接口。
-   * 空 userId 也走这里：校验器返回空串说明实现有问题，但对外仍是同一个不可用的结论。
-   */
+  // 校验失败统一映射为「无效或已过期」，**不区分**签名错、过期、用户不存在等具体原因——
+  // 区分它们等于给攻击者一个探测 token 状态的接口。
+  // 空 userId 也走这里：校验器返回空串说明实现有问题，但对外仍是同一个不可用的结论。
   try {
     const userId = await authService.validateToken(
       authorization.slice('Bearer '.length),

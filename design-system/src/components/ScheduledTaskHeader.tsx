@@ -60,7 +60,7 @@ export function ScheduledTaskHeader(props: ScheduledTaskHeaderProps) {
   } = props
   const Heading = headingLevel === 1 ? 'h1' : 'h2'
 
-  /** 渲染一个详情页签：选中态由 `activeTab` 决定，历史页签附带条数。 */
+  // 渲染一个详情页签：选中态由 `activeTab` 决定，历史页签附带条数。
   function renderTab(tab: ScheduledTaskDetailTab): ReactElement {
     const selected = activeTab === tab
     const label = tab === 'overview' ? '概览' : '执行记录'

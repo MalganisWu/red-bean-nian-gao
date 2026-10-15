@@ -42,7 +42,7 @@ export function collapseToProcessFold(
   let pendingSteps: ProcessStepItem[] = []
   let pendingTs = 0
 
-  /** 把已累积的步骤收束成一个 process section；没有步骤时不产出。 */
+  // 把已累积的步骤收束成一个 process section；没有步骤时不产出。
   function flushProcess(): void {
     if (pendingSteps.length === 0) return
     out.push({
@@ -54,7 +54,7 @@ export function collapseToProcessFold(
     pendingTs = 0
   }
 
-  /** 追加一个过程步骤；稳定业务 ID 重复的节点只保留一次。 */
+  // 追加一个过程步骤；稳定业务 ID 重复的节点只保留一次。
   function pushStep(step: ProcessStepItem, ts: number): void {
     // answer 续跑期间，已收束的 process 与原始 card 会短暂同时存在。
     // 稳定业务 ID 相同的节点只保留一次，避免确认卡片重复渲染。
@@ -138,14 +138,14 @@ function attachSubAgentsToParents(steps: ProcessStepItem[]): ProcessStepItem[] {
   const toolIndexByCallID = new Map<string, number>()
   const attachedSubAgentIndexes = new Set<number>()
 
-  /** 记录每个 callId 首次出现的工具步骤下标。 */
+  // 记录每个 callId 首次出现的工具步骤下标。
   function collectToolIndex(step: ProcessStepItem, index: number): void {
     if (step.kind === 'tool' && step.tool?.callId && !toolIndexByCallID.has(step.tool.callId)) {
       toolIndexByCallID.set(step.tool.callId, index)
     }
   }
 
-  /** 把子 Agent 步骤挂到其父工具上，并记下被挂载的下标以便随后剔除。 */
+  // 把子 Agent 步骤挂到其父工具上，并记下被挂载的下标以便随后剔除。
   function attachSubAgentToParent(step: ProcessStepItem, index: number): void {
     if (step.kind !== 'sub_agent' || !step.subAgent?.parent_call_id) return
     const parentIndex = toolIndexByCallID.get(step.subAgent.parent_call_id)

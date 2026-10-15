@@ -48,7 +48,7 @@ export function SessionTaskListView(props: SessionTaskListViewProps) {
     if (activeSessionId) void loadSessionTasks(activeSessionId)
   }, [activeSessionId, loadSessionTasks])
 
-  /** 预取本会话各任务最近一次执行的视图状态（无执行记录的任务跳过）。 */
+  // 预取本会话各任务最近一次执行的视图状态（无执行记录的任务跳过）。
   function prefetchExecutionViewStates(): void {
     const executionIds = sessionTasks.flatMap((task) =>
       task.latest_execution ? [task.latest_execution.ExecutionID] : []

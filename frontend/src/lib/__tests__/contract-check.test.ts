@@ -266,7 +266,7 @@ describe('前端 API 契约校验（@red-bean/api-contract）', () => {
       expect(mockApiCall).toHaveBeenCalledTimes(1)
 
       const calledPath = mockApiCall.mock.calls[0][0] as string
-      const covered = coveringRoute(calledPath, routes, /* allowPrefix */ false)
+      const covered = coveringRoute(calledPath, routes, false) // allowPrefix
       expect(covered, `${method} ${calledPath} 不在共享契约路由表中`).toBeDefined()
       if (covered) {
         const methods = routes.get(covered)

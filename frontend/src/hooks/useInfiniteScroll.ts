@@ -25,7 +25,7 @@ export function useInfiniteScroll(
   const listRef = useRef<HTMLDivElement>(null)
 
   const handleScroll = useCallback(
-    /** 滚动到底部（剩余 <50px）且仍有下一页时触发 loadMore。 */
+    // 滚动到底部（剩余 <50px）且仍有下一页时触发 loadMore。
     function handleListScroll(): void {
       const el = listRef.current
       if (!el || loading || !hasMore) return

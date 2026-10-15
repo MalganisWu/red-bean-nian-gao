@@ -131,7 +131,7 @@ export function createAgentModuleCore(options: {
     lockRegistry,
     runtimeState
   )
-  /** 接回 Task 的结果投递能力后，补齐运行、Chat 与查询用例所需的装配。 */
+  // 接回 Task 的结果投递能力后，补齐运行、Chat 与查询用例所需的装配。
   function completeAgentModule(
     deliveryQueue: TaskResultDeliveryPort,
     moduleIdGenerator: IdGenerator

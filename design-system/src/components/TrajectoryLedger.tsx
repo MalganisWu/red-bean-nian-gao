@@ -27,7 +27,7 @@ import {
   type TrajectoryTurnEnd,
 } from './trajectoryTypes'
 
-/* 轨迹组件的公开类型经本文件统一 re-export（前端只能经组件文件取类型，类型-only 模块不直接对前端暴露） */
+// 轨迹组件的公开类型经本文件统一 re-export（前端只能经组件文件取类型，类型-only 模块不直接对前端暴露）
 export type {
   TrajectoryCompaction,
   TrajectoryGap,
@@ -107,7 +107,7 @@ const GRID_NARROW = '@max-[760px]:grid-cols-[28px_58px_16px_minmax(180px,1fr)_12
 /** 两套模板同时挂载，由最近的 `@container` 根节点宽度切换（容器查询上下文只在根节点建立一次） */
 const GRID = `${GRID_WIDE} ${GRID_NARROW}`
 
-/* ---------- 内部小件 ---------- */
+// ---------- 内部小件 ----------
 
 /**
  * 产出子行的单行摘要：取首行并在展示层截断。
@@ -138,7 +138,7 @@ function AxisNode(props: { kind: TrajectoryRecord['kind']; status?: TrajectoryRe
         kind === 'user' && 'bg-brand-indicator',
         kind === 'call' && 'bg-foreground-faint',
         kind === 'tool' && 'rounded-[1.5px]',
-        /* 等待审批与未闭合：空心方块——「还没定稿」与「已定稿」在形状上先分开 */
+        // 等待审批与未闭合：空心方块——「还没定稿」与「已定稿」在形状上先分开
         kind === 'tool' &&
           status === 'interrupt' &&
           'rounded-[1.5px] border-[1.5px] border-cat-tool-indicator bg-background',
@@ -154,7 +154,7 @@ function AxisNode(props: { kind: TrajectoryRecord['kind']; status?: TrajectoryRe
         kind === 'subagent' && 'h-[9px] w-[9px] border-2 border-cat-sub-indicator bg-background',
         kind === 'turn-end' && 'rounded-[1.5px] border-[1.5px] border-control-border bg-background',
         kind === 'session-end' && 'h-[9px] w-[9px] border-2 border-foreground-faint bg-background',
-        /* 进行中：唯一呼吸节点（与 ProcessFold 的 active 节点同语言） */
+        // 进行中：唯一呼吸节点（与 ProcessFold 的 active 节点同语言）
         status === 'running' &&
           'bg-process-node-active motion-safe:animate-[process-breathe_1.8s_ease-in-out_infinite]'
       )}
@@ -230,7 +230,7 @@ function KindChip(props: { record: TrajectoryRecord }) {
       </span>
     )
   }
-  /* ── 工具：状态并入 chip ── */
+  // ── 工具：状态并入 chip ──
   if (record.status === 'error') {
     return (
       <span className="inline-flex h-[19px] items-center rounded-md border border-danger-indicator bg-danger-bg px-[5px] py-0 text-label leading-none font-semibold tracking-[0.035em] text-danger-text">
@@ -238,8 +238,8 @@ function KindChip(props: { record: TrajectoryRecord }) {
       </span>
     )
   }
-  /* LLM 发起挂起（等审批）：用品牌色提示「需要你」——注意与「用户」同色系，
-     但两者行位与文案都不同，且这正是一次等待人的动作。 */
+  // LLM 发起挂起（等审批）：用品牌色提示「需要你」——注意与「用户」同色系，
+  // 但两者行位与文案都不同，且这正是一次等待人的动作。
   if (record.status === 'interrupt') {
     return (
       <span className="inline-flex h-[19px] items-center rounded-md border border-brand-indicator bg-primary-soft px-[5px] py-0 text-label leading-none font-semibold tracking-[0.035em] text-brand-text">
@@ -247,7 +247,7 @@ function KindChip(props: { record: TrajectoryRecord }) {
       </span>
     )
   }
-  /* 用户打断、没有结果：中性色，它不是失败 */
+  // 用户打断、没有结果：中性色，它不是失败
   if (record.status === 'incomplete') {
     return (
       <span className="inline-flex h-[19px] items-center rounded-md border border-control-border bg-muted px-[5px] py-0 text-label leading-none font-semibold tracking-[0.035em] text-foreground-muted">
@@ -287,12 +287,12 @@ function OutputRow(props: {
       data-output-of={callId}
       aria-selected={selectedId === callId}
       data-hidden={!hit || undefined}
-      /* 带上 label：点「正文」就该看到正文，而不是默认停在「思考」tab */
+      // 带上 label：点「正文」就该看到正文，而不是默认停在「思考」tab
       onClick={() => onSelect?.(callId, label)}
       className={cn(
         `relative grid min-h-[30px] cursor-default ${GRID} items-center gap-x-2.5 border-b border-border/40 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus-ring`,
         'hover:bg-surface-hover',
-        /* 产出没有独立记录 id：所属调用被选中时同步高亮，视觉上保持连续 */
+        // 产出没有独立记录 id：所属调用被选中时同步高亮，视觉上保持连续
         selectedId === callId && 'bg-primary-soft'
       )}
     >
@@ -344,7 +344,7 @@ function AttemptRow(props: {
       .includes(q)
   const failed = attempt.status === 'error'
 
-  /** 键盘等价于点击：Enter / 空格选中这条尝试。 */
+  // 键盘等价于点击：Enter / 空格选中这条尝试。
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -429,7 +429,7 @@ function AttemptRow(props: {
   )
 }
 
-/* ---------- 行 ---------- */
+// ---------- 行 ----------
 
 /**
  * 把一轮的扁平记录分成「请求组」与「独立行」。
@@ -446,12 +446,12 @@ export type TurnItem =
       readonly kind: 'request'
       readonly index: number
       readonly call: TrajectoryRecord
-      /** 这次请求**写出**的工具调用（模型产出），与思考/正文并列。 */
+      // 这次请求**写出**的工具调用（模型产出），与思考/正文并列。
       readonly callBlocks: readonly TrajectoryRecord[]
     }
   | {
       readonly kind: 'system-run'
-      /** 系统执行的对象：工具执行或子 Agent 委派。 */
+      // 系统执行的对象：工具执行或子 Agent 委派。
       readonly record: TrajectoryRecord
     }
 
@@ -484,8 +484,8 @@ export function groupRequests(records: readonly TrajectoryRecord[]): TurnItem[] 
       continue
     }
     requestIndex += 1
-    /* 这次请求写出的工具调用 = 紧随其后、属于它的 tool 记录（它们同时也会作为系统执行再出现一次）。
-       只用于渲染「工具调用」这一**模型产出**行；不是把系统执行挂到请求下面。 */
+    // 这次请求写出的工具调用 = 紧随其后、属于它的 tool 记录（它们同时也会作为系统执行再出现一次）。
+    // 只用于渲染「工具调用」这一**模型产出**行；不是把系统执行挂到请求下面。
     const callBlocks: TrajectoryRecord[] = []
     let j = i + 1
     while (j < records.length) {
@@ -587,13 +587,13 @@ function RequestHeaderRow(props: {
   toolCount: number
   selectedId: string | undefined
   onSelect: ((id: string, tab?: string) => void) | undefined
-  /** 该请求的工具执行是否已折叠成摘要行。 */
+  // 该请求的工具执行是否已折叠成摘要行。
   folded?: boolean | undefined
-  /** 折叠开关；缺省表示该请求没有可折叠的工具执行。 */
+  // 折叠开关；缺省表示该请求没有可折叠的工具执行。
   onToggleFold?: (() => void) | undefined
 }) {
   const { index, call, toolCount, selectedId, onSelect, folded, onToggleFold } = props
-  /** 键盘等价于点击：Enter / 空格选中这次请求。 */
+  // 键盘等价于点击：Enter / 空格选中这次请求。
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -601,13 +601,13 @@ function RequestHeaderRow(props: {
     }
   }
 
-  /** 点请求边界圆点：只选中这次调用，不触发行选中。 */
+  // 点请求边界圆点：只选中这次调用，不触发行选中。
   function handleBoundaryClick(event: MouseEvent<HTMLButtonElement>): void {
     event.stopPropagation()
     onSelect?.(call.id, '概览')
   }
 
-  /** 点折叠箭头：只切换折叠，不触发行选中。 */
+  // 点折叠箭头：只切换折叠，不触发行选中。
   function handleToggleFoldClick(event: MouseEvent<SVGSVGElement>): void {
     event.stopPropagation()
     onToggleFold?.()
@@ -620,8 +620,8 @@ function RequestHeaderRow(props: {
       data-request-index={index}
       data-request-id={call.id}
       aria-selected={selectedId === call.id}
-      /* 点请求行 → 打开该次调用的详情（模型 / 入·出·缓 / 尝试明细）。
-         tab 固定给「概览」：请求的默认落点就是这次调用的用量与耗时。 */
+      // 点请求行 → 打开该次调用的详情（模型 / 入·出·缓 / 尝试明细）。
+      // tab 固定给「概览」：请求的默认落点就是这次调用的用量与耗时。
       onClick={() => onSelect?.(call.id, '概览')}
       onKeyDown={handleKeyDown}
       className={cn(
@@ -743,7 +743,7 @@ function EndRow(props: {
           ? 'border-brand-indicator text-brand-text'
           : 'border-control-border text-foreground-muted'
 
-  /** 键盘等价于点击：Enter / 空格选中这条终态记录。 */
+  // 键盘等价于点击：Enter / 空格选中这条终态记录。
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -822,8 +822,8 @@ function LedgerRow(props: {
   focusIds?: ReadonlySet<string> | null | undefined
 }) {
   const { record, scaleMs, selectedId, onSelect, filterText, isChild, focusIds } = props
-  /* 产出（思考/正文）与尝试明细默认**折叠**：审计优先看「做了什么」，
-     需要原文时再展开——默认展开会让每个调用都多出 1–2 行，密度翻倍。 */
+  // 产出（思考/正文）与尝试明细默认**折叠**：审计优先看「做了什么」，
+  // 需要原文时再展开——默认展开会让每个调用都多出 1–2 行，密度翻倍。
   const [childrenOpen, setChildrenOpen] = useState(false)
   const q = filterText.trim().toLowerCase()
   const hit =
@@ -858,7 +858,7 @@ function LedgerRow(props: {
   const isInstant = record.durationMs === undefined
   const isEnd = record.kind === 'turn-end' || record.kind === 'session-end'
 
-  /** 键盘等价于点击：Enter / 空格选中这条记录。 */
+  // 键盘等价于点击：Enter / 空格选中这条记录。
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -866,7 +866,7 @@ function LedgerRow(props: {
     }
   }
 
-  /** 展开 / 收起这条记录的产出与尝试明细，不触发行选中。 */
+  // 展开 / 收起这条记录的产出与尝试明细，不触发行选中。
   function handleToggleChildren(event: MouseEvent<SVGSVGElement>): void {
     event.stopPropagation()
     setChildrenOpen((v) => !v)
@@ -911,9 +911,9 @@ function LedgerRow(props: {
         <span
           className={cn(
             'flex min-w-0 items-center gap-2'
-            /* 不缩进、也不加左边框：左边框会连带 pl-2 把文字推右 8px。
-               注意可折叠行仍会因行首的 chevron（12px 图标 + 8px gap）比不可折叠行右移 20px——
-               这是展开控件的固有代价，不是缩进；对齐的是「记录」列的左边界，不是行内首元素。 */
+            // 不缩进、也不加左边框：左边框会连带 pl-2 把文字推右 8px。
+            // 注意可折叠行仍会因行首的 chevron（12px 图标 + 8px gap）比不可折叠行右移 20px——
+            // 这是展开控件的固有代价，不是缩进；对齐的是「记录」列的左边界，不是行内首元素。
           )}
         >
           {collapsible && (
@@ -1037,7 +1037,7 @@ function LedgerRow(props: {
   )
 }
 
-/* ---------- 结束标记行 ---------- */
+// ---------- 结束标记行 ----------
 
 /**
  * 终态文案：wire 只带机制值（按触发者分类），文案在展示边界补。
@@ -1078,7 +1078,7 @@ function endRowRecord(
   return rec
 }
 
-/* ---------- 压缩卡片 ---------- */
+// ---------- 压缩卡片 ----------
 
 /** 压缩终态 → 展示文案；三态在压缩卡片里都要可辨（失败/中断时上下文未收缩）。 */
 const CMP_STATUS_LABEL = { success: '成功', failed: '失败', interrupted: '已中断' } as const
@@ -1103,7 +1103,7 @@ function CompactionCard(props: {
   const released = compaction.beforeTokens - compaction.afterTokens
   const status = compaction.status ?? 'success'
 
-  /** 键盘等价于点击：Enter / 空格选中这条压缩事件。 */
+  // 键盘等价于点击：Enter / 空格选中这条压缩事件。
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -1236,9 +1236,9 @@ function computeIntervalsBefore(
 ): Map<number, Array<{ kind: 'gap'; gap: TrajectoryGap } | { kind: 'cmp' }>> {
   const sec = (t: string) => trajectoryTimeToSeconds(t)
 
-  /** 秒数格式化为 HH:MM:SS。 */
+  // 秒数格式化为 HH:MM:SS。
   function toHMS(s: number): string {
-    /** 两位补零。 */
+    // 两位补零。
     function p(n: number): string {
       return String(n).padStart(2, '0')
     }
@@ -1286,7 +1286,7 @@ function computeIntervalsBefore(
   return map
 }
 
-/* ---------- 轮次与主体 ---------- */
+// ---------- 轮次与主体 ----------
 
 /**
  * 会话轨迹的轮次分组记录表：七列网格「# | 时刻 | 时间轴 | 记录 | token 入·出·缓 | 耗时条 | 时长」。
@@ -1315,29 +1315,27 @@ export function TrajectoryLedger(props: TrajectoryLedgerProps) {
     focusIds,
   } = props
   const [collapsedTurns, setCollapsedTurns] = useState<ReadonlySet<number>>(new Set())
-  /**
-   * 请求级折叠：折叠某次调用的工具执行，收成一行 `… N 个工具调用 · name, name`。
-   * 键是 call 记录的 id。
-   */
+  // 请求级折叠：折叠某次调用的工具执行，收成一行 `… N 个工具调用 · name, name`。
+  // 键是 call 记录的 id。
   const [collapsedCalls, setCollapsedCalls] = useState<ReadonlySet<string>>(new Set())
-  /** 当前轮次 = 含选中记录的轮次；turnRail 只画在它上面。 */
+  // 当前轮次 = 含选中记录的轮次；turnRail 只画在它上面。
   const activeTurn = useMemo(() => findActiveTurn(turns, selectedId), [turns, selectedId])
   const scale = scaleMs ?? Math.max(...turns.map((t) => t.durationMs), 1)
   const query = filterText ?? ''
 
-  /* 每轮之前的间隔项（空档 / 压缩 + 两侧空档），由轮次起止与压缩时刻推导 */
+  // 每轮之前的间隔项（空档 / 压缩 + 两侧空档），由轮次起止与压缩时刻推导
   const intervalsBefore = useMemo(
     () => computeIntervalsBefore(turns, compaction),
     [turns, compaction]
   )
 
-  /** 展开全部：清空轮次与调用两级的折叠集合。 */
+  // 展开全部：清空轮次与调用两级的折叠集合。
   function expandAll(): void {
     setCollapsedTurns(new Set())
     setCollapsedCalls(new Set())
   }
 
-  /** 轮次标题行的键盘激活：等价于点击它（切换本轮折叠）。 */
+  // 轮次标题行的键盘激活：等价于点击它（切换本轮折叠）。
   function handleTurnKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -1345,7 +1343,7 @@ export function TrajectoryLedger(props: TrajectoryLedgerProps) {
     }
   }
 
-  /** 轮次标题里的 token 列：三段用量合计，未采集时退化为一个短横。 */
+  // 轮次标题里的 token 列：三段用量合计，未采集时退化为一个短横。
   function renderTurnUsage(turn: TrajectoryTurn): ReactElement | string {
     const usage = turnUsage(turn.records)
     if (usage === undefined) return '—'
@@ -1361,20 +1359,20 @@ export function TrajectoryLedger(props: TrajectoryLedgerProps) {
     )
   }
 
-  /** 渲染一轮：间隔带、轮次标题行、折叠摘要行与本轮全部记录。 */
+  // 渲染一轮：间隔带、轮次标题行、折叠摘要行与本轮全部记录。
   function renderTurn(turn: TrajectoryTurn, turnIndex: number): ReactElement {
     const collapsed = collapsedTurns.has(turn.turn)
     const children = turn.records.flatMap((r) => r.children ?? [])
     const toolCount = turn.records.filter((r) => r.kind === 'tool').length + children.length
     const errCount = [...turn.records, ...children].filter((r) => r.status === 'error').length
     const hasSub = turn.records.some((r) => r.kind === 'subagent')
-    /* 轮次的首要计数单位是**请求**（一次用户提问会引发多次模型网关调用），
-       「条记录」是拍平后的旧口径，与两级结构对不上。 */
+    // 轮次的首要计数单位是**请求**（一次用户提问会引发多次模型网关调用），
+    // 「条记录」是拍平后的旧口径，与两级结构对不上。
     const requestCount = turn.records.filter((r) => r.kind === 'call').length
     const intervals = intervalsBefore.get(turn.turn) ?? []
     const items = groupRequests(turn.records)
-    /* 被请求级折叠收走的系统执行：它们仍然与请求平级（语义不变），只是渲染时收进摘要行。
-       用 id 集合跳过，而不是把工具挂进请求的子项——那会与「独立阶段」的模型冲突。 */
+    // 被请求级折叠收走的系统执行：它们仍然与请求平级（语义不变），只是渲染时收进摘要行。
+    // 用 id 集合跳过，而不是把工具挂进请求的子项——那会与「独立阶段」的模型冲突。
     const foldedSystemIds = new Set<string>()
     for (const item of items) {
       if (
@@ -1386,7 +1384,7 @@ export function TrajectoryLedger(props: TrajectoryLedgerProps) {
       }
     }
 
-    /** 渲染本轮的一个阶段项：请求组、系统执行或普通记录。 */
+    // 渲染本轮的一个阶段项：请求组、系统执行或普通记录。
     function renderTurnItem(item: TurnItem): ReactElement | null {
       if (item.kind === 'request') {
         return (
@@ -1476,10 +1474,10 @@ export function TrajectoryLedger(props: TrajectoryLedgerProps) {
         )
       }
       if (item.kind === 'system-run') {
-        /* 已被上方请求级折叠收进摘要行 → 这里不再单独渲染 */
+        // 已被上方请求级折叠收进摘要行 → 这里不再单独渲染
         if (foldedSystemIds.has(item.record.id)) return null
-        /* 系统执行是**独立阶段**，与请求平级：不缩进、也不加左边框。
-           它「不产出模型 token」由 chip「工具执行」承担，不靠线条表达。 */
+        // 系统执行是**独立阶段**，与请求平级：不缩进、也不加左边框。
+        // 它「不产出模型 token」由 chip「工具执行」承担，不靠线条表达。
         return (
           <LedgerRow
             key={`sys-${item.record.id}`}
@@ -1538,9 +1536,9 @@ export function TrajectoryLedger(props: TrajectoryLedgerProps) {
             onDoubleClick={() => setCollapsedTurns((prev) => toggleInSet(prev, turn.turn))}
             onClick={() => setCollapsedTurns((prev) => toggleInSet(prev, turn.turn))}
             onKeyDown={handleTurnKeyDown}
-            /* **不 sticky**：轮次标题是记录流的一部分，随内容滚动（轮次标记只是
-               行内角标）。只有工具栏与列头钉在顶部——多钉一层会让被穿过的行与它重叠，
-               看起来像断层。 */
+            // **不 sticky**：轮次标题是记录流的一部分，随内容滚动（轮次标记只是
+            // 行内角标）。只有工具栏与列头钉在顶部——多钉一层会让被穿过的行与它重叠，
+            // 看起来像断层。
             className={`relative grid min-h-[42px] cursor-pointer select-none ${GRID} items-center gap-x-2.5 border-b border-border/40 bg-muted`}
           >
             {/* 轮次起线：2px、骑在行边界上、贯通整行。第一轮不画。 */}
@@ -1650,7 +1648,7 @@ export function TrajectoryLedger(props: TrajectoryLedgerProps) {
                     'turn-end',
                     turn.endState.at,
                     turn.endState.seq,
-                    /* 状态由空心 chip 承担，正文不再重复它；note 保留（如失败原因） */
+                    // 状态由空心 chip 承担，正文不再重复它；note 保留（如失败原因）
                     `轮次 ${turn.turn} 结束${turn.endState.note ? ` · ${turn.endState.note}` : ''}`
                   )}
                   state={turn.endState.state}

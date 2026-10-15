@@ -259,7 +259,7 @@ export function toolFact(input: {
   readonly result?: string | undefined
   readonly error?: string | undefined
   readonly durationMs?: number | undefined
-  /** 只有 interrupt / incomplete 需要显式记；完成与失败由 result / error 推断。 */
+  // 只有 interrupt / incomplete 需要显式记；完成与失败由 result / error 推断。
   readonly status?: RunToolStatus | undefined
 }): RunToolFact {
   return {

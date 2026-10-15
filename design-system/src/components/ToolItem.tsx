@@ -1,7 +1,5 @@
-/**
- * 内部件：被 ProcessFold / ReasoningBlock / DelegationBlock 内部使用，
- * 不单独出 showcase 页。见 `skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`。
- */
+// 内部件：被 ProcessFold / ReasoningBlock / DelegationBlock 内部使用，
+// 不单独出 showcase 页。见 `skills/red-bean-nian-gao-frontend-coding-conventions/SKILL.md`。
 'use client'
 
 import { useState } from 'react'

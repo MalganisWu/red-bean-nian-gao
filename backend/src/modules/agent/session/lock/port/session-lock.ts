@@ -64,4 +64,4 @@ export interface SessionLockRegistry {
   ): SessionLease | Promise<SessionLease>
 }
 
-/** 生成产品实体标识；生产默认实现由 Composition Root 注入。 */
+// 生成产品实体标识；生产默认实现由 Composition Root 注入。

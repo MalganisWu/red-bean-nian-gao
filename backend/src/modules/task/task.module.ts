@@ -394,7 +394,7 @@ function reconcileTask(
   logger: Logger,
   intervalMilliseconds: number
 ): BackgroundTask {
-  /** 周期性对账投递队列，直到收到中止信号。 */
+  // 周期性对账投递队列，直到收到中止信号。
   async function reconcileLoop(signal: AbortSignal): Promise<void> {
     await reconcileOnce(queue, logger, signal)
     while (!signal.aborted) {

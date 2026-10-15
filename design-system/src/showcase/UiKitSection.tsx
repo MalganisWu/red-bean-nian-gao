@@ -1,7 +1,5 @@
-/*
- * 内部件 · UiKit 排版骨架。
- * 展示站自身用的分区 / 行 / 单元三层容器，不对外承诺 API，也不单独出 showcase 页。
- */
+// 内部件 · UiKit 排版骨架。
+// 展示站自身用的分区 / 行 / 单元三层容器，不对外承诺 API，也不单独出 showcase 页。
 import type { ReactNode } from 'react'
 
 /** 分区容器 Props：一段标题加其下的全部示例。 */

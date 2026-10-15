@@ -90,7 +90,7 @@ export function ConversationPage() {
   const [decision, setDecision] = useState<Record<string, QuestionCardAnswer> | undefined>()
   const [refused, setRefused] = useState(false)
 
-  /** 记录确认卡提交的作答，并从拒答态回到已作答。 */
+  // 记录确认卡提交的作答，并从拒答态回到已作答。
   function handleConfirm(answers: Record<string, QuestionCardAnswer>): void {
     setDecision(answers)
     setRefused(false)

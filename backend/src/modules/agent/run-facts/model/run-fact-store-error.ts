@@ -3,7 +3,7 @@
  * 调用方（如轨迹读取端）据此决定降级策略；基础设施故障不应使用本错误。
  */
 export const RUN_FACT_STORE_ERROR_CODES = Object.freeze({
-  /** facts 内容或 run 行形状不可读（历史脏数据 / 未来版本记录）。 */
+  // facts 内容或 run 行形状不可读（历史脏数据 / 未来版本记录）。
   FACTS_UNREADABLE: 'run_fact_facts_unreadable',
 } as const)
 

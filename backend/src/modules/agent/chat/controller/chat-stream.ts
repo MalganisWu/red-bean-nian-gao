@@ -115,7 +115,7 @@ async function nextOrHeartbeat(
   let timer: ReturnType<typeof setTimeout> | undefined
   let onDisconnect: (() => void) | undefined
 
-  /** 心跳路径：部署定时器，到点即以心跳步进结果兑现；句柄交给外层 `finally` 清理。 */
+  // 心跳路径：部署定时器，到点即以心跳步进结果兑现；句柄交给外层 `finally` 清理。
   function armHeartbeat(resolve: (result: NextOrHeartbeat) => void): void {
     timer = setTimeout(
       (): void => resolve({ kind: STREAM_STEP_KINDS.HEARTBEAT }),
@@ -123,7 +123,7 @@ async function nextOrHeartbeat(
     )
   }
 
-  /** 断连路径：已中止则立即兑现，否则挂一次性监听，同样由外层 `finally` 摘除。 */
+  // 断连路径：已中止则立即兑现，否则挂一次性监听，同样由外层 `finally` 摘除。
   function watchDisconnect(resolve: (result: NextOrHeartbeat) => void): void {
     if (disconnectSignal.aborted) {
       resolve({ kind: STREAM_STEP_KINDS.DISCONNECTED })

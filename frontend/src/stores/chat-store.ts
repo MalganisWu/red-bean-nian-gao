@@ -392,7 +392,7 @@ function createChatStore(
   set: Parameters<StateCreator<ChatStore>>[0],
   get: Parameters<StateCreator<ChatStore>>[1]
 ): ChatStore {
-  /** 追加一条用户消息（id 与时间戳在本地生成）。 */
+  // 追加一条用户消息（id 与时间戳在本地生成）。
   function addUserMessage(content: string): void {
     set((state) => ({
       messages: [
@@ -407,7 +407,7 @@ function createChatStore(
     }))
   }
 
-  /** 开始一轮流式：记下请求/会话 id 与起点时刻，清空上一轮的状态与错误。 */
+  // 开始一轮流式：记下请求/会话 id 与起点时刻，清空上一轮的状态与错误。
   function startStreaming(requestId: string, sessionId: string): void {
     set({
       requestId,
@@ -421,7 +421,7 @@ function createChatStore(
     })
   }
 
-  /** 把在途 section 定稿为一条消息（续跑则合并进卡片消息），并清空 pendingSections。 */
+  // 把在途 section 定稿为一条消息（续跑则合并进卡片消息），并清空 pendingSections。
   function finalizeStreamingText(terminalStatus?: 'cancelled'): void {
     const { messages, pendingSections, sentAt } = get()
     // answer 续跑合并目标【从消息推导，不依赖瞬态 flag，与 ChatMessages streaming 渲染同逻辑】
@@ -472,7 +472,7 @@ function createChatStore(
     })
   }
 
-  /** 追加一张待回答卡片。 */
+  // 追加一张待回答卡片。
   function setPendingCard(card: CardSectionData): void {
     // card 事件 → 作为 type="card" section 追加到在途消息
     set((state) => ({
@@ -480,7 +480,7 @@ function createChatStore(
     }))
   }
 
-  /** 把卡片标记为已回答，并写入用户提交的答案。 */
+  // 把卡片标记为已回答，并写入用户提交的答案。
   function markCardAnswered(
     interactionId: string,
     answers: Record<string, QuestionCardAnswer>
@@ -497,7 +497,7 @@ function createChatStore(
     }))
   }
 
-  /** 把卡片标记为已拒绝（answers 置空）。 */
+  // 把卡片标记为已拒绝（answers 置空）。
   function markCardRefused(interactionId: string): void {
     set((state) => ({
       messages: state.messages.map((m) => ({
@@ -511,7 +511,7 @@ function createChatStore(
     }))
   }
 
-  /** 进入卡片提交态（submitting），记录本次提交的答案与拒绝标记。 */
+  // 进入卡片提交态（submitting），记录本次提交的答案与拒绝标记。
   function beginCardSubmission(
     interactionId: string,
     payload: {
@@ -529,7 +529,7 @@ function createChatStore(
     })
   }
 
-  /** 标记卡片提交已被服务端受理。 */
+  // 标记卡片提交已被服务端受理。
   function acceptCardSubmission(): void {
     set((state) => ({
       cardSubmission:
@@ -539,7 +539,7 @@ function createChatStore(
     }))
   }
 
-  /** 提交收尾：按拒绝与否落定卡片，并清空提交态。 */
+  // 提交收尾：按拒绝与否落定卡片，并清空提交态。
   function completeCardSubmission(): void {
     const submission = get().cardSubmission
     if (!submission) return
@@ -552,7 +552,7 @@ function createChatStore(
     set({ cardSubmission: null })
   }
 
-  /** 提交失败：卡片转错误态，同时结束本轮流式与请求生命周期。 */
+  // 提交失败：卡片转错误态，同时结束本轮流式与请求生命周期。
   function failCardSubmission(error: string): void {
     const submission = get().cardSubmission
     set({
@@ -565,41 +565,41 @@ function createChatStore(
     })
   }
 
-  /** 确保在途 section 里已有一个思考块，没有则新建空思考块。 */
+  // 确保在途 section 里已有一个思考块，没有则新建空思考块。
   function ensureThinkingBlock(): void {
     set(withThinkingBlock)
   }
 
-  /** 工具开始：追加一条 running 的 tool section。 */
+  // 工具开始：追加一条 running 的 tool section。
   function startToolCall(callId: string, toolName: string, params?: Record<string, unknown>): void {
     set((state) => ({
       pendingSections: applyToolStart(state.pendingSections, callId, toolName, params),
     }))
   }
 
-  /** 工具成功落定，并把同 callId 的委派 section 收尾（剥掉续跑协议标记）。 */
+  // 工具成功落定，并把同 callId 的委派 section 收尾（剥掉续跑协议标记）。
   function completeToolCall(callId: string, result: string): void {
     set((state) => withCompletedToolCall(state, callId, result))
   }
 
-  /** 工具失败落定，并把同 callId 的委派 section 收尾为失败。 */
+  // 工具失败落定，并把同 callId 的委派 section 收尾为失败。
   function failToolCall(callId: string, error: string): void {
     set((state) => withFailedToolCall(state, callId, error))
   }
 
-  /** 并入一条子 Agent 信封事件：按 parent_call_id 建或找 sub_agent section。 */
+  // 并入一条子 Agent 信封事件：按 parent_call_id 建或找 sub_agent section。
   function appendSubAgentEvent(env: SubAgentEnvelopePayload): void {
     set((state) => withSubAgentEvent(state, env))
   }
 
-  /** 把仍处于 running 的工具 section 收尾为中断态。 */
+  // 把仍处于 running 的工具 section 收尾为中断态。
   function settleIncompleteTools(): void {
     set((state) => ({
       pendingSections: settleSectionsIncomplete(state.pendingSections),
     }))
   }
 
-  /** 记录流式错误，并结束本轮请求生命周期。 */
+  // 记录流式错误，并结束本轮请求生命周期。
   function setError(error: ErrorEvent): void {
     set({
       error,
@@ -610,7 +610,7 @@ function createChatStore(
     })
   }
 
-  /** 停止流式：先定稿在途文本，再清空流式状态。 */
+  // 停止流式：先定稿在途文本，再清空流式状态。
   function stopStreaming(terminalStatus?: 'cancelled'): void {
     get().finalizeStreamingText(terminalStatus)
     set({
@@ -621,7 +621,7 @@ function createChatStore(
     })
   }
 
-  /** 拉取会话列表首屏。 */
+  // 拉取会话列表首屏。
   async function loadSessions(): Promise<void> {
     set({ sessionsLoading: true, sessionsError: null })
     try {
@@ -634,7 +634,7 @@ function createChatStore(
     }
   }
 
-  /** 以当前游标追加下一页会话列表（无游标或正在加载时跳过）。 */
+  // 以当前游标追加下一页会话列表（无游标或正在加载时跳过）。
   async function loadMoreSessions(): Promise<void> {
     const { nextCursor, sessionsLoading } = get()
     if (!nextCursor || sessionsLoading) return
@@ -652,7 +652,7 @@ function createChatStore(
     }
   }
 
-  /** 切换会话：先清空并递增导航代次，再拉取目标会话（仍停留在目标会话时才落地）。 */
+  // 切换会话：先清空并递增导航代次，再拉取目标会话（仍停留在目标会话时才落地）。
   async function switchSession(sessionId: string): Promise<void> {
     // 立即清空会话状态，避免拉取期间渲染过期内容；epoch 递增令流控制器作废旧连接
     set((state) =>
@@ -735,10 +735,10 @@ function createChatStore(
   }
 }
 
-/* store 一律不做热替换：React Fast Refresh 只重建"接受更新"的组件边界，没被重建的模块
-   （如 useChatStream）会继续持有旧 store 实例，于是写入方与读取方各绑一份 state——
-   表现就是实时投影不再跟随 SSE、流结束后同一轮出现两次。这里声明自接受并整页刷新，
-   代价是开发期一次刷新，换来实例唯一（import.meta.hot 在生产构建中为 undefined）。 */
+// store 一律不做热替换：React Fast Refresh 只重建"接受更新"的组件边界，没被重建的模块
+// （如 useChatStream）会继续持有旧 store 实例，于是写入方与读取方各绑一份 state——
+// 表现就是实时投影不再跟随 SSE、流结束后同一轮出现两次。这里声明自接受并整页刷新，
+// 代价是开发期一次刷新，换来实例唯一（import.meta.hot 在生产构建中为 undefined）。
 if (import.meta.hot) {
   import.meta.hot.accept(() => {
     window.location.reload()

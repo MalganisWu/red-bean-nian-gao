@@ -73,7 +73,7 @@ export function QuestionCardPage() {
   >()
   const continued = resolution !== 'pending'
 
-  /** 记录确认卡的作答，并把过程推进到已作答。 */
+  // 记录确认卡的作答，并把过程推进到已作答。
   function handleConfirm(nextAnswers: Record<string, QuestionCardAnswer>): void {
     setSubmittedAnswers(nextAnswers)
     setResolution('answered')

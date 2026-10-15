@@ -17,7 +17,7 @@ export function RequireAuth(): React.ReactElement {
   const [attempt, setAttempt] = useState(0)
   const [loadState, setLoadState] = useState<'loading' | 'error'>('loading')
 
-  /** 未认证或缺用户信息时拉取当前用户；卸载后丢弃回填结果。 */
+  // 未认证或缺用户信息时拉取当前用户；卸载后丢弃回填结果。
   function restoreUser(): (() => void) | undefined {
     if (!isAuthenticated || user) return undefined
 
@@ -33,7 +33,7 @@ export function RequireAuth(): React.ReactElement {
 
   useEffect(restoreUser, [attempt, fetchMe, isAuthenticated, user])
 
-  /** 重试加载账户信息：先回到加载态，再触发一次重新拉取。 */
+  // 重试加载账户信息：先回到加载态，再触发一次重新拉取。
   function retryLoad(): void {
     setLoadState('loading')
     setAttempt((value) => value + 1)

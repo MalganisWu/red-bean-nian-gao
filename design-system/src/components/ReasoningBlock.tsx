@@ -1,8 +1,6 @@
-/*
- * 复合件 · ReasoningBlock（兼容入口）。
- * 不拥有独立视觉语言：把旧的 reason items 摊平后交给统一的 ProcessFold 渲染，
- * 保留这个导出只为兼容既有调用方，新代码直接用 ProcessFold。
- */
+// 复合件 · ReasoningBlock（兼容入口）。
+// 不拥有独立视觉语言：把旧的 reason items 摊平后交给统一的 ProcessFold 渲染，
+// 保留这个导出只为兼容既有调用方，新代码直接用 ProcessFold。
 'use client'
 
 import { ProcessFold, type ProcessStep } from './ProcessFold'

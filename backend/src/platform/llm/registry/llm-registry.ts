@@ -126,7 +126,7 @@ export class LlmProviderRegistry {
    * @returns Runtime SDK 认得的工厂函数；它内部查的是构造期封闭的静态表，运行期不会再变
    */
   public adapterFactory(): LlmAdapterFactory {
-    /** 按归一化后的 provider 名查表并构造 adapter；名字为空、查不到或工厂返回空都算失败。 */
+    // 按归一化后的 provider 名查表并构造 adapter；名字为空、查不到或工厂返回空都算失败。
     const createAdapter = (
       rawProvider: string,
       apiKey: string,

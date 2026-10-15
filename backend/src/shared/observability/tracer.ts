@@ -1,8 +1,6 @@
-/*
- * 产品侧的中性观测 Port。与 Runtime SDK 的同名契约同形但**独立定义**：
- * 业务代码依赖这一个，SDK 类型只在 Runtime Adapter 边界做映射，
- * 因此换观测后端（结构化日志 ↔ OTLP）不会波及任何业务模块。
- */
+// 产品侧的中性观测 Port。与 Runtime SDK 的同名契约同形但**独立定义**：
+// 业务代码依赖这一个，SDK 类型只在 Runtime Adapter 边界做映射，
+// 因此换观测后端（结构化日志 ↔ OTLP）不会波及任何业务模块。
 /** 产品宿主使用的中性 Trace 属性。 */
 export interface TraceAttribute {
   /** 属性名，如 `http.method`；命名由调用方约定。 */

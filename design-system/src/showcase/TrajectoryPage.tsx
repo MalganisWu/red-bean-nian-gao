@@ -15,7 +15,7 @@ import type {
 
 import { SpecPageHeader } from './SpecPageHeader'
 
-/* ===== 定稿演示数据（与 docs/design/session/session-trajectory.md 同口径） ===== */
+// ===== 定稿演示数据（与 docs/design/session/session-trajectory.md 同口径） =====
 
 /**
  * 上下文压缩夹具：发生在第 2 轮之后，token 由 42300 降到 8100、压缩 26 条消息。
@@ -325,9 +325,9 @@ const TURNS: TrajectoryTurn[] = [
 /** 会话级终态夹具：记录表末尾的「会话结束 · 完成」行，独立于轮次的 `endState`。 */
 const SESSION_END: TrajectorySessionEnd = { at: '14:09:11', state: 'completed' }
 
-/* 进行中轮次演示：末个已终结轮次（带「轮次 N 结束 · 完成」行）与紧随其后、endState 缺省的
-   进行中轮次并列，直观对比「已终结」与「仍在流式输出」。endState 缺省 = 前端实时投影尚未
-   收到轮次终态，此轮「时长」只是已确认活动区间的下界，且末条工具记录仍在执行。 */
+// 进行中轮次演示：末个已终结轮次（带「轮次 N 结束 · 完成」行）与紧随其后、endState 缺省的
+// 进行中轮次并列，直观对比「已终结」与「仍在流式输出」。endState 缺省 = 前端实时投影尚未
+// 收到轮次终态，此轮「时长」只是已确认活动区间的下界，且末条工具记录仍在执行。
 
 /**
  * 进行中轮次演示：已终结的第 3 轮，紧跟一个 `endState` 缺省的第 4 轮。
@@ -395,7 +395,7 @@ const IN_PROGRESS_TURNS: TrajectoryTurn[] = [
   },
 ]
 
-/* 加载期一次性分配全局稳定序号 #N（展示顺序即序号顺序） */
+// 加载期一次性分配全局稳定序号 #N（展示顺序即序号顺序）
 
 /**
  * 展示序号的单调计数器，只在本模块加载期使用。
@@ -425,9 +425,9 @@ for (const t of TURNS) {
   if (COMPACTION.afterTurn === t.turn) assignSeq(COMPACTION)
 }
 assignSeq(SESSION_END)
-/* 审批与打断演示：审批行（LLM 发起挂起 → 等待用户）、被打断的工具（用户主动取消 → 未闭合）、
-   以及两种终态（interrupt = 等待用户、crashed = 进程遗留）。
-   审批在存储层是同一 callId 的两条 append-only 记录，投影重建为**一行**并给出 waitMs。 */
+// 审批与打断演示：审批行（LLM 发起挂起 → 等待用户）、被打断的工具（用户主动取消 → 未闭合）、
+// 以及两种终态（interrupt = 等待用户、crashed = 进程遗留）。
+// 审批在存储层是同一 callId 的两条 append-only 记录，投影重建为**一行**并给出 waitMs。
 
 /**
  * 审批与打断演示数据：第 5 轮是审批（等待用户），第 6 轮是被用户取消。
@@ -524,7 +524,7 @@ const APPROVAL_TURNS: TrajectoryTurn[] = [
   },
 ]
 
-/* 进行中演示复用 turn 3 的记录（序号已在上方分配），只补新加的未终结轮次，避免覆盖既有序号 */
+// 进行中演示复用 turn 3 的记录（序号已在上方分配），只补新加的未终结轮次，避免覆盖既有序号
 for (const t of IN_PROGRESS_TURNS.filter((item) => item.endState === undefined)) {
   for (const r of t.records) {
     assignSeq(r)
@@ -595,12 +595,12 @@ function turnLabelOf(id: string | undefined): string | undefined {
 /** 会话轨迹视图 Showcase：泳道时序概览 + 轮次记录表 + 记录检查器。 */
 export function TrajectoryPage() {
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
-  /** 点产出行时携带的 tab（思考 / 正文 / 工具调用）——让详情直接停在那一块。 */
+  // 点产出行时携带的 tab（思考 / 正文 / 工具调用）——让详情直接停在那一块。
   const [selectedTab, setSelectedTab] = useState<string | undefined>(undefined)
   const [filter, setFilter] = useState('')
   const [focusIds, setFocusIds] = useState<ReadonlySet<string> | null>(null)
 
-  /** 选中记录：记住产出行带来的 tab；再点一次同一条（未带 tab）即清空选中。 */
+  // 选中记录：记住产出行带来的 tab；再点一次同一条（未带 tab）即清空选中。
   function handleSelect(id: string, tab?: string): void {
     setSelectedTab(tab)
     setSelectedId((cur) => (cur === id && tab === undefined ? undefined : id))

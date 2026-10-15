@@ -167,7 +167,7 @@ export class TaskExecutionService {
         { key: 'task.id', value: taskId },
       ],
     })
-    /** 在 span 内完成「加载状态 → 执行 Agent → 落库」，并把 Agent 失败向外抛出。 */
+    // 在 span 内完成「加载状态 → 执行 Agent → 落库」，并把 Agent 失败向外抛出。
     const executeRun = async (): Promise<void> => {
       const state = await this.#loadRunState(taskId, lease, traceId, signal)
       const outcome = await this.#executeAgent(state, lease, signal)

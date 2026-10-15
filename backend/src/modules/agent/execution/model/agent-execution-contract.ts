@@ -1,8 +1,6 @@
-/*
- * 产品侧的 Runtime 执行契约。这些类型与 SDK 的同名接口**形状对应但不共享定义**，
- * 是刻意的：业务模块只依赖本文件，SDK 类型只在 `execution/adapter/` 的 mapper 里出现。
- * 好处是 SDK 升级时的类型改动被挡在 Adapter 之外，业务层不会被波及。
- */
+// 产品侧的 Runtime 执行契约。这些类型与 SDK 的同名接口**形状对应但不共享定义**，
+// 是刻意的：业务模块只依赖本文件，SDK 类型只在 `execution/adapter/` 的 mapper 里出现。
+// 好处是 SDK 升级时的类型改动被挡在 Adapter 之外，业务层不会被波及。
 import type { AgentMessage, AgentToolCall } from '../../model/agent-message.js'
 import type { AgentJsonObject, AgentJsonValue } from '../../model/json-value.js'
 import type { AgentRuntimeEvent } from '../../run/model/agent-runtime-event.js'

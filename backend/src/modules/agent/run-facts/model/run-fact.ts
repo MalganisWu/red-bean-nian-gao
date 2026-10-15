@@ -1,10 +1,8 @@
 import type { AgentJsonObject } from '../../model/json-value.js'
 
-/**
- * 会话事实日志的消息级事实模型（设计见 docs/design/session/session-trajectory.md）。
- * 纯数据类型：不含 parser/serializer；JSON 信任边界的校验在 persistence 层 row mapper。
- * G1 只写 user / assistant / tool 三类；compaction 等会话级事实由 G2 扩展。
- */
+// 会话事实日志的消息级事实模型（设计见 docs/design/session/session-trajectory.md）。
+// 纯数据类型：不含 parser/serializer；JSON 信任边界的校验在 persistence 层 row mapper。
+// G1 只写 user / assistant / tool 三类；compaction 等会话级事实由 G2 扩展。
 
 /** 事实记录的当前 schema 版本；每条事实落库时都要带上。 */
 export const RUN_FACT_SCHEMA_VERSION = 1

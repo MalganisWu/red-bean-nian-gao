@@ -168,11 +168,9 @@ export async function loadConfig(options: LoadConfigOptions = {}): Promise<AppCo
   const directory = options.directory ?? process.cwd()
   const environment = options.environment ?? process.env
   const base = await readYamlConfig(join(directory, 'config.yaml'))
-  /*
-   * 本地单源：不再有 `config.local.yaml` 覆盖层。所有本地覆盖都走环境变量
-   * （`backend/.env.local` 在进程入口注入 `process.env`，见 `load-local-env-file.ts`）。
-   * 链路由三段收敛为两段：config.yaml（入库默认值） → process.env。
-   */
+  // 本地单源：不再有 `config.local.yaml` 覆盖层。所有本地覆盖都走环境变量
+  // （`backend/.env.local` 在进程入口注入 `process.env`，见 `load-local-env-file.ts`）。
+  // 链路由三段收敛为两段：config.yaml（入库默认值） → process.env。
   return parseConfig(record(base), environment)
 }
 

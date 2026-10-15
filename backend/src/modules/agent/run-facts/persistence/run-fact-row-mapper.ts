@@ -17,15 +17,13 @@ import {
 } from '../model/session-run.js'
 import { optionalField } from '../../../../shared/object/optional-field.js'
 
-/*
- * PostgreSQL 信任边界：session_runs 的 JSONB（facts/header）与列值一律从 unknown 开始校验，
- * 映射惯例与 session-row-mapper.ts 保持一致。
- *
- * 每条事实都自带 `schemaVersion`，读取端的纪律见 parseRunFacts：
- * 不认识的类型/版本，带 `ignorable` 标记的跳过、否则整批拒绝。
- * `ignorable` 由**写入端**在「这条记录丢了对审计不影响判断」时打上——
- * 这个决定只有写入方做得出来，读取方无从推断，所以标记落在数据里而不是代码里。
- */
+// PostgreSQL 信任边界：session_runs 的 JSONB（facts/header）与列值一律从 unknown 开始校验，
+// 映射惯例与 session-row-mapper.ts 保持一致。
+//
+// 每条事实都自带 `schemaVersion`，读取端的纪律见 parseRunFacts：
+// 不认识的类型/版本，带 `ignorable` 标记的跳过、否则整批拒绝。
+// `ignorable` 由**写入端**在「这条记录丢了对审计不影响判断」时打上——
+// 这个决定只有写入方做得出来，读取方无从推断，所以标记落在数据里而不是代码里。
 
 /** 单次 attempt 的 token 用量形状；cacheReadTokens 允许为 null（供应商未上报缓存命中）。 */
 const usageSchema = z.object({

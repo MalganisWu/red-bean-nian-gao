@@ -1,8 +1,6 @@
-/*
- * 复合件 · DelegationBlock（子 Agent 委派行）。
- * Process 轨道内的一行紧凑子任务：展开后只加深一层缩进，不嵌套第二条 Process，
- * 否则「子代理再嵌套子代理」会把轨道读成一棵树。
- */
+// 复合件 · DelegationBlock（子 Agent 委派行）。
+// Process 轨道内的一行紧凑子任务：展开后只加深一层缩进，不嵌套第二条 Process，
+// 否则「子代理再嵌套子代理」会把轨道读成一棵树。
 'use client'
 
 import { useState, type ReactElement } from 'react'

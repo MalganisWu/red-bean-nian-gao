@@ -328,21 +328,19 @@ async function closeActiveRun(run: ActiveRun): Promise<void> {
 function raceWithAbort(operation: Promise<void>, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return Promise.reject(abortReason(signal))
 
-  /**
-   * executor：operation 的落地与 signal 的中止谁先到谁兑现；
-   * 任一条路径先到都摘掉中止监听，不在调用方传进来的 signal 上留下监听器。
-   */
+  // executor：operation 的落地与 signal 的中止谁先到谁兑现；
+  // 任一条路径先到都摘掉中止监听，不在调用方传进来的 signal 上留下监听器。
   function settleAgainstAbort(resolve: () => void, reject: (reason?: unknown) => void): void {
     const onAbort = (): void => reject(abortReason(signal))
     signal.addEventListener('abort', onAbort, { once: true })
 
-    /** operation 成功落地：摘掉中止监听并放行等待。 */
+    // operation 成功落地：摘掉中止监听并放行等待。
     function onResolved(): void {
       signal.removeEventListener('abort', onAbort)
       resolve()
     }
 
-    /** operation 失败落地：摘掉中止监听并透传归一化错误。 */
+    // operation 失败落地：摘掉中止监听并透传归一化错误。
     function onRejected(cause: unknown): void {
       signal.removeEventListener('abort', onAbort)
       reject(normalizeError(cause))

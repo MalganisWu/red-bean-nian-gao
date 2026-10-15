@@ -562,11 +562,9 @@ export class PostgresMigrator implements MigrationRunnerPort {
    */
   public async up(signal: AbortSignal): Promise<MigrationGroup> {
     await this.initialize(signal)
-    /*
-     * 整个过程在一个事务里，且**先取 advisory lock 再读历史**——顺序不能反。
-     * 先读后锁的话，两个实例可能读到同一份历史，各自算出同一批 pending，然后双双执行。
-     * 锁在整个事务结束时自动释放（pg_advisory_xact_lock 的语义）。
-     */
+    // 整个过程在一个事务里，且**先取 advisory lock 再读历史**——顺序不能反。
+    // 先读后锁的话，两个实例可能读到同一份历史，各自算出同一批 pending，然后双双执行。
+    // 锁在整个事务结束时自动释放（pg_advisory_xact_lock 的语义）。
     return this.#database.transaction(signal, (transaction): Promise<MigrationGroup> =>
       this.#applyPendingMigrations(transaction, signal)
     )

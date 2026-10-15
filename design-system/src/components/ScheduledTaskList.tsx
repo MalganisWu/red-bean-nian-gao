@@ -166,7 +166,7 @@ export function ScheduledTaskList(props: ScheduledTaskListProps) {
   } = props
   const visibleItems = items.filter((item) => matchesFilter(item, filter))
 
-  /** 渲染一行定时任务：标题、计划、最近执行、生命周期与动作槽位。 */
+  // 渲染一行定时任务：标题、计划、最近执行、生命周期与动作槽位。
   function renderTaskItem(item: ScheduledTaskListItemData): ReactElement {
     const latestRun = item.latestRun
     return (

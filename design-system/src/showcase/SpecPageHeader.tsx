@@ -1,7 +1,5 @@
-/*
- * 内部件 · SpecPageHeader。
- * 展示站各组件页共用的标题区（标题 / 说明 / 备注三段），不对外承诺 API。
- */
+// 内部件 · SpecPageHeader。
+// 展示站各组件页共用的标题区（标题 / 说明 / 备注三段），不对外承诺 API。
 
 /** 规范页头部 Props；三段文字依次渲染为标题、说明与备注，均为必填。 */
 export interface SpecPageHeaderProps {

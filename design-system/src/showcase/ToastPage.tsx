@@ -78,7 +78,7 @@ function showAllPreviewToasts(): void {
 function mountPreviewToasts(): () => void {
   const previewTimer = window.setTimeout(showAllPreviewToasts, 400)
 
-  /** 卸载时撤销定时器，并关掉可能仍在屏幕上的预览通知。 */
+  // 卸载时撤销定时器，并关掉可能仍在屏幕上的预览通知。
   function clearPreviewToasts(): void {
     window.clearTimeout(previewTimer)
     toast.dismiss(PREVIEW_IDS.notice)

@@ -1,4 +1,4 @@
-/** 契约包入口：聚合各域的 DTO、schema 与运行时守卫，消费方从这一个入口统一取用。 */
+// 契约包入口：聚合各域的 DTO、schema 与运行时守卫，消费方从这一个入口统一取用。
 export * from './chat/dto.js'
 export * from './chat/event-types.js'
 export * from './chat/schema.js'

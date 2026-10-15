@@ -17,15 +17,13 @@ import {
 import type { TrajectoryAttempt, TrajectoryRecord } from '@/components/retroui/TrajectoryLedger'
 import { formatEpochToClock } from '@/pages/chat/trajectory-mapper'
 
-/**
- * 轨迹实时投影 store：与 chat-store 并行消费同一批 SSE 事件，做第二个投影
- * （一条事件流、两个独立投影）。
- *
- * 口径纪律：
- * - 进行中的记录只有开始标记，不虚构耗时（durationMs 缺省，时长列显示 —）；
- * - live 耗时是客户端 Date.now 近似值；持久化数字以服务端为准；
- * - DONE 的 tokens_used 是服务端真实值，直接作为轮次 token 合计。
- */
+// 轨迹实时投影 store：与 chat-store 并行消费同一批 SSE 事件，做第二个投影
+// （一条事件流、两个独立投影）。
+//
+// 口径纪律：
+// - 进行中的记录只有开始标记，不虚构耗时（durationMs 缺省，时长列显示 —）；
+// - live 耗时是客户端 Date.now 近似值；持久化数字以服务端为准；
+// - DONE 的 tokens_used 是服务端真实值，直接作为轮次 token 合计。
 
 /** 流式构建中的可变记录。 */
 interface LiveRecord {
@@ -202,12 +200,12 @@ function beginTurnState(
       },
     ],
   }
-  /* 只保留"当前进行中的一轮"：已结束的轮次以持久化历史为准，实时侧不留存——
-     否则视图重新打开时同一个 run 会既出现在历史里、又出现在实时投影里（重复轮次）。 */
+  // 只保留"当前进行中的一轮"：已结束的轮次以持久化历史为准，实时侧不留存——
+  // 否则视图重新打开时同一个 run 会既出现在历史里、又出现在实时投影里（重复轮次）。
   return {
     liveTurns: [turn],
     recordStartTimes: {},
-    /* 新会话此时还没有 session_id（START 才带回），先记已知值，START 会补齐 */
+    // 新会话此时还没有 session_id（START 才带回），先记已知值，START 会补齐
     liveSessionId: sessionId ?? null,
   }
 }
@@ -245,8 +243,8 @@ function reduceTrajectoryEvent(
       if (!turn || !isTokenEvent(event.data)) return state
       const step = ensureCall(turn)
       step.reply = (step.reply ?? '') + event.data.content
-      /* 摘要必须跟随回答一起增长，且与持久化投影同口径（有回答取回答首行）。
-         只更新 reply 会让记录行在整个作答期间一动不动——看起来像轨迹停住了。 */
+      // 摘要必须跟随回答一起增长，且与持久化投影同口径（有回答取回答首行）。
+      // 只更新 reply 会让记录行在整个作答期间一动不动——看起来像轨迹停住了。
       step.summary = callSummary(step)
       return { liveTurns: turns }
     }
@@ -255,7 +253,7 @@ function reduceTrajectoryEvent(
       const code = event.data.code
       if (code === 'llm_retry' || code === 'llm_empty_response_retry') {
         const step = ensureCall(turn)
-        /* 上一次尝试以失败告终，新一次尝试开始 */
+        // 上一次尝试以失败告终，新一次尝试开始
         const attempts: TrajectoryAttempt[] = [...(step.attempts ?? [])]
         const prev = attempts.at(-1)
         if (prev?.status === 'running') {
@@ -308,12 +306,12 @@ function reduceTrajectoryEvent(
           ...target,
           status: failed ? 'error' : 'success',
           result: failed ? data.error : data.content,
-          /* 失败摘要与持久化投影同口径（带错误首行），否则流式与回放两态对不上 */
+          // 失败摘要与持久化投影同口径（带错误首行），否则流式与回放两态对不上
           summary: failed
             ? `${data.tool_name} 失败：${firstLine(data.error ?? '')}`
             : firstLine(data.content || data.tool_name),
         }
-        /* 计时起点在 recordStartTimes 侧表（记录本体不带流式计时字段） */
+        // 计时起点在 recordStartTimes 侧表（记录本体不带流式计时字段）
         const startedAt = state.recordStartTimes[target.id]
         if (startedAt !== undefined) {
           settled.durationMs = Math.max(0, Date.now() - startedAt)
@@ -372,7 +370,7 @@ function reduceTrajectoryEvent(
       return { streamingSessionId: null, liveTurns: turns }
     }
     case SSE_EVENT_TYPES.ERROR: {
-      /* 流式错误：本轮以失败终态收尾（轨迹如实记录失败，不做成功伪装） */
+      // 流式错误：本轮以失败终态收尾（轨迹如实记录失败，不做成功伪装）
       if (!turn) return state
       turn.records.push({
         id: nextId(),
@@ -384,10 +382,10 @@ function reduceTrajectoryEvent(
       return { streamingSessionId: null, liveTurns: turns }
     }
     case SSE_EVENT_TYPES.CARD: {
-      /* 审批挂起：LLM 决定调用 interrupting 工具，服务端在流结束前发 card 事件。
-             轨迹侧据此合成一行「工具 · 等待审批」——否则这次调用在实时视图里完全不存在
-             （interrupting 工具不发 tool_start / tool_result），与持久化视图对不上。
-             `interaction_id` 就是 callId，与持久化侧按 callId 重建出的行同源。 */
+      // 审批挂起：LLM 决定调用 interrupting 工具，服务端在流结束前发 card 事件。
+      // 轨迹侧据此合成一行「工具 · 等待审批」——否则这次调用在实时视图里完全不存在
+      // （interrupting 工具不发 tool_start / tool_result），与持久化视图对不上。
+      // `interaction_id` 就是 callId，与持久化侧按 callId 重建出的行同源。
       if (!turn || !isCardEvent(event.data)) return state
       const card = event.data
       if (card.status !== 'pending') return state
@@ -407,7 +405,7 @@ function reduceTrajectoryEvent(
       })
       return { liveTurns: turns }
     }
-    /* heartbeat（心跳）由 chat 主投影承担，轨迹投影不消费 */
+    // heartbeat（心跳）由 chat 主投影承担，轨迹投影不消费
     case SSE_EVENT_TYPES.HEARTBEAT:
       return state
     default:
@@ -521,8 +519,8 @@ function settleAttempt(
  */
 function firstLine(text: string): string {
   const line = text.split('\n', 1)[0] ?? ''
-  /* 200 字符与截断标记必须与后端持久化投影（SUMMARY_MAX_CHARS）保持一致：
-     流式与回放切换时摘要不应无端变样。视觉截断由 CSS 负责，这里只是防御上限。 */
+  // 200 字符与截断标记必须与后端持久化投影（SUMMARY_MAX_CHARS）保持一致：
+  // 流式与回放切换时摘要不应无端变样。视觉截断由 CSS 负责，这里只是防御上限。
   return line.length > 200 ? `${line.slice(0, 200)}...` : line
 }
 
@@ -541,10 +539,10 @@ function callSummary(step: LiveRecord): string {
 
 export type { LiveRecord, LiveTurn }
 
-/* store 一律不做热替换：React Fast Refresh 只重建"接受更新"的组件边界，没被重建的模块
-   （如 useChatStream）会继续持有旧 store 实例，于是写入方与读取方各绑一份 state——
-   表现就是实时投影不再跟随 SSE、流结束后同一轮出现两次。这里声明自接受并整页刷新，
-   代价是开发期一次刷新，换来实例唯一（import.meta.hot 在生产构建中为 undefined）。 */
+// store 一律不做热替换：React Fast Refresh 只重建"接受更新"的组件边界，没被重建的模块
+// （如 useChatStream）会继续持有旧 store 实例，于是写入方与读取方各绑一份 state——
+// 表现就是实时投影不再跟随 SSE、流结束后同一轮出现两次。这里声明自接受并整页刷新，
+// 代价是开发期一次刷新，换来实例唯一（import.meta.hot 在生产构建中为 undefined）。
 if (import.meta.hot) {
   import.meta.hot.accept(() => {
     window.location.reload()

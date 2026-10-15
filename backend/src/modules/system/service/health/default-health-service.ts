@@ -86,7 +86,7 @@ export class HealthService implements HealthServicePort {
     if (this.#draining)
       return { status: 503, body: { status: 'not_ready', checks: { server: 'draining' } } }
     const names: readonly (keyof ReadinessChecks)[] = ['database', 'redis', 'storage']
-    /** 跑单个依赖探针并归一为 ok/error；探针自身失败不向外抛。 */
+    // 跑单个依赖探针并归一为 ok/error；探针自身失败不向外抛。
     const runCheck = async (
       name: keyof ReadinessChecks
     ): Promise<readonly [keyof ReadinessChecks, 'ok' | 'error']> => {
@@ -128,12 +128,12 @@ async function runWithTimeout(
   else parentSignal.addEventListener('abort', abort, { once: true })
   let timeout: ReturnType<typeof setTimeout> | undefined
 
-  /** executor：到点中止探针并让竞速以超时错误失败；句柄交给外层 `finally` 清理。 */
+  // executor：到点中止探针并让竞速以超时错误失败；句柄交给外层 `finally` 清理。
   function armTimeout(
     _resolve: (value: PromiseLike<never>) => void,
     reject: (reason?: unknown) => void
   ): void {
-    /** 探针超时：先中止 controller（探针自己也要能感知），再让竞速失败。 */
+    // 探针超时：先中止 controller（探针自己也要能感知），再让竞速失败。
     function onTimeout(): void {
       controller.abort(new Error('readiness check timed out'))
       reject(new Error('readiness check timed out'))
@@ -142,7 +142,7 @@ async function runWithTimeout(
     timeout = setTimeout(onTimeout, timeoutMilliseconds)
   }
 
-  /** executor：探针被中止时让竞速以中止原因失败；父信号与超时都走同一个 controller。 */
+  // executor：探针被中止时让竞速以中止原因失败；父信号与超时都走同一个 controller。
   function watchProbeAbort(
     _resolve: (value: PromiseLike<never>) => void,
     reject: (reason?: unknown) => void

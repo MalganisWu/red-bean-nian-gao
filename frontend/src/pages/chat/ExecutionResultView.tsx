@@ -57,7 +57,7 @@ export function ExecutionResultView(props: ExecutionResultViewProps) {
   const loadExecutionViewStates = useTaskStore((state) => state.loadExecutionViewStates)
   const markExecutionSeen = useTaskStore((state) => state.markExecutionSeen)
 
-  /** 拉取任务与本次执行详情（首屏加载与失败重试共用）。 */
+  // 拉取任务与本次执行详情（首屏加载与失败重试共用）。
   function loadTaskAndExecution(): void {
     void loadTaskDetail(taskId)
     void loadExecutionDetail(taskId, executionId)
@@ -65,7 +65,7 @@ export function ExecutionResultView(props: ExecutionResultViewProps) {
 
   useEffect(loadTaskAndExecution, [executionId, loadExecutionDetail, loadTaskDetail, taskId])
 
-  /** 当前执行详情已就绪时补拉该执行的视图状态（已看过/已折叠）。 */
+  // 当前执行详情已就绪时补拉该执行的视图状态（已看过/已折叠）。
   function loadExecutionViewState(): void {
     if (activeExecution?.TaskID !== taskId || activeExecution.ExecutionID !== executionId) return
     void loadExecutionViewStates([executionId])
@@ -73,7 +73,7 @@ export function ExecutionResultView(props: ExecutionResultViewProps) {
 
   useEffect(loadExecutionViewState, [activeExecution, executionId, loadExecutionViewStates, taskId])
 
-  /** 视图状态就绪且尚未标记已读时，延迟 800ms 上报「已看过」。 */
+  // 视图状态就绪且尚未标记已读时，延迟 800ms 上报「已看过」。
   function markSeenWhenReady(): (() => void) | undefined {
     if (!executionViewStateLoaded || executionViewState?.seen_at) return undefined
     const timer = window.setTimeout(() => {

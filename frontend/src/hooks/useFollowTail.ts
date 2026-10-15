@@ -48,13 +48,13 @@ export function useFollowTail(props: FollowTailOptions): FollowTail {
   useEffect(resetFollowIntent, [active])
   useEffect(scrollToBottom, [active, contentKey])
 
-  /* 跟随窗口关闭时复位跟随意图：避免上一轮的「用户上滚」状态带进下一轮流 */
+  // 跟随窗口关闭时复位跟随意图：避免上一轮的「用户上滚」状态带进下一轮流
   function resetFollowIntent(): void {
     if (active) return
     followRef.current = true
   }
 
-  /* 内容增长时贴底：仅在跟随生效且用户未上滚暂停时执行 */
+  // 内容增长时贴底：仅在跟随生效且用户未上滚暂停时执行
   function scrollToBottom(): void {
     if (!active || !followRef.current) return
     const el = containerRef.current
@@ -62,11 +62,11 @@ export function useFollowTail(props: FollowTailOptions): FollowTail {
     el.scrollTop = el.scrollHeight
   }
 
-  /** 滚动事件：按距底距离判定用户上滚暂停 / 回底恢复跟随。 */
+  // 滚动事件：按距底距离判定用户上滚暂停 / 回底恢复跟随。
   function onScroll(event: UIEvent<HTMLDivElement>): void {
     const el = event.currentTarget
     const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    /* 程序化贴底后该距离为 0，不会误判为上滚 */
+    // 程序化贴底后该距离为 0，不会误判为上滚
     followRef.current = distanceToBottom <= FOLLOW_TAIL_THRESHOLD_PX
   }
 

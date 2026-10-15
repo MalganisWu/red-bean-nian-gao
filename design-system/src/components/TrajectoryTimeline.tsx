@@ -107,7 +107,7 @@ function computePositions(
       p.width = Math.max((p.width / total) * 100, 0.9)
     }
   }
-  /* 请求子记录继承所属步骤位置 */
+  // 请求子记录继承所属步骤位置
   for (const t of turns) {
     for (const r of t.records) {
       const p = pos.get(r.id)
@@ -198,7 +198,7 @@ function bindWheelZoom(
   applyZoom: (updater: (previous: number) => number) => void
 ): (() => void) | undefined {
   if (!host) return undefined
-  /* 取别名而非直接用参数：TS 的窄化不会进入下面两个闭包，参数在这里仍视为可空。 */
+  // 取别名而非直接用参数：TS 的窄化不会进入下面两个闭包，参数在这里仍视为可空。
   const laneHost = host
   function handleWheelZoom(event: WheelEvent): void {
     if (!event.ctrlKey && !event.metaKey) return
@@ -261,19 +261,19 @@ export function TrajectoryTimeline(props: TrajectoryTimelineProps) {
   const lanesRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<number | null>(null)
 
-  /* 区间变化时向消费方通告区间内记录集合 */
+  // 区间变化时向消费方通告区间内记录集合
   useEffect(
     () => publishRangeFocus(positions, rangeSel, onRangeFocus),
     [rangeSel, positions, onRangeFocus]
   )
 
-  /* Esc 复位选区 */
+  // Esc 复位选区
   useEffect(() => bindEscapeReset(() => setRangeSel(null)), [])
 
-  /* Ctrl/⌘+滚轮缩放需要 non-passive 监听才能 preventDefault */
+  // Ctrl/⌘+滚轮缩放需要 non-passive 监听才能 preventDefault
   useEffect(() => bindWheelZoom(lanesRef.current, setZoom), [])
 
-  /** 把客户端 x 坐标换算成轨道内的百分比（0–100）。 */
+  // 把客户端 x 坐标换算成轨道内的百分比（0–100）。
   function pctOfClientX(clientX: number): number {
     const track = lanesRef.current?.querySelector('.trajectory-lane-track')
     const rect = track?.getBoundingClientRect()
@@ -281,7 +281,7 @@ export function TrajectoryTimeline(props: TrajectoryTimelineProps) {
     return Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100))
   }
 
-  /** 左键在轨道上按下：起点即拖选区间。 */
+  // 左键在轨道上按下：起点即拖选区间。
   function handleMouseDown(event: MouseEvent<HTMLDivElement>): void {
     if (event.button !== 0) return
     if (!(event.target instanceof HTMLElement)) return
@@ -292,21 +292,21 @@ export function TrajectoryTimeline(props: TrajectoryTimelineProps) {
     event.preventDefault()
   }
 
-  /** 拖拽中：让选区的右端跟随指针。 */
+  // 拖拽中：让选区的右端跟随指针。
   function handleMouseMove(event: MouseEvent<HTMLDivElement>): void {
     if (dragRef.current === null) return
     const x = pctOfClientX(event.clientX)
     setRangeSel({ l: Math.min(dragRef.current, x), r: Math.max(dragRef.current, x) })
   }
 
-  /** 松开鼠标结束拖选。 */
+  // 松开鼠标结束拖选。
   function handleMouseUp(): void {
-    /* 宽度不足 0.5% 视为单击，不成选区 */
+    // 宽度不足 0.5% 视为单击，不成选区
     setRangeSel((cur) => (cur && cur.r - cur.l < 0.5 ? null : cur))
     dragRef.current = null
   }
 
-  /** 右键：有选区时阻止默认菜单并清空选区。 */
+  // 右键：有选区时阻止默认菜单并清空选区。
   function handleContextMenu(event: MouseEvent<HTMLDivElement>): void {
     if (rangeSel) {
       event.preventDefault()
@@ -314,7 +314,7 @@ export function TrajectoryTimeline(props: TrajectoryTimelineProps) {
     }
   }
 
-  /** 渲染压缩泳道的标记段；没有压缩事件或其位置缺失时不渲染。 */
+  // 渲染压缩泳道的标记段；没有压缩事件或其位置缺失时不渲染。
   function renderCompactionMarker(): ReactElement | null {
     if (!compaction) return null
     const p = positions.get(compaction.id)
@@ -339,7 +339,7 @@ export function TrajectoryTimeline(props: TrajectoryTimelineProps) {
     )
   }
 
-  /** 渲染一条记录在泳道里的段；位置缺失时不渲染。 */
+  // 渲染一条记录在泳道里的段；位置缺失时不渲染。
   function renderSegment(r: TrajectoryRecord): ReactElement | null {
     const p = positions.get(r.id)
     if (!p) return null

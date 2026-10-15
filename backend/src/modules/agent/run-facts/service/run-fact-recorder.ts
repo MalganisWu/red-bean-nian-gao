@@ -238,7 +238,7 @@ export class RunFactRecorder implements AgentExecutionEventSink {
     readonly params: AgentJsonObject | null
     readonly startedAt: number
   }): void {
-    /* 登记 callId：同一次运行内不会再收到闭合消息（运行就挂起了），登记只为防御重复写入 */
+    // 登记 callId：同一次运行内不会再收到闭合消息（运行就挂起了），登记只为防御重复写入
     this.#seenToolCalls.add(input.callId)
     const interruptedToolFact = toolFact({
       callId: input.callId,
@@ -378,7 +378,7 @@ export class RunFactRecorder implements AgentExecutionEventSink {
    * @param operation - 返回写入 promise 的操作；失败由队列捕获并置 #broken
    */
   #enqueue(operation: () => Promise<void>): void {
-    /** 写入失败收尾：标记停写，并把归一化后的错误交给诊断回调（缺省即静默降级）。 */
+    // 写入失败收尾：标记停写，并把归一化后的错误交给诊断回调（缺省即静默降级）。
     const onWriteFailure = (cause: unknown): void => {
       this.#broken = true
       this.#onError?.(normalizeError(cause))

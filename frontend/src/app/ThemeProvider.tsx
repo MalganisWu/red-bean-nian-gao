@@ -40,7 +40,7 @@ export function ThemeProvider(props: { children: ReactNode }) {
   const { children } = props
   const [theme, setTheme] = useState<Theme>(initialTheme)
 
-  /** 把当前主题同步到 `documentElement` 与 localStorage。 */
+  // 把当前主题同步到 `documentElement` 与 localStorage。
   function applyTheme(): void {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     document.documentElement.style.colorScheme = theme

@@ -31,7 +31,7 @@ export function TasksPage() {
     tasksLoading
   )
 
-  /** 首屏初始化：清空分页状态后加载第一页任务。 */
+  // 首屏初始化：清空分页状态后加载第一页任务。
   function initializeTasks(): void {
     reset()
     void loadTasks()
@@ -39,7 +39,7 @@ export function TasksPage() {
 
   useEffect(initializeTasks, [loadTasks, reset])
 
-  /** 预取各任务最近一次执行的视图状态（无执行记录的任务跳过）。 */
+  // 预取各任务最近一次执行的视图状态（无执行记录的任务跳过）。
   function prefetchExecutionViewStates(): void {
     const executionIds = tasks.flatMap((task) =>
       task.latest_execution ? [task.latest_execution.ExecutionID] : []

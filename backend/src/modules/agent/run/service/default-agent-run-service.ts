@@ -155,7 +155,7 @@ export class ProductAgentRunService implements AgentRunServicePort {
     const config = executableConfig(
       await this.#loader.load(request.agentId, signal, { eventSink: emit })
     )
-    /** 事实写入失败只影响审计日志：记录 run 维度上下文，不打断会话主流程。 */
+    // 事实写入失败只影响审计日志：记录 run 维度上下文，不打断会话主流程。
     const reportFactWriteError = (error: Error): void => {
       this.#logger?.error('session run 事实日志写入失败', {
         error,
@@ -249,8 +249,8 @@ export class ProductAgentRunService implements AgentRunServicePort {
       const definition: AgentExecutionDefinition = {
         // 事实日志的模型观察 adapter 只包主运行：子 Agent 经 Loader 捕获原始 adapter。
         model: facts === undefined ? config.llmAdapter : facts.observeModel(config.llmAdapter),
-        /* 审批挂起事实：interrupting 工具不发 tool_start/tool_result，只能由宿主在
-           工具返回 interrupt 信号时自己记（引擎对「审批」一无所知）。 */
+        // 审批挂起事实：interrupting 工具不发 tool_start/tool_result，只能由宿主在
+        // 工具返回 interrupt 信号时自己记（引擎对「审批」一无所知）。
         dispatcher:
           facts === undefined
             ? config.toolDispatcher
