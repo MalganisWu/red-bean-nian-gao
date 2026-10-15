@@ -64,7 +64,7 @@ HTTP 边界按业务能力组织在 `src/modules/<module>/**/controller/`；公�
 
 - `*.module.ts` 按「组装目录」组织：组装体拆成按能力分段的私有工厂函数，函数名即段落标题（如
   `createPersistence` / `createDelivery` / `createScheduler` / `createCases`），主入口只保留
-  解构 + 工厂调用 + 返回组装；每段配一行中文段标题注释（`// ── 段名 ──` 或 JSDoc），保证组装清单
+  解构 + 工厂调用 + 返回组装；每段配一行中文段标题注释（`// ── 段名 ──`），保证组装清单
   从上到下一条流水线读完，不逐行编码对象构造。目录页化只重组模块文件，不改接线对象与行为。
 - 生产类的默认实现在对应 `*.module.ts` 中以明确的 `new ConcreteClass(...)` 绑定，
   `src/app/composition-root.ts` 只连接基础设施和各 Module 的公开能力。**两者都不得退化为运行期
@@ -110,8 +110,7 @@ Routes 100 行、Controller 200 行、主 Service 250 行、Adapter 300 行和�
 
 ## 注释
 
-注释的唯一事实来源是 [`references/common.md`](references/common.md) 的「注释」章节——适用范围、
-机械门禁检查什么、书写要求、提交前人工检查，全在那里。本仓额外强调：
+注释的唯一事实来源是 [`references/common.md`](references/common.md) 的「注释」章节。本仓额外强调：
 
 - DTO、Port、Adapter 和 Application Service 的模块入口要说明所有权、失败语义或数据转换方向。
 - Port 的 JSDoc 应注明默认实现与 composition root 组装位置。

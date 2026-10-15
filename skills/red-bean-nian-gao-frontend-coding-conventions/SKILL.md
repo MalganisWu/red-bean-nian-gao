@@ -153,8 +153,7 @@ AI 生成的代码默认不做性能优化（`memo`、`lazy`），避免过度�
 
 ## 注释
 
-注释的唯一事实来源是 [`references/common.md`](references/common.md) 的「注释」章节——适用范围、
-机械门禁检查什么、书写要求、提交前人工检查，全在那里。这两个 workspace 额外强调：
+注释的唯一事实来源是 [`references/common.md`](references/common.md) 的「注释」章节。这两个 workspace 额外强调：
 
 - **Props 注释即对外 API 文档**：关键 Props 用 JSDoc 说明用途与边界——回调触发时机、`undefined`
   与缺省语义、联动的前置条件。组件被前端经 alias 跨项目消费，改 Props 必须同 diff 更新注释。
