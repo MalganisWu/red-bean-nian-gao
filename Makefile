@@ -196,7 +196,7 @@ bootstrap: ## 克隆同级 Runtime SDK、检出 runtime.lock 版本并构建它�
 		git -C "$(SDK_DIR)" checkout --quiet --detach "$$lock" \
 			|| { echo "无法检出 $$lock —— 该版本可能还没推送到 $(SDK_REPO_URL)" >&2; exit 1; }; \
 	}; \
-	if [ -d "$(SDK_DIR)/.git" ]; then \
+	if git -C "$(SDK_DIR)" rev-parse --git-dir >/dev/null 2>&1; then \
 		current="$$(git -C "$(SDK_DIR)" rev-parse HEAD 2>/dev/null || true)"; \
 		if [ "$$current" = "$$lock" ]; then \
 			echo "Runtime SDK 已在 runtime.lock 锁定的版本：$$lock"; \
@@ -204,6 +204,8 @@ bootstrap: ## 克隆同级 Runtime SDK、检出 runtime.lock 版本并构建它�
 			echo "Runtime SDK 位于 $$current，切到 runtime.lock：$$lock"; \
 			checkout_locked; need_build=1; \
 		fi; \
+	elif [ -e "$(SDK_DIR)" ]; then \
+		echo "$(SDK_DIR) 已存在，但不是 Git 工作区（既不是检出也不是 worktree）——请手动处理后再运行" >&2; exit 1; \
 	else \
 		echo "克隆 Runtime SDK → $(SDK_DIR)"; \
 		git clone --quiet "$(SDK_REPO_URL)" "$(SDK_DIR)"; \
@@ -339,9 +341,7 @@ ds-check: ## Design System 质量检查（lint + format + typecheck + build）
 	$(PNPM_DS) ai:check
 
 # ── 前后端联合启动 ────────────────────────────────────────────────────────
-full-dev: ## 同时启动后端 + 前端（后端 8080，前端 5173）
-	@echo "启动后端..."
-	@$(PNPM_BE) dev &
-	@echo "启动前端..."
-	@$(PNPM) dev
-	@wait
+# 交给 scripts/full-dev.sh：Make 每行配方各起一个 shell，写在同一目标里的 `&` 与 `wait`
+# 跨不了 shell，中断时后端会留在 8080 端口上。脚本里两个进程同组启动、显式记 PID、trap 清理。
+full-dev: ## 同时启动后端 + 前端（后端 8080，前端 5173；退出时两个都清理）
+	@bash scripts/full-dev.sh
