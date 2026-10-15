@@ -135,7 +135,7 @@ check_living_doc_index() {
 			report_error "$file 未收录到 docs/README.md 活文档索引"
 		fi
 	done < <(git -C "$root" ls-files --cached --others --exclude-standard -- \
-		'docs/contracts/*.md' 'docs/design/**/*.md' 'docs/guides/*.md' \
+		'docs/glossary.md' 'docs/contracts/*.md' 'docs/design/**/*.md' 'docs/guides/*.md' \
 		'backend/docs/standards/*.md' 'frontend/docs/standards/*.md' \
 		'design-system/docs/*.md')
 }

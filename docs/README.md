@@ -39,6 +39,8 @@
 - [`../frontend/docs/standards/coding-conventions.md`](../frontend/docs/standards/coding-conventions.md)：前端编码规范。
 - [`../frontend/docs/standards/development-workflow.md`](../frontend/docs/standards/development-workflow.md)：前端开发流程。
 
+- [`glossary.md`](glossary.md)：**读者索引** —— 产品侧术语的一句话定义与「不是……」边界，含与 Runtime 契约词的跨层对照；不是第二个事实来源。
+
 ### Design System 规范
 
 - [`../design-system/docs/frontend-ui-coverage.md`](../design-system/docs/frontend-ui-coverage.md)：正式前端覆盖关系。
