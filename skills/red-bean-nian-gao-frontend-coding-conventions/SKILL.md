@@ -36,7 +36,7 @@ description: 在 red-bean-nian-gao 中编写、修改、重构或评审 frontend
 
 ## 组件
 
-- 一个文件一个组件，默认导出；文件名与组件名一致。
+- 一个文件一个组件，**具名导出**（`export function ChatInput`）；文件名与组件名一致。
 - 用函数组件，**不用 class 组件**，**不用 `React.FC`**。
 - Props 的 `interface` 放组件上方，不内联。
 - 参数写具名 `props: XxxProps`，解构放函数体首行；函数体内不使用 `props.xxx`。
@@ -129,8 +129,10 @@ return <DataView data={data} />
 guard/decoder 校验。返回类型标注不能替代运行时验证。**
 
 ```tsx
+import { API_ROUTES } from '@red-bean/api-contract'   // 路径只从这里来，不手写字面量
+
 async function fetchSessions(): Promise<SessionListResponse> {
-  return apiCall('/api/sessions', {}, (value) =>
+  return apiCall(API_ROUTES.SESSIONS.path, {}, (value) =>
     decodeEnvelopeData(value, isSessionListResponse, 'session list')
   )
 }
