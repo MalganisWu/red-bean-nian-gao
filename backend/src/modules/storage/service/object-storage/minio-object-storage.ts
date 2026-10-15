@@ -43,7 +43,7 @@ export class MinioObjectStorage implements ObjectStorage {
   readonly #region: string
 
   public constructor(config: MinioStorageConfig) {
-    if (config.bucket.trim() === '') throw new Error('MinIO bucket must not be empty')
+    if (config.bucket.trim() === '') throw new Error('MinIO bucket 不能为空')
     this.#client = new Client(clientOptions(config))
     this.#bucket = config.bucket
     this.#region = config.region
@@ -66,12 +66,9 @@ export class MinioObjectStorage implements ObjectStorage {
       }
       signal.throwIfAborted()
     } catch (cause: unknown) {
-      throw new Error(
-        `failed to ensure bucket ${JSON.stringify(this.#bucket)}: ${message(cause)}`,
-        {
-          cause,
-        }
-      )
+      throw new Error(`确保 bucket ${JSON.stringify(this.#bucket)} 存在失败：${message(cause)}`, {
+        cause,
+      })
     }
   }
 
@@ -95,7 +92,7 @@ export class MinioObjectStorage implements ObjectStorage {
       signal.throwIfAborted()
       return objectInfo(input.key, await this.#client.statObject(this.#bucket, input.key))
     } catch (cause: unknown) {
-      throw new Error(`upload ${JSON.stringify(input.key)} failed: ${message(cause)}`, { cause })
+      throw new Error(`上传 ${JSON.stringify(input.key)} 失败：${message(cause)}`, { cause })
     }
   }
 
@@ -121,7 +118,7 @@ export class MinioObjectStorage implements ObjectStorage {
       return { body, info }
     } catch (cause: unknown) {
       body?.destroy()
-      throw new Error(`download ${JSON.stringify(key)} failed: ${message(cause)}`, { cause })
+      throw new Error(`下载 ${JSON.stringify(key)} 失败：${message(cause)}`, { cause })
     }
   }
 
@@ -139,7 +136,7 @@ export class MinioObjectStorage implements ObjectStorage {
       await this.#client.removeObject(this.#bucket, key)
       signal.throwIfAborted()
     } catch (cause: unknown) {
-      throw new Error(`delete ${JSON.stringify(key)} failed: ${message(cause)}`, { cause })
+      throw new Error(`删除 ${JSON.stringify(key)} 失败：${message(cause)}`, { cause })
     }
   }
 
@@ -161,7 +158,7 @@ export class MinioObjectStorage implements ObjectStorage {
       return objectInfo(key, stat)
     } catch (cause: unknown) {
       if (hasErrorCode(cause, 'NoSuchKey') || hasErrorCode(cause, 'NotFound')) return undefined
-      throw new Error(`stat ${JSON.stringify(key)} failed: ${message(cause)}`, { cause })
+      throw new Error(`读取 ${JSON.stringify(key)} 元信息失败：${message(cause)}`, { cause })
     }
   }
 
@@ -186,7 +183,7 @@ export class MinioObjectStorage implements ObjectStorage {
       signal.throwIfAborted()
       return url
     } catch (cause: unknown) {
-      throw new Error(`presign get ${JSON.stringify(input.key)} failed: ${message(cause)}`, {
+      throw new Error(`生成读取预签名地址 ${JSON.stringify(input.key)} 失败：${message(cause)}`, {
         cause,
       })
     }
@@ -212,7 +209,7 @@ export class MinioObjectStorage implements ObjectStorage {
       signal.throwIfAborted()
       return url
     } catch (cause: unknown) {
-      throw new Error(`presign put ${JSON.stringify(input.key)} failed: ${message(cause)}`, {
+      throw new Error(`生成写入预签名地址 ${JSON.stringify(input.key)} 失败：${message(cause)}`, {
         cause,
       })
     }
@@ -232,11 +229,11 @@ export class MinioObjectStorage implements ObjectStorage {
 function clientOptions(config: MinioStorageConfig): ClientOptions {
   const endpoint = new URL(`${config.useSsl ? 'https' : 'http'}://${config.endpoint}`)
   if (endpoint.pathname !== '/' || endpoint.search !== '' || endpoint.hash !== '') {
-    throw new Error('MinIO endpoint must contain only host and optional port')
+    throw new Error('MinIO endpoint 只能包含主机与可选端口')
   }
   const port = endpoint.port === '' ? undefined : Number(endpoint.port)
   if (port !== undefined && (!Number.isSafeInteger(port) || port <= 0)) {
-    throw new Error('MinIO endpoint port is invalid')
+    throw new Error('MinIO endpoint 端口非法')
   }
   return {
     endPoint: endpoint.hostname,

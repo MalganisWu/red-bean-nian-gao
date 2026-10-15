@@ -84,9 +84,9 @@ export function createObservabilityProvider(
 ): ObservabilityProvider {
   const exporterName = options.exporter.trim().toLowerCase() || 'structured'
   const serviceName = options.serviceName.trim()
-  if (serviceName === '') throw new Error('create trace provider: service name must not be empty')
+  if (serviceName === '') throw new Error('创建 trace provider 失败：服务名不能为空')
   if (options.sampleRatio <= 0 || options.sampleRatio > 1) {
-    throw new Error('create trace provider: sample ratio must be in (0, 1]')
+    throw new Error('创建 trace provider 失败：采样率必须落在 (0, 1] 内')
   }
 
   if (exporterName === 'structured') {
@@ -94,7 +94,7 @@ export function createObservabilityProvider(
   }
   if (exporterName !== 'otlp') {
     throw new Error(
-      `create trace provider: unsupported exporter ${JSON.stringify(options.exporter)}`
+      `创建 trace provider 失败：不支持的 exporter ${JSON.stringify(options.exporter)}`
     )
   }
 

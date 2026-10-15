@@ -222,16 +222,16 @@ async function beginRequestContext(
   // - `close` + `writableFinished === false`：响应还没写完连接就关了（SSE 场景里这是最常见的）。
   // 加 `writableFinished` 判断是因为正常结束也会触发 `close`，不加就会把每次正常请求都当成取消。
   const controller = new AbortController()
-  if (request.raw.aborted) controller.abort(new Error('HTTP request aborted'))
+  if (request.raw.aborted) controller.abort(new Error('HTTP 请求已中止'))
   else {
     request.raw.once('aborted', (): void => {
-      controller.abort(new Error('HTTP request aborted'))
+      controller.abort(new Error('HTTP 请求已中止'))
     })
   }
   // 连接关闭且响应未写完：视为客户端断连，中止整条链路。
   function onResponseClose(): void {
     if (!reply.raw.writableFinished) {
-      controller.abort(new Error('HTTP response disconnected'))
+      controller.abort(new Error('HTTP 响应已断开'))
     }
   }
   reply.raw.once('close', onResponseClose)

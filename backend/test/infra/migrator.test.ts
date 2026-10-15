@@ -127,7 +127,7 @@ void describe('TypeScript migrator', () => {
       const database = new MigrationDatabase()
       database.historyRows = historyRows
       const migrator = new PostgresMigrator(database)
-      await assert.rejects(migrator.status(AbortSignal.timeout(1_000)), /migration history/u)
+      await assert.rejects(migrator.status(AbortSignal.timeout(1_000)), /migration 历史/)
     }
   })
 
@@ -176,7 +176,7 @@ void describe('TypeScript migrator', () => {
 
     await assert.rejects(
       migrator.up(AbortSignal.timeout(1_000)),
-      /migration 20260608000001 up failed: migration statement failed/u
+      /migration 20260608000001 up 失败：migration statement failed/u
     )
   })
 

@@ -237,7 +237,7 @@ export function mapTaskListRow(value: unknown): AgentTaskListItem {
  */
 export function mapViewStateRow(value: unknown): ExecutionViewState {
   const parsed = viewStateRowSchema.safeParse(value)
-  if (!parsed.success) throw new Error('invalid task view-state row', { cause: parsed.error })
+  if (!parsed.success) throw new Error('任务视图状态行数据非法', { cause: parsed.error })
   return {
     executionId: parsed.data.execution_id,
     ...optionalField('seenAt', parsed.data.seen_at),

@@ -144,7 +144,7 @@ export function MarkdownCodeBlock(props: MarkdownCodeBlockProps) {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(code)
       } else if (!fallbackCopyText(code)) {
-        throw new Error('copy command failed')
+        throw new Error('复制命令失败')
       }
       setCopyState('copied')
     } catch {

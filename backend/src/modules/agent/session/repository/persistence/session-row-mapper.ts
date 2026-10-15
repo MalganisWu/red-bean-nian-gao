@@ -79,7 +79,7 @@ export interface SessionOwnerRow {
  */
 export function parseSession(value: unknown): Session {
   const parsed = sessionRowSchema.safeParse(value)
-  if (!parsed.success) throw new Error('invalid session row', { cause: parsed.error })
+  if (!parsed.success) throw new Error('会话行数据非法', { cause: parsed.error })
   const row = parsed.data
   return {
     id: row.session_id,
@@ -99,7 +99,7 @@ export function parseSession(value: unknown): Session {
  */
 export function parseSessionSummary(value: unknown): SessionSummary {
   const parsed = sessionRowSchema.safeParse(value)
-  if (!parsed.success) throw new Error('invalid session row', { cause: parsed.error })
+  if (!parsed.success) throw new Error('会话行数据非法', { cause: parsed.error })
   const messages = parsed.data.display_messages.map(toDisplayMessage)
   return {
     id: parsed.data.session_id,
@@ -117,7 +117,7 @@ export function parseSessionSummary(value: unknown): SessionSummary {
  */
 export function parseSessionOwner(value: unknown): SessionOwnerRow {
   const parsed = sessionOwnerSchema.safeParse(value)
-  if (!parsed.success) throw new Error('invalid session owner row', { cause: parsed.error })
+  if (!parsed.success) throw new Error('会话归属行数据非法', { cause: parsed.error })
   return parsed.data
 }
 
@@ -129,7 +129,7 @@ export function parseSessionOwner(value: unknown): SessionOwnerRow {
  */
 export function parseRevision(value: unknown): bigint {
   const parsed = revisionSchema.safeParse(value)
-  if (!parsed.success) throw new Error('invalid session revision row', { cause: parsed.error })
+  if (!parsed.success) throw new Error('会话 revision 行数据非法', { cause: parsed.error })
   return toBigInt(parsed.data.revision, 'revision')
 }
 
@@ -141,7 +141,7 @@ export function parseRevision(value: unknown): bigint {
  */
 export function parseFencingToken(value: unknown): bigint {
   const parsed = tokenSchema.safeParse(value)
-  if (!parsed.success) throw new Error('invalid session fencing token row', { cause: parsed.error })
+  if (!parsed.success) throw new Error('会话 fencing token 行数据非法', { cause: parsed.error })
   return toBigInt(parsed.data.token, 'fencing token')
 }
 
@@ -157,10 +157,10 @@ export function parseFencingToken(value: unknown): bigint {
 export function toBigInt(value: string | number | bigint, name: string): bigint {
   try {
     const parsed = BigInt(value)
-    if (parsed < 0n) throw new Error(`${name} must not be negative`)
+    if (parsed < 0n) throw new Error(`${name} 不能为负数`)
     return parsed
   } catch (cause: unknown) {
-    throw new Error(`invalid ${name}`, { cause })
+    throw new Error(`${name} 非法`, { cause })
   }
 }
 

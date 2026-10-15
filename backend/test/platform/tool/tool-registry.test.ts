@@ -124,34 +124,34 @@ void describe('TypeScript tool registry', () => {
   })
 
   void it('rejects invalid startup composition', () => {
-    assert.throws(() => new ToolRegistry([]), /at least one tool is required/)
-    assert.throws(() => new ToolRegistry([null]), /plugin at index 0 must not be null/)
-    assert.throws(() => new ToolRegistry([plugin(' ', (): void => {})]), /name must not be empty/)
+    assert.throws(() => new ToolRegistry([]), /至少需要一个工具/)
+    assert.throws(() => new ToolRegistry([null]), /插件不能为 null/)
+    assert.throws(() => new ToolRegistry([plugin(' ', (): void => {})]), /名字不能为空/)
     assert.throws(
       () =>
         new ToolRegistry([
           provide('valid', new FakeTool('tool_a')),
           provide(' VALID ', new FakeTool('tool_b')),
         ]),
-      /duplicate tool provider plugin/
+      /工具 provider 插件重复/
     )
     assert.throws(
       () =>
         new ToolRegistry([plugin('missing-tool', (registrar): void => registrar.provide(null))]),
-      /tool must not be null/
+      /工具不能为 null/
     )
     assert.throws(
       () => new ToolRegistry([provide('empty-tool', new FakeTool(''))]),
-      /tool name must not be empty/
+      /工具名不能为空/
     )
     assert.throws(
       () => new ToolRegistry([provide('whitespace-tool', new FakeTool(' tool_a '))]),
-      /must not contain surrounding whitespace/
+      /首尾不能有空白/
     )
     assert.throws(
       () =>
         new ToolRegistry([provide('mismatch', new FakeTool('tool_a', { schemaName: 'tool_b' }))]),
-      /does not match schema function name/
+      /与 schema 函数名 .* 不一致/
     )
     assert.throws(
       () =>
@@ -159,7 +159,7 @@ void describe('TypeScript tool registry', () => {
           provide('first', new FakeTool('tool_a')),
           provide('second', new FakeTool('tool_a')),
         ]),
-      /already registered/
+      /已注册/
     )
     assert.throws(
       () =>
@@ -168,7 +168,7 @@ void describe('TypeScript tool registry', () => {
             throw new Error('registration failed')
           }),
         ]),
-      /register tool provider plugin "broken": registration failed/
+      /注册工具 provider 插件 "broken" 失败：registration failed/
     )
   })
 
@@ -183,6 +183,6 @@ void describe('TypeScript tool registry', () => {
     assert.ok(registry)
     if (captured === undefined) throw new Error('registrar was not captured')
     const sealedRegistrar = captured
-    assert.throws(() => sealedRegistrar.provide(new FakeTool('late_tool')), /registry is sealed/)
+    assert.throws(() => sealedRegistrar.provide(new FakeTool('late_tool')), /注册表已封存/)
   })
 })

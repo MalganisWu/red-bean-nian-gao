@@ -245,7 +245,7 @@ void describe('TypeScript backend configuration', () => {
 
   void it('parses compound positive durations', () => {
     assert.equal(parseDurationMilliseconds('1h30m5.5s'), 5_405_500)
-    assert.throws(() => parseDurationMilliseconds('0s'), /greater than zero/)
+    assert.throws(() => parseDurationMilliseconds('0s'), /必须大于零/)
     assert.throws(() => parseDurationMilliseconds('1 day'), /duration/)
   })
 })

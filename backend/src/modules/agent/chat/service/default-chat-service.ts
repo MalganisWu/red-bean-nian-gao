@@ -358,5 +358,5 @@ function raceWithAbort(operation: Promise<void>, signal: AbortSignal): Promise<v
  * @returns 归一化后的中止原因
  */
 function abortReason(signal: AbortSignal): Error {
-  return signal.reason instanceof Error ? signal.reason : new Error('Chat shutdown aborted')
+  return signal.reason instanceof Error ? signal.reason : new Error('对话关闭已中止')
 }

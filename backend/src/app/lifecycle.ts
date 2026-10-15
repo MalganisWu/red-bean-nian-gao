@@ -17,9 +17,9 @@ export class Lifecycle {
    */
   public onClose(handler: CloseHandler | null | undefined): void {
     if (typeof handler !== 'function') {
-      throw new Error('lifecycle close handler must be a function')
+      throw new Error('生命周期的 close 处理器必须是函数')
     }
-    if (this.#closed) throw new Error('lifecycle is already closed')
+    if (this.#closed) throw new Error('生命周期已经关闭')
     this.#handlers.push(handler)
   }
 

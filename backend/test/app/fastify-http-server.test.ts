@@ -28,7 +28,7 @@ void describe('Fastify HTTP server lifecycle adapter', () => {
     const server = fastify({ logger: false })
     assert.throws(
       () => new FastifyHttpServer(server, { host: '127.0.0.1', port: 'invalid' }),
-      /port/u
+      /端口/
     )
   })
 })

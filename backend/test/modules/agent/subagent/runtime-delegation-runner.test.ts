@@ -265,7 +265,7 @@ void describe('product Runtime child runner parity', () => {
         },
         new AbortController().signal
       ),
-      /interrupt ID does not match/u
+      /interrupt ID 与挂起的 checkpoint 不符/u
     )
     assert.equal(adapter.calls, 0)
   })

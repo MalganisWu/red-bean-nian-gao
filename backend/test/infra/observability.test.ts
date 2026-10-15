@@ -331,7 +331,7 @@ void describe('observability provider', () => {
           environment: '',
           sampleRatio: 1,
         }),
-      /unsupported exporter/u
+      /不支持的 exporter/
     )
     assert.throws(
       (): ObservabilityProvider =>
@@ -341,7 +341,7 @@ void describe('observability provider', () => {
           environment: '',
           sampleRatio: 1,
         }),
-      /service name/u
+      /服务名不能为空/u
     )
     assert.throws(
       (): ObservabilityProvider =>
@@ -351,7 +351,7 @@ void describe('observability provider', () => {
           environment: '',
           sampleRatio: 0,
         }),
-      /sample ratio/u
+      /采样率/u
     )
   })
 })

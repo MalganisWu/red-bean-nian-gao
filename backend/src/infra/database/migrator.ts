@@ -530,7 +530,7 @@ export class PostgresMigrator implements MigrationRunnerPort {
         signal
       )
     } catch (cause: unknown) {
-      throw new Error(`initialize migrations: ${normalizeError(cause).message}`, { cause })
+      throw new Error(`初始化 migration 失败：${normalizeError(cause).message}`, { cause })
     }
   }
 
@@ -664,7 +664,7 @@ export class PostgresMigrator implements MigrationRunnerPort {
       )
       rows = result.rows
     } catch (cause: unknown) {
-      throw new Error(`read migration history: ${normalizeError(cause).message}`, { cause })
+      throw new Error(`读取 migration 历史失败：${normalizeError(cause).message}`, { cause })
     }
     const applied = rows.map(parseHistoryRow)
     validateHistory(applied, this.#migrations)
@@ -703,11 +703,11 @@ function validateCatalog(migrations: readonly Migration[]): readonly Migration[]
   const names = new Set<string>()
   let previous = ''
   for (const item of migrations) {
-    if (!/^\d{14}$/u.test(item.name)) throw new Error(`invalid migration name: ${item.name}`)
-    if (names.has(item.name)) throw new Error(`duplicate migration name: ${item.name}`)
-    if (previous !== '' && item.name <= previous) throw new Error('migration catalog is not sorted')
+    if (!/^\d{14}$/u.test(item.name)) throw new Error(`migration 名字非法：${item.name}`)
+    if (names.has(item.name)) throw new Error(`migration 名字重复：${item.name}`)
+    if (previous !== '' && item.name <= previous) throw new Error('migration 目录未按序排列')
     if (item.up.length === 0 || item.down.length === 0) {
-      throw new Error(`migration ${item.name} must define up and down statements`)
+      throw new Error(`migration ${item.name} 必须同时定义 up 与 down 语句`)
     }
     names.add(item.name)
     previous = item.name
@@ -747,7 +747,7 @@ function toMigrationStatus(
  */
 function parseHistoryRow(row: unknown): AppliedMigration {
   const parsed = historyRowSchema.safeParse(row)
-  if (!parsed.success) throw new Error('invalid migration history row', { cause: parsed.error })
+  if (!parsed.success) throw new Error('migration 历史行数据非法', { cause: parsed.error })
   return {
     id: parsed.data.id,
     name: parsed.data.name,
@@ -770,12 +770,12 @@ function validateHistory(
 ): void {
   const seen = new Set<string>()
   for (const [index, item] of applied.entries()) {
-    if (seen.has(item.name)) throw new Error(`invalid migration history: duplicate ${item.name}`)
+    if (seen.has(item.name)) throw new Error(`migration 历史非法：${item.name} 重复`)
     const expected = migrations[index]
-    if (expected === undefined) throw new Error(`invalid migration history: unknown ${item.name}`)
+    if (expected === undefined) throw new Error(`migration 历史非法：${item.name} 不存在`)
     if (item.name !== expected.name) {
       throw new Error(
-        `invalid migration history: expected ${expected.name} at position ${String(index + 1)}, got ${item.name}`
+        `migration 历史非法：第 ${String(index + 1)} 位应为 ${expected.name}，实际是 ${item.name}`
       )
     }
     seen.add(item.name)
@@ -814,7 +814,7 @@ async function runMigrationStatements(
     for (const statement of statements) await executor.query(statement, [], signal)
   } catch (cause: unknown) {
     throw new Error(
-      `migration ${migrationItem.name} ${direction} failed: ${normalizeError(cause).message}`,
+      `migration ${migrationItem.name} ${direction} 失败：${normalizeError(cause).message}`,
       { cause }
     )
   }

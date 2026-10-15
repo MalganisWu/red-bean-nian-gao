@@ -53,24 +53,22 @@ class StartupRegistrar implements ToolRegistrar {
    *   名字与 `schema.function.name` 不一致、重名都会抛错
    */
   public provide(tool: Tool | null | undefined): void {
-    if (this.#sealed) throw new Error('tool registry is sealed')
+    if (this.#sealed) throw new Error('工具注册表已封存')
     if (tool === null || tool === undefined) {
-      throw new TypeError('tool must not be null')
+      throw new TypeError('工具不能为 null')
     }
     const name = tool.name.trim()
-    if (name === '') throw new Error('tool name must not be empty')
+    if (name === '') throw new Error('工具名不能为空')
     if (name !== tool.name) {
-      throw new Error(
-        `tool name ${JSON.stringify(tool.name)} must not contain surrounding whitespace`
-      )
+      throw new Error(`工具名 ${JSON.stringify(tool.name)} 首尾不能有空白`)
     }
     if (tool.schema.function.name !== name) {
       throw new Error(
-        `tool name ${JSON.stringify(name)} does not match schema function name ${JSON.stringify(tool.schema.function.name)}`
+        `工具名 ${JSON.stringify(name)} 与 schema 函数名 ${JSON.stringify(tool.schema.function.name)} 不一致`
       )
     }
     if (this.#tools.has(name)) {
-      throw new Error(`tool ${JSON.stringify(name)} already registered`)
+      throw new Error(`工具 ${JSON.stringify(name)} 已注册`)
     }
     this.#tools.set(name, tool)
   }
@@ -146,24 +144,23 @@ export class ToolRegistry {
     try {
       for (const [index, plugin] of plugins.entries()) {
         if (plugin === null || plugin === undefined) {
-          throw new TypeError(`tool provider plugin at index ${index} must not be null`)
+          throw new TypeError(`第 ${index} 个工具 provider 插件不能为 null`)
         }
         const name = plugin.name.trim().toLowerCase()
         if (name === '') {
-          throw new Error(`tool provider plugin at index ${index} name must not be empty`)
+          throw new Error(`第 ${index} 个工具 provider 插件的名字不能为空`)
         }
         if (names.has(name)) {
-          throw new Error(`duplicate tool provider plugin ${JSON.stringify(name)}`)
+          throw new Error(`工具 provider 插件重复：${JSON.stringify(name)}`)
         }
         names.add(name)
         try {
           plugin.register(registrar)
         } catch (cause: unknown) {
           const error = normalizeError(cause)
-          throw new Error(
-            `register tool provider plugin ${JSON.stringify(name)}: ${error.message}`,
-            { cause }
-          )
+          throw new Error(`注册工具 provider 插件 ${JSON.stringify(name)} 失败：${error.message}`, {
+            cause,
+          })
         }
       }
     } finally {
@@ -171,7 +168,7 @@ export class ToolRegistry {
     }
 
     this.#tools = registrar.snapshot()
-    if (this.#tools.size === 0) throw new Error('at least one tool is required')
+    if (this.#tools.size === 0) throw new Error('至少需要一个工具')
   }
 
   /**

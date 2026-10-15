@@ -245,7 +245,7 @@ export class PostgresUserRepository implements UserRepository {
       const row = result.rows[0]
       if (row === undefined) return undefined
       const validation = userRowSchema.safeParse(row)
-      if (!validation.success) throw new Error('invalid users row', { cause: validation.error })
+      if (!validation.success) throw new Error('用户行数据非法', { cause: validation.error })
       return toUser(validation.data)
     } catch (cause: unknown) {
       throw contextualError(errorContext, cause)
@@ -265,7 +265,7 @@ export class PostgresUserRepository implements UserRepository {
 function parseUserListRow(row: unknown): z.infer<typeof userListRowSchema> {
   const validation = userListRowSchema.safeParse(row)
   if (!validation.success) {
-    throw new Error('invalid users row', { cause: validation.error })
+    throw new Error('用户行数据非法', { cause: validation.error })
   }
   return validation.data
 }
@@ -318,5 +318,5 @@ function toUser(row: z.infer<typeof userRowSchema>): User {
  */
 function contextualError(context: string, cause: unknown): Error {
   const error = cause instanceof Error ? cause : new Error(String(cause))
-  return new Error(`${context}: ${error.message}`, { cause })
+  return new Error(`${context}：${error.message}`, { cause })
 }

@@ -28,9 +28,6 @@ void describe('product builtin provider', () => {
   })
 
   void it('rejects missing dependencies during startup composition', () => {
-    assert.throws(
-      () => new ToolRegistry([productBuiltinProvider(null)]),
-      /product tools must not be null/u
-    )
+    assert.throws(() => new ToolRegistry([productBuiltinProvider(null)]), /产品工具不能为 null/u)
   })
 })

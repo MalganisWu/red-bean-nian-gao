@@ -272,7 +272,7 @@ export class RedisCancelRegistry implements CancelRegistryPort {
  */
 function positiveMilliseconds(value: number, name: string): number {
   if (!Number.isSafeInteger(value) || value <= 0) {
-    throw new RangeError(`${name} must be a positive safe integer`)
+    throw new RangeError(`${name} 必须是正安全整数`)
   }
   return value
 }

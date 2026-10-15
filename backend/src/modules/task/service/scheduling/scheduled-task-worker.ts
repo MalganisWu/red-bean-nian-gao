@@ -38,7 +38,7 @@ export class ScheduledTaskWorker {
    * @param parent - 父级停止信号，与内部停止信号合并后一并中断循环。
    */
   public async start(parent: AbortSignal): Promise<void> {
-    if (this.#started) throw new Error('scheduled task worker already started')
+    if (this.#started) throw new Error('定时任务 worker 已经启动')
     this.#started = true
     const signal = AbortSignal.any([parent, this.#stopController.signal])
     this.#logger.info('scheduled task worker started', {
@@ -59,7 +59,7 @@ export class ScheduledTaskWorker {
     } finally {
       await this.#scheduler.waitForIdle()
       this.#logger.info(
-        parent.aborted ? 'scheduled task worker context cancelled' : 'scheduled task worker stopped'
+        parent.aborted ? 'scheduled task worker context cancelled' : '定时任务 worker 已停止'
       )
     }
   }
@@ -68,7 +68,7 @@ export class ScheduledTaskWorker {
    * 停止扫描循环并等待在途 worker 排空；abort 幂等，可重复调用。
    */
   public async stop(): Promise<void> {
-    this.#stopController.abort(new Error('scheduled task worker stopped'))
+    this.#stopController.abort(new Error('定时任务 worker 已停止'))
     await this.#scheduler.waitForIdle()
   }
 }

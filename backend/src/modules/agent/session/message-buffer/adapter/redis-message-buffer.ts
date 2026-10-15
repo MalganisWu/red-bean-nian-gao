@@ -114,7 +114,7 @@ export class RedisMessageBuffer implements MessageBuffer {
 
   public constructor(redis: RedisMessageBufferStore, ttlSeconds = DEFAULT_TTL_SECONDS) {
     if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds <= 0) {
-      throw new RangeError('message buffer TTL must be a positive integer')
+      throw new RangeError('消息缓冲 TTL 必须是正整数')
     }
     this.#redis = redis
     this.#ttlSeconds = ttlSeconds
@@ -361,7 +361,7 @@ function decodeMessage(value: string): AgentMessage {
  * @returns 带上下文与 cause 的错误。
  */
 function contextualError(context: string, cause: unknown): Error {
-  return new Error(`${context}: ${cause instanceof Error ? cause.message : String(cause)}`, {
+  return new Error(`${context}：${cause instanceof Error ? cause.message : String(cause)}`, {
     cause,
   })
 }

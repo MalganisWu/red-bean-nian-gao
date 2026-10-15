@@ -9,7 +9,7 @@ const abortController = new AbortController()
 
 /** SIGINT/SIGTERM 的中止回调：带原因中止信号，让进行中的迁移能读到中断原因并干净退出。 */
 function abort(): void {
-  abortController.abort(new Error('migration interrupted'))
+  abortController.abort(new Error('migration 已中断'))
 }
 
 process.once('SIGINT', abort)

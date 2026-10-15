@@ -38,14 +38,14 @@ export class TimestampIdGenerator implements IdGenerator {
   public generate(prefix: string): string {
     const timestamp = this.#clock()
     if (!Number.isSafeInteger(timestamp) || timestamp < 0) {
-      throw new Error('ID timestamp must be a non-negative safe integer')
+      throw new Error('ID 时间戳必须是非负安全整数')
     }
     const bytes = this.#randomBytes(SUFFIX_LENGTH)
-    if (bytes.length !== SUFFIX_LENGTH) throw new Error('ID random source returned invalid length')
+    if (bytes.length !== SUFFIX_LENGTH) throw new Error('ID 随机源返回了非法长度')
     let suffix = ''
     for (const byte of bytes) {
       const character = ALPHABET.at(byte % ALPHABET.length)
-      if (character === undefined) throw new Error('ID alphabet lookup failed')
+      if (character === undefined) throw new Error('ID 字母表查找失败')
       suffix += character
     }
     return `${prefix}_${String(timestamp)}${suffix}`

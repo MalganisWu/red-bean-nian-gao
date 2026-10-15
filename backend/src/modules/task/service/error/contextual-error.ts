@@ -7,5 +7,5 @@
  */
 export function contextualError(context: string, cause: unknown): Error {
   const error = cause instanceof Error ? cause : new Error(String(cause))
-  return new Error(`${context}: ${error.message}`, { cause })
+  return new Error(`${context}：${error.message}`, { cause })
 }

@@ -116,7 +116,7 @@ export class RedisSessionLockRegistry implements SessionLockRegistry {
     } catch (cause: unknown) {
       throw new Error(`生成 fencing token 失败: ${normalizeError(cause).message}`, { cause })
     }
-    if (fencingToken <= 0n) throw new Error('fencing token must be greater than zero')
+    if (fencingToken <= 0n) throw new Error('fencing token 必须大于零')
     const key = `session_lock:${sessionId}`
     const owner = `${requestId}:${String(fencingToken)}:${this.#nonce()}`
     let acquired: boolean
@@ -323,7 +323,7 @@ function deferredError(): DeferredError {
   const promise = new Promise<Error>((resolve) => {
     resolvePromise = resolve
   })
-  if (resolvePromise === undefined) throw new Error('failed to initialize lease loss promise')
+  if (resolvePromise === undefined) throw new Error('初始化 lease 丢失 promise 失败')
   return { promise, resolve: resolvePromise }
 }
 
@@ -347,7 +347,7 @@ function nextFallbackFencingToken(): Promise<bigint> {
  */
 function positiveMilliseconds(value: number, name: string): number {
   if (!Number.isSafeInteger(value) || value <= 0) {
-    throw new RangeError(`${name} must be a positive safe integer`)
+    throw new RangeError(`${name} 必须是正安全整数`)
   }
   return value
 }

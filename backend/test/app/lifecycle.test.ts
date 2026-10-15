@@ -44,8 +44,8 @@ void describe('TypeScript backend lifecycle', () => {
 
   void it('rejects invalid and late registration', async () => {
     const lifecycle = new Lifecycle()
-    assert.throws(() => lifecycle.onClose(null), /must be a function/)
+    assert.throws(() => lifecycle.onClose(null), /必须是函数/)
     await lifecycle.close(new AbortController().signal)
-    assert.throws(() => lifecycle.onClose((): Promise<void> => Promise.resolve()), /closed/)
+    assert.throws(() => lifecycle.onClose((): Promise<void> => Promise.resolve()), /已经关闭/)
   })
 })

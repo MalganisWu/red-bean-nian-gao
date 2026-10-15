@@ -64,15 +64,12 @@ void describe('TypeScript LLM provider registry', () => {
   })
 
   void it('rejects invalid startup composition', () => {
-    assert.throws(() => new LlmProviderRegistry([]), /at least one LLM provider/)
-    assert.throws(() => new LlmProviderRegistry([null]), /plugin at index 0 must not be null/)
-    assert.throws(
-      () => new LlmProviderRegistry([plugin(' ', (): void => {})]),
-      /name must not be empty/
-    )
+    assert.throws(() => new LlmProviderRegistry([]), /至少需要一个 LLM provider/)
+    assert.throws(() => new LlmProviderRegistry([null]), /插件不能为 null/)
+    assert.throws(() => new LlmProviderRegistry([plugin(' ', (): void => {})]), /名字不能为空/)
     assert.throws(
       () => new LlmProviderRegistry([validPlugin('valid'), validPlugin(' VALID ')]),
-      /duplicate LLM provider plugin/
+      /LLM provider 插件重复/
     )
     assert.throws(
       () =>
@@ -81,7 +78,7 @@ void describe('TypeScript LLM provider registry', () => {
             registrar.provide(' ', (): LlmAdapter => new FakeAdapter())
           }),
         ]),
-      /provider name must not be empty/
+      /LLM provider 名不能为空/
     )
     assert.throws(
       () =>
@@ -90,7 +87,7 @@ void describe('TypeScript LLM provider registry', () => {
             registrar.provide('openai', null)
           }),
         ]),
-      /factory must be a function/
+      /工厂必须是函数/
     )
     assert.throws(
       () =>
@@ -100,7 +97,7 @@ void describe('TypeScript LLM provider registry', () => {
             registrar.provide(' OPENAI ', (): LlmAdapter => new FakeAdapter())
           }),
         ]),
-      /already registered/
+      /已注册/
     )
     assert.throws(
       () =>
@@ -109,22 +106,22 @@ void describe('TypeScript LLM provider registry', () => {
             throw new Error('registration failed')
           }),
         ]),
-      /register LLM provider plugin "broken": registration failed/
+      /注册 LLM provider 插件 "broken" 失败：registration failed/
     )
   })
 
   void it('rejects empty, unknown, and invalid provider results', () => {
     const registry = new LlmProviderRegistry([validPlugin()])
     const factory = registry.adapterFactory()
-    assert.throws(() => factory(' ', '', '', ''), /provider name must not be empty/)
-    assert.throws(() => factory('anthropic', '', '', ''), /unsupported LLM provider "anthropic"/)
+    assert.throws(() => factory(' ', '', '', ''), /LLM provider 名不能为空/)
+    assert.throws(() => factory('anthropic', '', '', ''), /不支持的 LLM provider/)
 
     const invalid = new LlmProviderRegistry([
       plugin('invalid-result', (registrar): void => {
         registrar.provide('invalid', (): null => null)
       }),
     ])
-    assert.throws(() => invalid.adapterFactory()('invalid', '', '', ''), /returned no adapter/)
+    assert.throws(() => invalid.adapterFactory()('invalid', '', '', ''), /没有返回 adapter/)
   })
 
   void it('seals registration after startup', () => {
@@ -140,7 +137,7 @@ void describe('TypeScript LLM provider registry', () => {
     const sealedRegistrar = captured
     assert.throws(
       () => sealedRegistrar.provide('late', (): LlmAdapter => new FakeAdapter()),
-      /registry is sealed/
+      /注册表已封存/
     )
   })
 })

@@ -12,7 +12,7 @@ const processController = new AbortController()
  */
 function stop(signalName: string): void {
   if (!processController.signal.aborted) {
-    processController.abort(new Error(`received ${signalName}`))
+    processController.abort(new Error(`收到信号 ${signalName}`))
   }
 }
 

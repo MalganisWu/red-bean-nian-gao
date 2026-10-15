@@ -33,7 +33,7 @@ export class HealthService implements HealthServicePort {
     timeoutMilliseconds = 1_000
   ) {
     if (!Number.isFinite(timeoutMilliseconds) || timeoutMilliseconds <= 0) {
-      throw new Error('readiness timeout must be greater than zero')
+      throw new Error('就绪探针超时必须大于零')
     }
     this.#checks = checks
     this.#version = Object.freeze({ ...version })
@@ -135,8 +135,8 @@ async function runWithTimeout(
   ): void {
     // 探针超时：先中止 controller（探针自己也要能感知），再让竞速失败。
     function onTimeout(): void {
-      controller.abort(new Error('readiness check timed out'))
-      reject(new Error('readiness check timed out'))
+      controller.abort(new Error('就绪探针超时'))
+      reject(new Error('就绪探针超时'))
     }
 
     timeout = setTimeout(onTimeout, timeoutMilliseconds)
@@ -172,5 +172,5 @@ async function runWithTimeout(
  * @returns 归一为 Error 的中止原因，供上层归一为 error 状态。
  */
 function abortReason(signal: AbortSignal): Error {
-  return signal.reason instanceof Error ? signal.reason : new Error('readiness check aborted')
+  return signal.reason instanceof Error ? signal.reason : new Error('就绪探针已中止')
 }

@@ -26,7 +26,7 @@ export function runtimeBuiltinProvider(hostTools: readonly Tool[] = []): ToolPro
       for (const id of CATALOG_TOOL_IDS) {
         const tool = lookupBuiltinTool(id)
         if (tool === undefined) {
-          throw new Error(`runtime builtin ${JSON.stringify(id)} is unavailable`)
+          throw new Error(`Runtime 内置工具 ${JSON.stringify(id)} 不可用`)
         }
         registrar.provide(tool)
       }
@@ -35,10 +35,9 @@ export function runtimeBuiltinProvider(hostTools: readonly Tool[] = []): ToolPro
           registrar.provide(tool)
         } catch (cause: unknown) {
           const error = cause instanceof Error ? cause : new Error(String(cause))
-          throw new Error(
-            `provide host-selected Runtime tool at index ${index}: ${error.message}`,
-            { cause }
-          )
+          throw new Error(`提供第 ${index} 个宿主选定的 Runtime 工具失败：${error.message}`, {
+            cause,
+          })
         }
       }
     },

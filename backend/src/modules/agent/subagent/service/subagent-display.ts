@@ -324,6 +324,6 @@ function cloneJson(value: AgentJsonValue): AgentJsonValue {
  */
 function cloneJsonObject(value: AgentJsonObject): AgentJsonObject {
   const clone = cloneJson(value)
-  if (!isJsonObject(clone)) throw new Error('JSON object clone unexpectedly changed shape')
+  if (!isJsonObject(clone)) throw new Error('JSON 对象克隆后结构意外改变')
   return clone
 }

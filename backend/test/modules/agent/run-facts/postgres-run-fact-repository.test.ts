@@ -198,7 +198,7 @@ void describe('PostgreSQL run fact repository', () => {
 
     await assert.rejects(
       repository.create(startCommand, AbortSignal.timeout(1_000)),
-      /创建 session run 容器失败 \(RUN_1\): connection refused/u
+      /创建 session run 容器失败 \(RUN_1\)：connection refused/u
     )
   })
 })

@@ -354,7 +354,7 @@ function emptySession(sessionId: string, userId: string): Session {
 function parseCursor(cursor: string): Date | undefined {
   if (cursor === '') return undefined
   const timestamp = Date.parse(cursor)
-  if (!Number.isFinite(timestamp)) throw new Error('invalid cursor')
+  if (!Number.isFinite(timestamp)) throw new Error('cursor 非法')
   return new Date(timestamp)
 }
 
@@ -376,7 +376,7 @@ function sessionNotFound(): SessionStoreError {
  * @returns 带上下文与 cause 的错误。
  */
 function contextualError(context: string, cause: unknown): Error {
-  return new Error(`${context}: ${cause instanceof Error ? cause.message : String(cause)}`, {
+  return new Error(`${context}：${cause instanceof Error ? cause.message : String(cause)}`, {
     cause,
   })
 }

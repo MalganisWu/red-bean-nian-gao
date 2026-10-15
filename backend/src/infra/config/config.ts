@@ -343,7 +343,7 @@ export function parseDurationMilliseconds(value: string): number {
   const sign = normalized.startsWith('-') ? -1 : 1
   const unsigned =
     normalized.startsWith('-') || normalized.startsWith('+') ? normalized.slice(1) : normalized
-  if (unsigned.length === 0) throw new Error('duration is invalid')
+  if (unsigned.length === 0) throw new Error('duration 取值非法')
 
   let position = 0
   let milliseconds = 0
@@ -352,18 +352,18 @@ export function parseDurationMilliseconds(value: string): number {
     const amountText = match[1]
     const unit = match[2]
     if (match.index !== position || amountText === undefined || unit === undefined) {
-      throw new Error('duration is invalid')
+      throw new Error('duration 取值非法')
     }
     const multiplier = DURATION_UNITS[unit]
-    if (multiplier === undefined) throw new Error('duration is invalid')
+    if (multiplier === undefined) throw new Error('duration 取值非法')
     milliseconds += Number(amountText) * multiplier
     position += wholeMatch.length
   }
   if (position !== unsigned.length || !Number.isFinite(milliseconds)) {
-    throw new Error('duration is invalid')
+    throw new Error('duration 取值非法')
   }
   milliseconds *= sign
-  if (milliseconds <= 0) throw new Error('duration must be greater than zero')
+  if (milliseconds <= 0) throw new Error('duration 必须大于零')
   return milliseconds
 }
 
@@ -491,7 +491,7 @@ function record(value: unknown): UnknownRecord {
   if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
     return Object.fromEntries(Object.entries(value))
   }
-  throw new Error('configuration root must be an object')
+  throw new Error('配置根必须是对象')
 }
 
 /**
@@ -544,7 +544,7 @@ function section(root: UnknownRecord, name: string): UnknownRecord {
   const value = root[name]
   if (value === undefined || value === null) return {}
   if (typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error(`${name} must be an object`)
+    throw new Error(`${name} 必须是对象`)
   }
   return Object.fromEntries(Object.entries(value))
 }
@@ -587,7 +587,7 @@ function stringValue(
   if (value === undefined || value === null || value === '') return fallback
   if (typeof value === 'string') return value
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  throw new Error(`${environmentName} must be a string`)
+  throw new Error(`环境变量 ${environmentName} 必须是字符串`)
 }
 
 /**
@@ -609,7 +609,7 @@ function numberValue(
   const value = sourceValue(source, key, environment, environmentName)
   if (value === undefined || value === null || value === '') return fallback
   const parsed = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(parsed)) throw new Error(`${environmentName} must be a number`)
+  if (!Number.isFinite(parsed)) throw new Error(`环境变量 ${environmentName} 必须是数字`)
   return parsed
 }
 
@@ -634,7 +634,7 @@ function booleanValue(
   if (typeof value === 'boolean') return value
   if (value === 'true' || value === '1' || value === 1) return true
   if (value === 'false' || value === '0' || value === 0) return false
-  throw new Error(`${environmentName} must be a boolean`)
+  throw new Error(`环境变量 ${environmentName} 必须是布尔值`)
 }
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'

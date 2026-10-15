@@ -103,7 +103,7 @@ void describe('PostgreSQL user repository', () => {
 
     await assert.rejects(
       repository.getById('USER_1', AbortSignal.timeout(1_000)),
-      /查询用户失败 \(id=USER_1\): invalid users row/u
+      /查询用户失败 \(id=USER_1\)：用户行数据非法/u
     )
   })
 
@@ -161,7 +161,7 @@ void describe('PostgreSQL user repository', () => {
       repository.getByEmail('alice@example.com', AbortSignal.timeout(1_000)),
       (error: unknown): boolean => {
         assert.ok(error instanceof Error)
-        assert.equal(error.message, '查询用户失败 (email=alice@example.com): connection lost')
+        assert.equal(error.message, '查询用户失败 (email=alice@example.com)：connection lost')
         assert.equal(error.cause, database.error)
         return true
       }

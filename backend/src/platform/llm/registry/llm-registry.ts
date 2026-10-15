@@ -50,14 +50,14 @@ class StartupRegistrar implements LlmProviderRegistrar {
    * @param factory - 造 adapter 的工厂；不是函数即抛错
    */
   public provide(rawName: string, factory: LlmProviderFactory | null | undefined): void {
-    if (this.#sealed) throw new Error('LLM provider registry is sealed')
+    if (this.#sealed) throw new Error('LLM provider 注册表已封存')
     const name = normalizeName(rawName)
-    if (name === '') throw new Error('LLM provider name must not be empty')
+    if (name === '') throw new Error('LLM provider 名不能为空')
     if (typeof factory !== 'function') {
-      throw new TypeError('LLM provider factory must be a function')
+      throw new TypeError('LLM provider 工厂必须是函数')
     }
     if (this.#providers.has(name)) {
-      throw new Error(`LLM provider ${JSON.stringify(name)} already registered`)
+      throw new Error(`LLM provider ${JSON.stringify(name)} 已注册`)
     }
     this.#providers.set(name, factory)
   }
@@ -87,24 +87,23 @@ export class LlmProviderRegistry {
     try {
       for (const [index, plugin] of plugins.entries()) {
         if (plugin === null || plugin === undefined) {
-          throw new TypeError(`LLM provider plugin at index ${index} must not be null`)
+          throw new TypeError(`第 ${index} 个 LLM provider 插件不能为 null`)
         }
         const name = normalizeName(plugin.name)
         if (name === '') {
-          throw new Error(`LLM provider plugin at index ${index} name must not be empty`)
+          throw new Error(`第 ${index} 个 LLM provider 插件的名字不能为空`)
         }
         if (names.has(name)) {
-          throw new Error(`duplicate LLM provider plugin ${JSON.stringify(name)}`)
+          throw new Error(`LLM provider 插件重复：${JSON.stringify(name)}`)
         }
         names.add(name)
         try {
           plugin.register(registrar)
         } catch (cause: unknown) {
           const error = normalizeError(cause)
-          throw new Error(
-            `register LLM provider plugin ${JSON.stringify(name)}: ${error.message}`,
-            { cause }
-          )
+          throw new Error(`注册 LLM provider 插件 ${JSON.stringify(name)} 失败：${error.message}`, {
+            cause,
+          })
         }
       }
     } finally {
@@ -113,7 +112,7 @@ export class LlmProviderRegistry {
 
     this.#providers = registrar.snapshot()
     if (this.#providers.size === 0) {
-      throw new Error('at least one LLM provider is required')
+      throw new Error('至少需要一个 LLM provider')
     }
   }
 
@@ -135,11 +134,11 @@ export class LlmProviderRegistry {
     ): LlmAdapter => {
       const provider = normalizeName(rawProvider)
       if (provider === '') {
-        throw new Error('LLM provider name must not be empty')
+        throw new Error('LLM provider 名不能为空')
       }
       const factory = this.#providers.get(provider)
       if (factory === undefined) {
-        throw new Error(`unsupported LLM provider ${JSON.stringify(provider)}`)
+        throw new Error(`不支持的 LLM provider：${JSON.stringify(provider)}`)
       }
 
       let adapter: LlmAdapter | null | undefined
@@ -148,12 +147,12 @@ export class LlmProviderRegistry {
       } catch (cause: unknown) {
         const error = normalizeError(cause)
         throw new Error(
-          `create LLM adapter for provider ${JSON.stringify(provider)}: ${error.message}`,
+          `为 provider ${JSON.stringify(provider)} 创建 LLM adapter 失败：${error.message}`,
           { cause }
         )
       }
       if (adapter === null || adapter === undefined) {
-        throw new Error(`LLM provider ${JSON.stringify(provider)} returned no adapter`)
+        throw new Error(`LLM provider ${JSON.stringify(provider)} 没有返回 adapter`)
       }
       return adapter
     }

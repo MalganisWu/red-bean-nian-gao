@@ -35,7 +35,7 @@ export class FastifyHttpServer implements HttpServer {
 
   public constructor(server: FastifyInstance, options: FastifyHttpServerOptions) {
     const port = numericPort(options.port)
-    if (options.host.trim() === '') throw new Error('HTTP host must not be empty')
+    if (options.host.trim() === '') throw new Error('HTTP host 不能为空')
     this.#server = server
     this.#host = options.host
     this.#port = port
@@ -55,7 +55,7 @@ export class FastifyHttpServer implements HttpServer {
    * 「服务自己挂掉」就永远不会被观察到。等 `onClose` 钩子兑现，才等价于「一直服务到关闭」。
    */
   public async listen(): Promise<void> {
-    if (this.#started) throw new Error('HTTP server is already started')
+    if (this.#started) throw new Error('HTTP 服务已经启动')
     this.#started = true
     await this.#server.listen({ host: this.#host, port: this.#port })
     await this.#closed.promise
@@ -104,7 +104,7 @@ export class FastifyHttpServer implements HttpServer {
 function numericPort(value: string | number): number {
   const port = typeof value === 'number' ? value : Number(value)
   if (!Number.isSafeInteger(port) || port < 0 || port > 65_535) {
-    throw new Error('HTTP port must be an integer between 0 and 65535')
+    throw new Error('HTTP 端口必须是 0 到 65535 之间的整数')
   }
   return port
 }
@@ -142,7 +142,7 @@ function raceWithAbort(operation: Promise<void>, signal: AbortSignal): Promise<v
  * @returns 可直接抛出的 Error 实例
  */
 function abortReason(signal: AbortSignal): Error {
-  return signal.reason instanceof Error ? signal.reason : new Error('HTTP shutdown aborted')
+  return signal.reason instanceof Error ? signal.reason : new Error('HTTP 关闭已中止')
 }
 
 /**
@@ -153,7 +153,7 @@ function abortReason(signal: AbortSignal): Error {
  */
 function deferred(): Deferred {
   let resolve = (): void => {
-    throw new Error('deferred promise resolved before initialization')
+    throw new Error('deferred promise 在初始化前就被兑现')
   }
   const promise = new Promise<void>((resolvePromise): void => {
     resolve = resolvePromise

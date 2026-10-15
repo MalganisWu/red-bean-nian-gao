@@ -199,7 +199,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * @returns 带上下文消息与 cause 链的新错误
  */
 function contextualError(context: string, cause: unknown): Error {
-  return new Error(`${context}: ${cause instanceof Error ? cause.message : String(cause)}`, {
+  return new Error(`${context}：${cause instanceof Error ? cause.message : String(cause)}`, {
     cause,
   })
 }

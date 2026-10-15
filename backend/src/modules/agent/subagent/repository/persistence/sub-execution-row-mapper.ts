@@ -114,7 +114,7 @@ export function subExecutionValues(record: SubExecutionRecord): readonly unknown
  */
 export function mapSubExecutionRow(value: unknown): SubExecutionRecord {
   const parsed = subExecutionRowSchema.safeParse(value)
-  if (!parsed.success) throw new Error('invalid sub execution row', { cause: parsed.error })
+  if (!parsed.success) throw new Error('子执行行数据非法', { cause: parsed.error })
   const row = parsed.data
   return {
     executionId: row.execution_id,

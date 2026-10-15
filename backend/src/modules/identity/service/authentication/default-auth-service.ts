@@ -72,7 +72,7 @@ export class BcryptPasswordHasher implements PasswordHasher {
   readonly #cost: number
 
   public constructor(cost: number = DEFAULT_BCRYPT_COST) {
-    if (!Number.isSafeInteger(cost) || cost <= 0) throw new Error('bcrypt cost must be positive')
+    if (!Number.isSafeInteger(cost) || cost <= 0) throw new Error('bcrypt cost 必须为正')
     this.#cost = cost
   }
 
@@ -85,7 +85,7 @@ export class BcryptPasswordHasher implements PasswordHasher {
    * @returns bcrypt 散列串，已含盐与成本参数，可直接入库
    */
   public async hash(password: string): Promise<string> {
-    if (password === '') throw new Error('password cannot be empty')
+    if (password === '') throw new Error('密码不能为空')
     try {
       return await bcrypt.hash(password, this.#cost)
     } catch (cause: unknown) {
@@ -104,7 +104,7 @@ export class BcryptPasswordHasher implements PasswordHasher {
   public async verify(hashedPassword: string, plainPassword: string): Promise<void> {
     try {
       if (!(await bcrypt.compare(plainPassword, hashedPassword))) {
-        throw new Error('password mismatch')
+        throw new Error('密码不匹配')
       }
     } catch (cause: unknown) {
       throw new Error(`密码验证失败: ${normalizeError(cause).message}`, { cause })
@@ -131,7 +131,7 @@ export class JwtAuthService implements AuthServicePort {
   readonly #now: () => Date
 
   public constructor(options: JwtAuthServiceOptions) {
-    if (options.secret === '') throw new Error('JWT secret must not be empty')
+    if (options.secret === '') throw new Error('JWT secret 不能为空')
     this.#userRepository = options.userRepository
     this.#passwordHasher = options.passwordHasher
     this.#secret = new TextEncoder().encode(options.secret)
@@ -163,7 +163,7 @@ export class JwtAuthService implements AuthServicePort {
     try {
       user = await this.#userRepository.getByUsername(username, signal)
     } catch (cause: unknown) {
-      throw new Error(`failed to get user: ${normalizeError(cause).message}`, { cause })
+      throw new Error(`查询用户失败：${normalizeError(cause).message}`, { cause })
     }
     if (user === undefined) throw invalidCredentials()
     try {
@@ -250,7 +250,7 @@ export class JwtAuthService implements AuthServicePort {
     try {
       user = await this.#userRepository.getById(claims.user_id, signal)
     } catch (cause: unknown) {
-      throw new Error(`failed to refresh user: ${normalizeError(cause).message}`, { cause })
+      throw new Error(`刷新用户失败：${normalizeError(cause).message}`, { cause })
     }
     if (user === undefined || !user.isActive) {
       throw new AuthError(AUTH_ERROR_CODES.INVALID_TOKEN, 'invalid token')
@@ -291,7 +291,7 @@ export class JwtAuthService implements AuthServicePort {
  */
 function parseClaims(value: unknown): TokenClaims {
   const parsed = claimsSchema.safeParse(value)
-  if (!parsed.success) throw new Error('invalid token claims')
+  if (!parsed.success) throw new Error('token claims 非法')
   return parsed.data
 }
 

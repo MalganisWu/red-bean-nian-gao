@@ -503,7 +503,7 @@ export class RedisConnection implements RedisStore {
     signal.throwIfAborted()
     const response = await this.#driver.ping()
     signal.throwIfAborted()
-    if (response !== 'PONG') throw new Error(`redis ping returned ${JSON.stringify(response)}`)
+    if (response !== 'PONG') throw new Error(`Redis ping 返回了 ${JSON.stringify(response)}`)
   }
 
   /**
@@ -526,10 +526,10 @@ export class RedisConnection implements RedisStore {
    */
   public async listRange(key: string, signal: AbortSignal): Promise<readonly string[]> {
     const result = await this.#evaluate(LIST_RANGE_SCRIPT, [key], [], signal)
-    if (!Array.isArray(result)) throw new Error('redis list range returned an invalid value')
+    if (!Array.isArray(result)) throw new Error('Redis 列表范围返回了非法值')
     const values: string[] = []
     for (const item of result) {
-      if (typeof item !== 'string') throw new Error('redis list range returned an invalid value')
+      if (typeof item !== 'string') throw new Error('Redis 列表范围返回了非法值')
       values.push(item)
     }
     return values
@@ -553,7 +553,7 @@ export class RedisConnection implements RedisStore {
   ): Promise<string | undefined> {
     const result = await this.#evaluate(LIST_CLAIM_SCRIPT, [sourceKey, processingKey], [], signal)
     if (result === null) return undefined
-    if (typeof result !== 'string') throw new Error('redis list claim returned an invalid value')
+    if (typeof result !== 'string') throw new Error('Redis 列表认领返回了非法值')
     return result
   }
 
@@ -772,7 +772,7 @@ function validateRedisUrl(value: string): void {
 function redisInteger(value: unknown): number {
   if (typeof value === 'number' && Number.isSafeInteger(value)) return value
   if (typeof value === 'bigint') return Number(value)
-  throw new Error('invalid Redis integer response')
+  throw new Error('Redis 整数响应非法')
 }
 
 /**
@@ -784,10 +784,10 @@ function redisInteger(value: unknown): number {
  * @returns 校验通过的字符串数组；形状不对时抛错
  */
 function redisStringArray(value: unknown, operation: string): readonly string[] {
-  if (!Array.isArray(value)) throw new Error(`${operation} returned an invalid value`)
+  if (!Array.isArray(value)) throw new Error(`${operation} 返回了非法值`)
   const items: string[] = []
   for (const item of value) {
-    if (typeof item !== 'string') throw new Error(`${operation} returned an invalid value`)
+    if (typeof item !== 'string') throw new Error(`${operation} 返回了非法值`)
     items.push(item)
   }
   return items

@@ -15,7 +15,7 @@ export function productBuiltinProvider(
   return {
     name: 'product-builtins',
     register(registrar): void {
-      if (tools === null || tools === undefined) throw new Error('product tools must not be null')
+      if (tools === null || tools === undefined) throw new Error('产品工具不能为 null')
       for (const tool of tools) registrar.provide(tool)
     },
   }
