@@ -135,7 +135,7 @@ ts-lint: be-lint fe-lint ds-lint ## 对全部 TypeScript package 执行类型感
 ts-policy-check: ## 检查严格 TS 配置、ESLint 政策、package scripts 与 Make 入口
 	node ./scripts/check-typescript-policy.mjs
 
-ts-export-jsdoc-check: ## 检查四个 package 导出符号与公开成员的 JSDoc（棘轮基线，纯语法解析，不依赖构建产物）
+ts-export-jsdoc-check: ## 检查四个 package 导出符号与公开成员的 JSDoc（零容忍，纯语法解析，不依赖构建产物）
 	node ./scripts/check-export-jsdoc.mjs
 
 secrets-check: ## 检查环境文件忽略策略与高置信度密钥
