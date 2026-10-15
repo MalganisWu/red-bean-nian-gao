@@ -195,7 +195,7 @@ export interface AgentRuntimeConfig {
   readonly maxToolIterations?: number | undefined
   /** 单次工具执行的超时秒数；超时按该工具失败处理。 */
   readonly toolTimeoutSeconds?: number | undefined
-  /** 同时执行的工具调用上限；超出的调用排队等待。 */
+  /** 同时执行的工具调用上限；不提供表示不限并发，提供了但不是正整数会被拒绝。 */
   readonly maxConcurrentTools?: number | undefined
   /** 单次 LLM 调用的最大重试次数（不含首次）。 */
   readonly maxLlmRetries?: number | undefined
